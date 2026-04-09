@@ -14,6 +14,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/quorant/quorant/internal/admin"
+	"github.com/quorant/quorant/internal/ai"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/billing"
 	"github.com/quorant/quorant/internal/com"
@@ -193,6 +194,18 @@ func run() error {
 	adminService := admin.NewAdminService(adminRepo, logger)
 	adminHandler := admin.NewAdminHandler(adminService, logger)
 	admin.RegisterRoutes(mux, adminHandler, tokenValidator)
+
+	// AI module
+	contextChunkRepo := ai.NewPostgresContextChunkRepository(pool)
+	contextLakeService := ai.NewContextLakeService(contextChunkRepo, orgRepo, ai.StubEmbeddingFunc, logger)
+	policyRepo := ai.NewPostgresPolicyRepository(pool)
+	policyService := ai.NewPolicyService(policyRepo, logger)
+	aiHandler := ai.NewAIHandler(policyService, contextLakeService, orgRepo, logger)
+	ai.RegisterRoutes(mux, aiHandler, tokenValidator)
+
+	// Replace stub resolvers with real implementations (for future module injection).
+	_ = ai.NewPostgresContextRetriever(contextLakeService)
+	_ = ai.NewPostgresPolicyResolver(policyService)
 
 	// Doc module
 	s3Client, err := storage.NewS3Client(cfg.S3)
