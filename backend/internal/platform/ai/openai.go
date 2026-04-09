@@ -79,7 +79,8 @@ func (c *OpenAIClient) Complete(ctx context.Context, req CompletionRequest) (*Co
 		} `json:"choices"`
 		Model string `json:"model"`
 		Usage struct {
-			TotalTokens int `json:"total_tokens"`
+			PromptTokens     int `json:"prompt_tokens"`
+			CompletionTokens int `json:"completion_tokens"`
 		} `json:"usage"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
@@ -94,7 +95,8 @@ func (c *OpenAIClient) Complete(ctx context.Context, req CompletionRequest) (*Co
 	return &CompletionResponse{
 		Content:    content,
 		Model:      result.Model,
-		TokensUsed: result.Usage.TotalTokens,
+		InputTokens: result.Usage.PromptTokens,
+		OutputTokens: result.Usage.CompletionTokens,
 	}, nil
 }
 

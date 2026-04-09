@@ -18,11 +18,17 @@ const (
 
 // CompletionRequest represents a text generation request.
 type CompletionRequest struct {
-	Model       string    `json:"model"`
-	Messages    []Message `json:"messages"`
-	MaxTokens   int       `json:"max_tokens,omitempty"`
-	Temperature float64   `json:"temperature,omitempty"`
-	System      string    `json:"system,omitempty"` // system prompt (Anthropic-style)
+	Model          string          `json:"model"`
+	Messages       []Message       `json:"messages"`
+	MaxTokens      int             `json:"max_tokens,omitempty"`
+	Temperature    float64         `json:"temperature,omitempty"`
+	System         string          `json:"system,omitempty"`          // system prompt (Anthropic-style)
+	ResponseFormat *ResponseFormat `json:"response_format,omitempty"` // for structured JSON output
+}
+
+// ResponseFormat requests structured output from the LLM.
+type ResponseFormat struct {
+	Type string `json:"type"` // "json_object" for JSON mode
 }
 
 // Message is a single message in a conversation.
@@ -33,9 +39,10 @@ type Message struct {
 
 // CompletionResponse is the result of a text generation request.
 type CompletionResponse struct {
-	Content    string `json:"content"`
-	Model      string `json:"model"`
-	TokensUsed int    `json:"tokens_used,omitempty"`
+	Content      string `json:"content"`
+	Model        string `json:"model"`
+	InputTokens  int    `json:"input_tokens,omitempty"`
+	OutputTokens int    `json:"output_tokens,omitempty"`
 }
 
 // EmbeddingRequest represents a text embedding request.
@@ -76,7 +83,13 @@ type Config struct {
 }
 
 // NewClient creates an LLM client based on the provider configuration.
+// Returns an error if API key is missing for providers that require one.
 func NewClient(cfg Config) (Client, error) {
+	// Validate API key for cloud providers (not required for local like Ollama)
+	if cfg.APIKey == "" && cfg.BaseURL == "" {
+		return nil, fmt.Errorf("API key required for provider %q (set LLM_API_KEY or LLM_BASE_URL for local providers)", cfg.Provider)
+	}
+
 	switch cfg.Provider {
 	case ProviderAnthropic:
 		return NewAnthropicClient(cfg)

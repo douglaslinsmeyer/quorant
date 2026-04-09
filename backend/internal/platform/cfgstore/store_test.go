@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+
 	"github.com/quorant/quorant/internal/platform/cfgstore"
 	"github.com/stretchr/testify/assert"
 )
 
-// mockStore for unit testing the scope resolution logic.
 func TestScopeConstants(t *testing.T) {
 	assert.Equal(t, cfgstore.Scope("platform"), cfgstore.ScopePlatform)
 	assert.Equal(t, cfgstore.Scope("firm"), cfgstore.ScopeFirm)
@@ -34,16 +34,43 @@ func TestEntry_JSON(t *testing.T) {
 }
 
 func TestNewPostgresStore(t *testing.T) {
-	// Just verify it doesn't panic with nil pool (constructor only)
 	store := cfgstore.NewPostgresStore(nil)
 	assert.NotNil(t, store)
-
-	// Set with nil pool will fail at query time, not construction
-	err := store.Set(context.Background(), cfgstore.ScopePlatform, nil, "key", json.RawMessage(`"val"`))
-	assert.Error(t, err) // platform config not allowed via DB
-
-	id := uuid.New()
-	err = store.Delete(context.Background(), cfgstore.ScopeOrg, nil, "key")
-	assert.Error(t, err) // nil scope ID
-	_ = id
 }
+
+func TestValidation_PlatformScopeRejectsNonNilID(t *testing.T) {
+	store := cfgstore.NewPostgresStore(nil)
+	err := store.Set(context.Background(), cfgstore.ScopePlatform, ptrUUID(), "key", json.RawMessage(`"val"`))
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "platform scope must have nil scope_id")
+}
+
+func TestValidation_OrgScopeRequiresID(t *testing.T) {
+	store := cfgstore.NewPostgresStore(nil)
+	err := store.Set(context.Background(), cfgstore.ScopeOrg, nil, "key", json.RawMessage(`"val"`))
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "requires a scope_id")
+}
+
+func TestValidation_DeleteOrgScopeRequiresID(t *testing.T) {
+	store := cfgstore.NewPostgresStore(nil)
+	err := store.Delete(context.Background(), cfgstore.ScopeOrg, nil, "key")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "requires a scope_id")
+}
+
+func TestValidation_UnknownScope(t *testing.T) {
+	store := cfgstore.NewPostgresStore(nil)
+	err := store.Set(context.Background(), "invalid", nil, "key", json.RawMessage(`"val"`))
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown scope")
+}
+
+func ptrUUID() *uuid.UUID {
+	id := uuid.New()
+	return &id
+}
+
+// Note: Integration tests for Get/GetAll/Set/Delete scope resolution
+// require a running PostgreSQL with the config_entries table.
+// Those tests belong in postgres_test.go with build tag: integration.
