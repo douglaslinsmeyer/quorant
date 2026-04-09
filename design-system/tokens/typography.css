@@ -1,0 +1,96 @@
+/**
+ * Quorant Design System — Typography Tokens
+ *
+ * Imports Google Fonts (Manrope for headings, Inter for body, JetBrains Mono for code)
+ * and defines the complete type scale as CSS custom properties.
+ *
+ * Scale levels:
+ *   display, h1, h2, h3, h4, body-lg, body, body-sm, caption, overline
+ *
+ * Each level exposes:
+ *   --type-{level}-size        font size
+ *   --type-{level}-weight      font weight
+ *   --type-{level}-line-height line height
+ *   --type-{level}-font        font family reference (var(--font-*))
+ *
+ * Overline additionally exposes:
+ *   --type-overline-letter-spacing
+ *   --type-overline-text-transform
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ============================================================
+     Font Family Stacks
+     ============================================================ */
+  --font-heading: 'Manrope', 'Segoe UI', system-ui, sans-serif;
+  --font-body:    'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
+
+  /* ============================================================
+     Type Scale
+     ============================================================ */
+
+  /* Display — Hero / marketing large text */
+  --type-display-size:        3rem;       /* 48px */
+  --type-display-weight:      800;
+  --type-display-line-height: 1.1;
+  --type-display-font:        var(--font-heading);
+
+  /* H1 — Page titles */
+  --type-h1-size:        2.25rem;    /* 36px */
+  --type-h1-weight:      700;
+  --type-h1-line-height: 1.2;
+  --type-h1-font:        var(--font-heading);
+
+  /* H2 — Section headings */
+  --type-h2-size:        1.75rem;    /* 28px */
+  --type-h2-weight:      700;
+  --type-h2-line-height: 1.25;
+  --type-h2-font:        var(--font-heading);
+
+  /* H3 — Sub-section headings */
+  --type-h3-size:        1.375rem;   /* 22px */
+  --type-h3-weight:      600;
+  --type-h3-line-height: 1.3;
+  --type-h3-font:        var(--font-heading);
+
+  /* H4 — Card headings / labels */
+  --type-h4-size:        1.125rem;   /* 18px */
+  --type-h4-weight:      600;
+  --type-h4-line-height: 1.35;
+  --type-h4-font:        var(--font-heading);
+
+  /* Body Large — Introductory / lead copy */
+  --type-body-lg-size:        1.125rem;  /* 18px */
+  --type-body-lg-weight:      400;
+  --type-body-lg-line-height: 1.6;
+  --type-body-lg-font:        var(--font-body);
+
+  /* Body — Default prose */
+  --type-body-size:        1rem;      /* 16px */
+  --type-body-weight:      400;
+  --type-body-line-height: 1.6;
+  --type-body-font:        var(--font-body);
+
+  /* Body Small — Supporting / secondary text */
+  --type-body-sm-size:        0.875rem;  /* 14px */
+  --type-body-sm-weight:      400;
+  --type-body-sm-line-height: 1.5;
+  --type-body-sm-font:        var(--font-body);
+
+  /* Caption — Image captions / metadata */
+  --type-caption-size:        0.75rem;   /* 12px */
+  --type-caption-weight:      500;
+  --type-caption-line-height: 1.4;
+  --type-caption-font:        var(--font-body);
+
+  /* Overline — Label above a section or card heading */
+  --type-overline-size:           0.6875rem;  /* 11px */
+  --type-overline-weight:         600;
+  --type-overline-line-height:    1.4;
+  --type-overline-font:           var(--font-body);
+  --type-overline-letter-spacing: 0.08em;
+  --type-overline-text-transform: uppercase;
+}
