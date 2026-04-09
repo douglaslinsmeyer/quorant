@@ -1,0 +1,22 @@
+# Minimal infrastructure for CI / unit+integration tests.
+# Only PostgreSQL is needed for Phase 1 tests.
+# Deliberately excludes Redis, NATS, MinIO, and Zitadel to keep CI fast.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: quorant-postgres-test
+    environment:
+      POSTGRES_DB: quorant_test
+      POSTGRES_USER: quorant
+      POSTGRES_PASSWORD: quorant
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data   # in-memory — no volume needed in CI
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quorant -d quorant_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s

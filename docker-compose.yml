@@ -1,0 +1,135 @@
+services:
+  # ─── PostgreSQL 16 with pgvector (primary app database) ───────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: quorant-postgres
+    environment:
+      POSTGRES_DB: quorant_dev
+      POSTGRES_USER: quorant
+      POSTGRES_PASSWORD: quorant
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quorant -d quorant_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ─── Redis 7 ──────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: quorant-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ─── NATS 2.10 with JetStream ─────────────────────────────────────────────
+  nats:
+    image: nats:2.10-alpine
+    container_name: quorant-nats
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"   # client
+      - "8222:8222"   # monitoring
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8222/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ─── MinIO (S3-compatible object storage) ─────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: quorant-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ─── Zitadel PostgreSQL (dedicated DB for the identity provider) ───────────
+  # NOTE: Zitadel requires its own database instance separate from the app DB.
+  zitadel-db:
+    image: postgres:16-alpine
+    container_name: quorant-zitadel-db
+    environment:
+      POSTGRES_DB: zitadel
+      POSTGRES_USER: zitadel
+      POSTGRES_PASSWORD: zitadel
+    ports:
+      - "5433:5432"
+    volumes:
+      - zitadel_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zitadel -d zitadel"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ─── Zitadel (identity provider / OIDC) ───────────────────────────────────
+  # NOTE: This is a minimal bootstrap configuration for local development.
+  # Full auth integration (OIDC apps, roles, API keys) is done in Phase 2.
+  # Zitadel is exposed on host port 8085 to avoid conflict with the app API on 8080.
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:latest
+    container_name: quorant-zitadel
+    command: start-from-init --masterkeyFromEnv --tlsMode disabled
+    environment:
+      ZITADEL_MASTERKEY: "MasterkeyNeedsToHave32Characters"
+      ZITADEL_DATABASE_POSTGRES_HOST: zitadel-db
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: zitadel
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_EXTERNALPORT: 8085
+      ZITADEL_EXTERNALDOMAIN: localhost
+    ports:
+      - "8085:8080"
+    depends_on:
+      zitadel-db:
+        condition: service_healthy
+    # NOTE: Zitadel uses a distroless image (no shell/wget/curl available).
+    # The HTTP readiness endpoint is http://localhost:8085/debug/ready (returns "ok").
+    # The built-in `zitadel ready` CLI subcommand requires the full server config to
+    # resolve the target host/port, which isn't available in a simple health check.
+    # Zitadel is confirmed healthy when its logs show "server is listening".
+    # A proper health check can be wired in Phase 2 using a curl-enabled init container.
+    healthcheck:
+      test: ["CMD", "/app/zitadel", "ready"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  zitadel_db_data:
