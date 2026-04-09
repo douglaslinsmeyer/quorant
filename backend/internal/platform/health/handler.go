@@ -148,7 +148,11 @@ func NewNATSChecker(conn *nats.Conn) *NATSChecker {
 func (c *NATSChecker) Name() string { return "nats" }
 
 // Check verifies that the NATS connection is in the CONNECTED state.
+// If the connection is nil (e.g. NATS was unavailable at startup), it returns an error.
 func (c *NATSChecker) Check(_ context.Context) error {
+	if c.conn == nil {
+		return fmt.Errorf("nats connection is nil")
+	}
 	if c.conn.Status() != nats.CONNECTED {
 		return fmt.Errorf("nats connection is not connected (status: %v)", c.conn.Status())
 	}
