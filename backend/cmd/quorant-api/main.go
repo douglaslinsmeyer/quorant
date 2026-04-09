@@ -14,11 +14,13 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/quorant/quorant/internal/audit"
+	"github.com/quorant/quorant/internal/billing"
 	"github.com/quorant/quorant/internal/com"
 	"github.com/quorant/quorant/internal/doc"
 	"github.com/quorant/quorant/internal/fin"
 	"github.com/quorant/quorant/internal/gov"
 	"github.com/quorant/quorant/internal/iam"
+	"github.com/quorant/quorant/internal/license"
 	"github.com/quorant/quorant/internal/org"
 	"github.com/quorant/quorant/internal/task"
 	"github.com/quorant/quorant/internal/platform/auth"
@@ -170,6 +172,20 @@ func run() error {
 	taskService := task.NewTaskService(taskRepo, logger)
 	taskHandler := task.NewTaskHandler(taskService, logger)
 	task.RegisterRoutes(mux, taskHandler, tokenValidator)
+
+	// License module
+	licenseRepo := license.NewPostgresLicenseRepository(pool)
+	entitlementChecker := license.NewPostgresEntitlementChecker(licenseRepo)
+	_ = entitlementChecker // Will be injected into middleware in a future phase
+	licenseService := license.NewLicenseService(licenseRepo, entitlementChecker, logger)
+	licenseHandler := license.NewLicenseHandler(licenseService, logger)
+	license.RegisterRoutes(mux, licenseHandler, tokenValidator)
+
+	// Billing module
+	billingRepo := billing.NewPostgresBillingRepository(pool)
+	billingService := billing.NewBillingService(billingRepo, logger)
+	billingHandler := billing.NewBillingHandler(billingService, logger)
+	billing.RegisterRoutes(mux, billingHandler, tokenValidator)
 
 	// Doc module
 	s3Client, err := storage.NewS3Client(cfg.S3)
