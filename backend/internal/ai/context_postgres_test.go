@@ -5,6 +5,7 @@ package ai_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -402,4 +403,183 @@ func TestSimilaritySearch_SourceTypeFilter(t *testing.T) {
 		assert.Equal(t, "governing_document", r.SourceType, "only governing_document source type should be returned")
 	}
 	require.NotEmpty(t, results)
+}
+
+func TestSimilaritySearch_UnitIDFilter(t *testing.T) {
+	pool := setupAITestDB(t)
+	repo := ai.NewPostgresContextChunkRepository(pool)
+	ctx := context.Background()
+
+	o := setupOrg(t, pool, "hoa")
+	unitID := uuid.New()
+
+	chunks := []*ai.ContextChunk{
+		{
+			Scope:      "org",
+			OrgID:      &o.ID,
+			SourceType: "governing_document",
+			SourceID:   uuid.New(),
+			ChunkIndex: 0,
+			Content:    "Chunk with unit_id in metadata",
+			Embedding:  zeroEmbedding(),
+			TokenCount: 5,
+			Metadata:   map[string]any{"unit_id": unitID.String()},
+		},
+		{
+			Scope:      "org",
+			OrgID:      &o.ID,
+			SourceType: "governing_document",
+			SourceID:   uuid.New(),
+			ChunkIndex: 0,
+			Content:    "Chunk with no unit_id",
+			Embedding:  zeroEmbedding(),
+			TokenCount: 4,
+			Metadata:   map[string]any{},
+		},
+	}
+	require.NoError(t, repo.CreateBatch(ctx, chunks))
+
+	filters := ai.ContextFilters{UnitID: &unitID}
+	results, err := repo.SimilaritySearch(ctx, zeroEmbedding(), o.ID, nil, nil, filters, 10)
+	require.NoError(t, err)
+
+	require.Len(t, results, 1, "only the chunk with matching unit_id should be returned")
+	assert.Equal(t, "Chunk with unit_id in metadata", results[0].Content)
+}
+
+func TestSimilaritySearch_DateRangeFilter(t *testing.T) {
+	pool := setupAITestDB(t)
+	repo := ai.NewPostgresContextChunkRepository(pool)
+	ctx := context.Background()
+
+	o := setupOrg(t, pool, "hoa")
+
+	// Insert a chunk so we have something to filter.
+	require.NoError(t, repo.CreateBatch(ctx, []*ai.ContextChunk{
+		{
+			Scope:      "org",
+			OrgID:      &o.ID,
+			SourceType: "governing_document",
+			SourceID:   uuid.New(),
+			ChunkIndex: 0,
+			Content:    "Recent chunk",
+			Embedding:  zeroEmbedding(),
+			TokenCount: 2,
+			Metadata:   map[string]any{},
+		},
+	}))
+
+	// A date range that covers now should return results.
+	tr := &ai.TimeRange{
+		Start: time.Now().Add(-1 * time.Minute),
+		End:   time.Now().Add(1 * time.Minute),
+	}
+	filters := ai.ContextFilters{DateRange: tr}
+	results, err := repo.SimilaritySearch(ctx, zeroEmbedding(), o.ID, nil, nil, filters, 10)
+	require.NoError(t, err)
+	require.NotEmpty(t, results, "chunks within the date range should be returned")
+
+	// A date range entirely in the past should return nothing.
+	oldRange := &ai.TimeRange{
+		Start: time.Now().Add(-24 * time.Hour),
+		End:   time.Now().Add(-23 * time.Hour),
+	}
+	filters2 := ai.ContextFilters{DateRange: oldRange}
+	results2, err := repo.SimilaritySearch(ctx, zeroEmbedding(), o.ID, nil, nil, filters2, 10)
+	require.NoError(t, err)
+	assert.Empty(t, results2, "chunks outside the date range should not be returned")
+}
+
+func TestSimilaritySearch_ScopesFilter(t *testing.T) {
+	pool := setupAITestDB(t)
+	repo := ai.NewPostgresContextChunkRepository(pool)
+	ctx := context.Background()
+
+	o := setupOrg(t, pool, "hoa")
+
+	chunks := []*ai.ContextChunk{
+		{
+			Scope:      "org",
+			OrgID:      &o.ID,
+			SourceType: "governing_document",
+			SourceID:   uuid.New(),
+			ChunkIndex: 0,
+			Content:    "Org-scoped chunk",
+			Embedding:  zeroEmbedding(),
+			TokenCount: 3,
+			Metadata:   map[string]any{},
+		},
+		{
+			Scope:      "global",
+			SourceType: "governing_document",
+			SourceID:   uuid.New(),
+			ChunkIndex: 0,
+			Content:    "Global chunk",
+			Embedding:  zeroEmbedding(),
+			TokenCount: 2,
+			Metadata:   map[string]any{},
+		},
+	}
+	require.NoError(t, repo.CreateBatch(ctx, chunks))
+
+	// Only request org-scoped results.
+	filters := ai.ContextFilters{Scopes: []ai.ContextScope{"org"}}
+	results, err := repo.SimilaritySearch(ctx, zeroEmbedding(), o.ID, nil, nil, filters, 10)
+	require.NoError(t, err)
+
+	for _, r := range results {
+		assert.Equal(t, "org", r.Scope, "only org-scoped chunks should be returned")
+	}
+	require.NotEmpty(t, results)
+
+	// Verify global chunk is absent.
+	contents := make([]string, len(results))
+	for i, r := range results {
+		contents[i] = r.Content
+	}
+	assert.NotContains(t, contents, "Global chunk")
+}
+
+// ─── Validate ────────────────────────────────────────────────────────────────
+
+func TestValidate_GlobalScope(t *testing.T) {
+	orgID := uuid.New()
+	jur := "CA"
+
+	assert.NoError(t, (&ai.ContextChunk{Scope: "global"}).Validate())
+	assert.Error(t, (&ai.ContextChunk{Scope: "global", OrgID: &orgID}).Validate(), "global with org_id should fail")
+	assert.Error(t, (&ai.ContextChunk{Scope: "global", Jurisdiction: &jur}).Validate(), "global with jurisdiction should fail")
+}
+
+func TestValidate_JurisdictionScope(t *testing.T) {
+	orgID := uuid.New()
+	jur := "TX"
+	empty := ""
+
+	assert.NoError(t, (&ai.ContextChunk{Scope: "jurisdiction", Jurisdiction: &jur}).Validate())
+	assert.Error(t, (&ai.ContextChunk{Scope: "jurisdiction"}).Validate(), "jurisdiction without jurisdiction should fail")
+	assert.Error(t, (&ai.ContextChunk{Scope: "jurisdiction", Jurisdiction: &empty}).Validate(), "jurisdiction with empty string should fail")
+	assert.Error(t, (&ai.ContextChunk{Scope: "jurisdiction", Jurisdiction: &jur, OrgID: &orgID}).Validate(), "jurisdiction with org_id should fail")
+}
+
+func TestValidate_FirmScope(t *testing.T) {
+	orgID := uuid.New()
+	jur := "FL"
+
+	assert.NoError(t, (&ai.ContextChunk{Scope: "firm", OrgID: &orgID}).Validate())
+	assert.Error(t, (&ai.ContextChunk{Scope: "firm"}).Validate(), "firm without org_id should fail")
+	assert.Error(t, (&ai.ContextChunk{Scope: "firm", OrgID: &orgID, Jurisdiction: &jur}).Validate(), "firm with jurisdiction should fail")
+}
+
+func TestValidate_OrgScope(t *testing.T) {
+	orgID := uuid.New()
+	jur := "NY"
+
+	assert.NoError(t, (&ai.ContextChunk{Scope: "org", OrgID: &orgID}).Validate())
+	assert.Error(t, (&ai.ContextChunk{Scope: "org"}).Validate(), "org without org_id should fail")
+	assert.Error(t, (&ai.ContextChunk{Scope: "org", OrgID: &orgID, Jurisdiction: &jur}).Validate(), "org with jurisdiction should fail")
+}
+
+func TestValidate_UnknownScope(t *testing.T) {
+	assert.Error(t, (&ai.ContextChunk{Scope: "tenant"}).Validate(), "unknown scope should fail")
 }

@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,4 +23,47 @@ type ContextChunk struct {
 	TokenCount   int            `json:"token_count"`
 	Metadata     map[string]any `json:"metadata"`
 	CreatedAt    time.Time      `json:"created_at"`
+}
+
+// Validate checks that scope constraints are satisfied, returning a friendly error
+// instead of a raw PostgreSQL constraint violation.
+//
+//   - global:       org_id must be nil, jurisdiction must be nil
+//   - jurisdiction: org_id must be nil, jurisdiction must be non-empty
+//   - firm:         org_id must be non-nil, jurisdiction must be nil
+//   - org:          org_id must be non-nil, jurisdiction must be nil
+func (c *ContextChunk) Validate() error {
+	switch c.Scope {
+	case "global":
+		if c.OrgID != nil {
+			return fmt.Errorf("context chunk: scope 'global' must not have org_id")
+		}
+		if c.Jurisdiction != nil {
+			return fmt.Errorf("context chunk: scope 'global' must not have jurisdiction")
+		}
+	case "jurisdiction":
+		if c.OrgID != nil {
+			return fmt.Errorf("context chunk: scope 'jurisdiction' must not have org_id")
+		}
+		if c.Jurisdiction == nil || *c.Jurisdiction == "" {
+			return fmt.Errorf("context chunk: scope 'jurisdiction' requires a non-empty jurisdiction")
+		}
+	case "firm":
+		if c.OrgID == nil || *c.OrgID == uuid.Nil {
+			return fmt.Errorf("context chunk: scope 'firm' requires org_id")
+		}
+		if c.Jurisdiction != nil {
+			return fmt.Errorf("context chunk: scope 'firm' must not have jurisdiction")
+		}
+	case "org":
+		if c.OrgID == nil || *c.OrgID == uuid.Nil {
+			return fmt.Errorf("context chunk: scope 'org' requires org_id")
+		}
+		if c.Jurisdiction != nil {
+			return fmt.Errorf("context chunk: scope 'org' must not have jurisdiction")
+		}
+	default:
+		return fmt.Errorf("context chunk: unknown scope %q (must be global, jurisdiction, firm, or org)", c.Scope)
+	}
+	return nil
 }

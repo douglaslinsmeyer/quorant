@@ -130,6 +130,7 @@ func (r *PostgresContextChunkRepository) DeleteBySource(ctx context.Context, sou
 
 // SimilaritySearch finds chunks similar to the query embedding via cosine distance.
 // The scope chain includes: the org itself, its managing firm (if any), jurisdiction, and global.
+// Optional filters: SourceTypes, Scopes, UnitID (via metadata), DateRange (via created_at).
 func (r *PostgresContextChunkRepository) SimilaritySearch(
 	ctx context.Context,
 	embedding []float32,
@@ -143,6 +144,28 @@ func (r *PostgresContextChunkRepository) SimilaritySearch(
 	var sourceTypes []string
 	for _, st := range filters.SourceTypes {
 		sourceTypes = append(sourceTypes, string(st))
+	}
+
+	// Build scope filter — nil means no restriction.
+	var scopes []string
+	for _, s := range filters.Scopes {
+		scopes = append(scopes, string(s))
+	}
+
+	// UnitID filter: match against metadata->>'unit_id'.
+	var unitID *uuid.UUID
+	if filters.UnitID != nil {
+		unitID = filters.UnitID
+	}
+
+	// DateRange filter.
+	var rangeStart, rangeEnd *interface{}
+	var startPtr, endPtr interface{}
+	if filters.DateRange != nil {
+		startPtr = filters.DateRange.Start
+		endPtr = filters.DateRange.End
+		rangeStart = &startPtr
+		rangeEnd = &endPtr
 	}
 
 	// Convert to pgvector type for the query parameter.
@@ -161,15 +184,32 @@ func (r *PostgresContextChunkRepository) SimilaritySearch(
 			OR (scope = 'global')
 		)
 		AND ($5::text[] IS NULL OR source_type::text = ANY($5))
+		AND ($6::text[] IS NULL OR scope::text = ANY($6))
+		AND ($7::uuid IS NULL OR metadata->>'unit_id' = $7::text)
+		AND ($8::timestamptz IS NULL OR created_at >= $8)
+		AND ($9::timestamptz IS NULL OR created_at <= $9)
 		ORDER BY embedding <=> $1::vector
-		LIMIT $6`
+		LIMIT $10`
+
+	// Flatten date range pointers to nil-able values for pgx.
+	var startVal, endVal interface{}
+	if rangeStart != nil {
+		startVal = *rangeStart
+	}
+	if rangeEnd != nil {
+		endVal = *rangeEnd
+	}
 
 	rows, err := r.pool.Query(ctx, q,
 		vec,
 		orgID,
-		firmOrgID,  // may be nil — matches nothing when NULL
+		firmOrgID,   // may be nil — matches nothing when NULL
 		jurisdiction, // may be nil — matches nothing when NULL
-		sourceTypes, // nil means all source types
+		sourceTypes,  // nil means all source types
+		scopes,       // nil means all scopes
+		unitID,       // nil means no unit filter
+		startVal,     // nil means no lower date bound
+		endVal,       // nil means no upper date bound
 		limit,
 	)
 	if err != nil {
