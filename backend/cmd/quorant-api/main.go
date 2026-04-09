@@ -26,6 +26,8 @@ import (
 	"github.com/quorant/quorant/internal/org"
 	"github.com/quorant/quorant/internal/task"
 	"github.com/quorant/quorant/internal/webhook"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/quorant/quorant/internal/platform/auth"
 	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/quorant/quorant/internal/platform/config"
@@ -124,6 +126,9 @@ func run() error {
 	// 9. Routes
 	mux := http.NewServeMux()
 	mux.Handle("GET /api/v1/health", healthHandler)
+
+	// Metrics endpoint (no auth — for Prometheus scraper)
+	mux.Handle("GET /metrics", promhttp.Handler())
 
 	// IAM module
 	userRepo := iam.NewPostgresUserRepository(pool)
@@ -252,7 +257,8 @@ func run() error {
 	handler = middleware.Logging(logger, handler)
 	handler = middleware.Recovery(logger, handler)
 	handler = middleware.RequestID(handler)
-	handler = middleware.Tracing(handler) // outermost: creates root span before RequestID
+	handler = middleware.Metrics(handler)  // after RequestID, before Tracing
+	handler = middleware.Tracing(handler)  // outermost: creates root span before RequestID
 	handler = middleware.CORS([]string{"*"}, handler) // permissive for dev; configured per-env in production
 
 	// 11. HTTP server
