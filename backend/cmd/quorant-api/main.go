@@ -178,7 +178,8 @@ func run() error {
 
 	// License module (initialized early — entitlementChecker is needed by AI and Webhook routes)
 	licenseRepo := license.NewPostgresLicenseRepository(pool)
-	entitlementChecker := license.NewPostgresEntitlementChecker(licenseRepo)
+	pgChecker := license.NewPostgresEntitlementChecker(licenseRepo)
+	entitlementChecker := license.NewCachedEntitlementChecker(pgChecker, rdb, 60*time.Second)
 	licenseService := license.NewLicenseService(licenseRepo, entitlementChecker, auditor, outboxPublisher, logger)
 	licenseHandler := license.NewLicenseHandler(licenseService, logger)
 	license.RegisterRoutes(mux, licenseHandler, tokenValidator, permChecker, resolveUserID)
