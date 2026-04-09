@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/quorant/quorant/internal/org"
 	"github.com/quorant/quorant/internal/platform/api"
 	"github.com/quorant/quorant/internal/platform/middleware"
 )
@@ -17,12 +16,12 @@ type AIHandler struct {
 	policyService  *PolicyService
 	contextService *ContextLakeService
 	policyResolver *PostgresPolicyResolver
-	orgRepo        org.OrgRepository
+	orgRepo OrgLookup
 	logger         *slog.Logger
 }
 
 // NewAIHandler constructs an AIHandler.
-func NewAIHandler(policyService *PolicyService, contextService *ContextLakeService, orgRepo org.OrgRepository, logger *slog.Logger) *AIHandler {
+func NewAIHandler(policyService *PolicyService, contextService *ContextLakeService, orgRepo OrgLookup, logger *slog.Logger) *AIHandler {
 	return &AIHandler{
 		policyService:  policyService,
 		contextService: contextService,
