@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/nats-io/nats.go"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/quorant/quorant/internal/platform/db"
 	"github.com/quorant/quorant/internal/platform/logging"
 	"github.com/quorant/quorant/internal/platform/queue"
+	"github.com/quorant/quorant/internal/platform/scheduler"
 	"github.com/quorant/quorant/internal/webhook"
 )
 
@@ -103,6 +105,17 @@ func run() error {
 			logger.Error("webhook retry worker error", "error", err)
 		}
 	}()
+
+	// Scheduler
+	sched := scheduler.New(logger)
+	sched.Register(scheduler.NewAssessmentGeneratorJob(pool, logger), 1*time.Hour)
+	sched.Register(scheduler.NewLateFeeJob(pool, logger), 24*time.Hour)
+	sched.Register(scheduler.NewCollectionEscalationJob(pool, logger), 24*time.Hour)
+	sched.Register(scheduler.NewARBAutoApprovalJob(pool, logger), 1*time.Hour)
+	sched.Register(scheduler.NewSLABreachMonitorJob(pool, logger), 5*time.Minute)
+	sched.Register(scheduler.NewAnnouncementPublisherJob(pool, logger), 1*time.Minute)
+	sched.Register(scheduler.NewNotificationDispatchJob(pool, logger), 30*time.Second)
+	go sched.Start(ctx)
 
 	logger.Info("worker started")
 
