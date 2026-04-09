@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // WebhookHandler handles HTTP requests for the webhook module.
@@ -33,8 +34,7 @@ func (h *WebhookHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: resolve idp_user_id -> users.id once IAM lookup is wired.
-	created, err := h.service.CreateSubscription(r.Context(), orgID, uuid.Nil, req)
+	created, err := h.service.CreateSubscription(r.Context(), orgID, middleware.UserIDFromContext(r.Context()), req)
 	if err != nil {
 		h.logger.Error("Create webhook subscription failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
