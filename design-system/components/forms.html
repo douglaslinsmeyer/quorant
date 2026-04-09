@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forms — Quorant Design System</title>
+
+  <link rel="stylesheet" href="../tokens/colors.css" />
+  <link rel="stylesheet" href="../tokens/typography.css" />
+  <link rel="stylesheet" href="../tokens/spacing.css" />
+  <link rel="stylesheet" href="../tokens/elevation.css" />
+  <link rel="stylesheet" href="../tokens/motion.css" />
+
+  <style>
+    /* ── Reset & Base ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: var(--type-body-size);
+      line-height: var(--type-body-line-height);
+      color: var(--color-neutral-900);
+      background: var(--surface-page);
+      padding: var(--space-8);
+      animation: page-enter var(--duration-slow) var(--ease-out) both;
+    }
+
+    /* ── Dark Mode Toggle ──────────────────────────────────────── */
+    .theme-btn {
+      position: fixed;
+      top: var(--space-4);
+      right: var(--space-4);
+      background: var(--surface-card);
+      border: 1px solid var(--color-neutral-200);
+      color: var(--color-neutral-700);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition:
+        background var(--duration-normal) var(--ease-smooth),
+        color var(--duration-normal) var(--ease-smooth),
+        box-shadow var(--duration-normal) var(--ease-smooth);
+      z-index: 100;
+    }
+
+    .theme-btn:hover {
+      box-shadow: var(--shadow-md);
+      background: var(--surface-elevated);
+    }
+
+    /* ── Page Header ────────────────────────────────────────────── */
+    .page-header {
+      margin-bottom: var(--space-8);
+    }
+
+    .page-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--type-h1-size);
+      font-weight: var(--type-h1-weight);
+      line-height: var(--type-h1-line-height);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-2);
+    }
+
+    .page-header p {
+      font-size: var(--type-body-lg-size);
+      color: var(--color-neutral-600);
+    }
+
+    /* ── Section ────────────────────────────────────────────────── */
+    .section {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-8);
+      margin-bottom: var(--space-6);
+    }
+
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h3-size);
+      font-weight: var(--type-h3-weight);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-1);
+    }
+
+    .section-desc {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-6);
+    }
+
+    .overline {
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-3);
+    }
+
+    /* ── Form Group ─────────────────────────────────────────────── */
+    .form-group {
+      margin-bottom: var(--space-5);
+    }
+
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+
+    /* ── Label ──────────────────────────────────────────────────── */
+    .label {
+      display: block;
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--color-neutral-800);
+      margin-bottom: var(--space-1);
+    }
+
+    .label-required::after {
+      content: ' *';
+      color: var(--color-error-600);
+    }
+
+    .label-optional {
+      font-weight: 400;
+      color: var(--color-neutral-400);
+      font-size: 12px;
+      margin-left: var(--space-1);
+    }
+
+    .field-hint {
+      font-size: 12px;
+      color: var(--color-neutral-400);
+      margin-top: var(--space-1);
+    }
+
+    /* ── Text Input & Textarea ──────────────────────────────────── */
+    .input,
+    .textarea {
+      display: block;
+      width: 100%;
+      height: var(--input-height);
+      padding: 0 var(--space-4);
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--color-neutral-900);
+      background: var(--surface-card);
+      border: 1.5px solid var(--color-neutral-400);
+      border-radius: var(--radius-md);
+      outline: none;
+      transition:
+        border-color var(--duration-fast) var(--ease-default),
+        box-shadow var(--duration-fast) var(--ease-default),
+        background var(--duration-fast) var(--ease-default);
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    .textarea {
+      height: auto;
+      min-height: 100px;
+      padding: var(--space-3) var(--space-4);
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    .input::placeholder,
+    .textarea::placeholder {
+      color: var(--color-neutral-400);
+    }
+
+    /* Focus */
+    .input:focus,
+    .textarea:focus {
+      border-color: var(--color-primary-600);
+      box-shadow: 0 0 0 3px var(--color-primary-200);
+    }
+
+    /* Error */
+    .input--error {
+      border-color: var(--color-error-600);
+    }
+
+    .input--error:focus {
+      border-color: var(--color-error-600);
+      box-shadow: 0 0 0 3px var(--color-error-100);
+    }
+
+    .error-message {
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--color-error-600);
+      margin-top: var(--space-1);
+    }
+
+    /* Disabled */
+    .input:disabled,
+    .textarea:disabled {
+      background: var(--color-neutral-100);
+      color: var(--color-neutral-500);
+      border-color: var(--color-neutral-300);
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* ── Select ─────────────────────────────────────────────────── */
+    .select-wrapper {
+      position: relative;
+    }
+
+    .select {
+      display: block;
+      width: 100%;
+      height: var(--input-height);
+      padding: 0 var(--space-10) 0 var(--space-4);
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--color-neutral-900);
+      background: var(--surface-card);
+      border: 1.5px solid var(--color-neutral-400);
+      border-radius: var(--radius-md);
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      transition:
+        border-color var(--duration-fast) var(--ease-default),
+        box-shadow var(--duration-fast) var(--ease-default);
+    }
+
+    .select:focus {
+      border-color: var(--color-primary-600);
+      box-shadow: 0 0 0 3px var(--color-primary-200);
+    }
+
+    .select-arrow {
+      position: absolute;
+      right: var(--space-4);
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      color: var(--color-neutral-500);
+    }
+
+    /* ── Input Row ──────────────────────────────────────────────── */
+    .input-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: var(--space-4);
+    }
+
+    .states-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-4);
+    }
+
+    @media (max-width: 700px) {
+      .states-row {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .state-label {
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      color: var(--color-neutral-500);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: var(--space-2);
+      text-align: center;
+    }
+
+    /* ── Checkbox & Radio ───────────────────────────────────────── */
+    .check-group,
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .check-label,
+    .radio-label {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--color-neutral-800);
+      user-select: none;
+    }
+
+    /* Hide native */
+    .check-label input[type="checkbox"],
+    .radio-label input[type="radio"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Custom checkbox */
+    .checkbox-box {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      border: 1.5px solid var(--color-neutral-400);
+      background: var(--surface-card);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition:
+        border-color var(--duration-fast) var(--ease-default),
+        background var(--duration-fast) var(--ease-default),
+        box-shadow var(--duration-fast) var(--ease-default);
+    }
+
+    .checkbox-box svg { display: none; }
+
+    .check-label input:checked ~ .checkbox-box {
+      background: var(--color-primary-600);
+      border-color: var(--color-primary-600);
+    }
+
+    .check-label input:checked ~ .checkbox-box svg {
+      display: block;
+    }
+
+    .check-label input:focus-visible ~ .checkbox-box {
+      box-shadow: 0 0 0 3px var(--color-primary-200);
+    }
+
+    /* Custom radio */
+    .radio-circle {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 1.5px solid var(--color-neutral-400);
+      background: var(--surface-card);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition:
+        border-color var(--duration-fast) var(--ease-default),
+        background var(--duration-fast) var(--ease-default),
+        box-shadow var(--duration-fast) var(--ease-default);
+    }
+
+    .radio-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #ffffff;
+      transform: scale(0);
+      transition: transform var(--duration-fast) var(--ease-spring);
+    }
+
+    .radio-label input:checked ~ .radio-circle {
+      background: var(--color-primary-600);
+      border-color: var(--color-primary-600);
+    }
+
+    .radio-label input:checked ~ .radio-circle .radio-dot {
+      transform: scale(1);
+    }
+
+    .radio-label input:focus-visible ~ .radio-circle {
+      box-shadow: 0 0 0 3px var(--color-primary-200);
+    }
+
+    /* ── Toggle Switch ──────────────────────────────────────────── */
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--color-neutral-800);
+      user-select: none;
+    }
+
+    .toggle-label input[type="checkbox"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .toggle-track {
+      flex-shrink: 0;
+      position: relative;
+      width: 44px;
+      height: 24px;
+      border-radius: var(--radius-full);
+      background: var(--color-neutral-400);
+      transition: background var(--duration-fast) var(--ease-default);
+    }
+
+    .toggle-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: var(--shadow-sm);
+      transition: transform var(--duration-fast) var(--ease-spring);
+    }
+
+    .toggle-label input:checked ~ .toggle-track {
+      background: var(--color-primary-600);
+    }
+
+    .toggle-label input:checked ~ .toggle-track .toggle-thumb {
+      transform: translateX(20px);
+    }
+
+    .toggle-label input:focus-visible ~ .toggle-track {
+      box-shadow: 0 0 0 3px var(--color-primary-200);
+    }
+
+    /* ── File Upload Area ───────────────────────────────────────── */
+    .file-area {
+      border: 1.5px dashed var(--color-neutral-300);
+      border-radius: var(--radius-md);
+      padding: var(--space-6);
+      text-align: center;
+      cursor: pointer;
+      transition:
+        border-color var(--duration-fast) var(--ease-default),
+        background var(--duration-fast) var(--ease-default);
+    }
+
+    .file-area:hover {
+      border-color: var(--color-primary-400);
+      background: var(--color-primary-50);
+    }
+
+    .file-area:focus-within {
+      border-color: var(--color-primary-600);
+      box-shadow: 0 0 0 3px var(--color-primary-200);
+      outline: none;
+    }
+
+    .file-area input[type="file"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .file-area__icon {
+      color: var(--color-neutral-400);
+      margin-bottom: var(--space-3);
+    }
+
+    .file-area__text {
+      font-size: 14px;
+      color: var(--color-neutral-700);
+      margin-bottom: var(--space-1);
+    }
+
+    .file-area__text strong {
+      color: var(--color-primary-600);
+      font-weight: 600;
+    }
+
+    .file-area__hint {
+      font-size: 12px;
+      color: var(--color-neutral-400);
+    }
+
+    /* ── Complete Form ──────────────────────────────────────────── */
+    .form-card {
+      max-width: 560px;
+    }
+
+    .form-title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h4-size);
+      font-weight: var(--type-h4-weight);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-1);
+    }
+
+    .form-subtitle {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-6);
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--color-neutral-200);
+      margin: var(--space-6) 0;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: var(--space-3);
+      align-items: center;
+      padding-top: var(--space-2);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: 14px;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      padding: 10px 20px;
+      min-height: 40px;
+      border: none;
+      transition:
+        background var(--duration-fast) var(--ease-default),
+        transform var(--duration-fast) var(--ease-default),
+        box-shadow var(--duration-fast) var(--ease-default);
+    }
+
+    .btn--primary {
+      background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
+      color: #ffffff;
+      box-shadow: var(--shadow-xs);
+    }
+
+    .btn--primary:hover {
+      transform: scale(1.02);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn--primary:active {
+      transform: scale(0.98);
+    }
+
+    .btn--secondary {
+      background: transparent;
+      color: var(--color-primary-600);
+      border: 1.5px solid var(--color-primary-600);
+    }
+
+    .btn--secondary:hover {
+      background: var(--color-primary-50);
+    }
+
+    /* ── Priority Radio Inline ──────────────────────────────────── */
+    .radio-inline-group {
+      display: flex;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+    }
+
+    .radio-inline-label {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--color-neutral-800);
+      user-select: none;
+    }
+
+    .radio-inline-label input[type="radio"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <button class="theme-btn" onclick="toggleTheme()">Toggle Dark Mode</button>
+
+  <div class="page-header">
+    <h1>Forms</h1>
+    <p>All form input primitives with full state coverage, and a complete real-world HOA form example.</p>
+  </div>
+
+  <!-- ── Text Input States ─────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Text Input</h2>
+    <p class="section-desc">44px height, 1.5px border, rounded-md. Four states shown.</p>
+
+    <div class="states-row">
+      <div>
+        <div class="overline">Default</div>
+        <div class="form-group">
+          <label class="label" for="input-default">Unit Number</label>
+          <input class="input" id="input-default" type="text" placeholder="e.g. 4A" />
+        </div>
+        <div class="state-label">Default</div>
+      </div>
+
+      <div>
+        <div class="overline">Focus</div>
+        <div class="form-group">
+          <label class="label" for="input-focus">Unit Number</label>
+          <input class="input" id="input-focus" type="text" placeholder="e.g. 4A" onfocus="this.style.borderColor='var(--color-primary-600)'; this.style.boxShadow='0 0 0 3px var(--color-primary-200)'" onblur="this.style.borderColor=''; this.style.boxShadow=''" />
+        </div>
+        <div class="state-label">Focus (click me)</div>
+      </div>
+
+      <div>
+        <div class="overline">Error</div>
+        <div class="form-group">
+          <label class="label label-required" for="input-error">Email Address</label>
+          <input class="input input--error" id="input-error" type="email" value="invalid-email" />
+          <div class="error-message">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="8" cy="11" r="0.75" fill="currentColor"/>
+            </svg>
+            Please enter a valid email address
+          </div>
+        </div>
+        <div class="state-label">Error</div>
+      </div>
+
+      <div>
+        <div class="overline">Disabled</div>
+        <div class="form-group">
+          <label class="label" for="input-disabled">Account ID</label>
+          <input class="input" id="input-disabled" type="text" value="HOA-00142" disabled />
+          <div class="field-hint">Auto-assigned, cannot be changed</div>
+        </div>
+        <div class="state-label">Disabled</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Textarea ──────────────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Textarea</h2>
+    <p class="section-desc">Same styling as text input, min-height 100px, vertically resizable.</p>
+
+    <div class="input-row">
+      <div class="form-group">
+        <label class="label label-required" for="textarea-default">Description</label>
+        <textarea class="textarea" id="textarea-default" placeholder="Describe the issue in detail…"></textarea>
+        <div class="field-hint">Minimum 20 characters</div>
+      </div>
+
+      <div class="form-group">
+        <label class="label" for="textarea-error">Notes</label>
+        <textarea class="textarea input--error" id="textarea-error">Too short.</textarea>
+        <div class="error-message">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="8" cy="11" r="0.75" fill="currentColor"/>
+          </svg>
+          Description must be at least 20 characters
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="label" for="textarea-disabled">Previous Notes</label>
+        <textarea class="textarea" id="textarea-disabled" disabled>Pool pump inspection completed April 3. No issues found at that time.</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Select ────────────────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Select</h2>
+    <p class="section-desc">Custom-styled dropdown with chevron arrow, consistent with text input styling.</p>
+
+    <div class="input-row">
+      <div class="form-group">
+        <label class="label label-required" for="select-category">Category</label>
+        <div class="select-wrapper">
+          <select class="select" id="select-category">
+            <option value="" disabled selected>Select a category…</option>
+            <option>Plumbing</option>
+            <option>Electrical</option>
+            <option>Landscaping</option>
+            <option>Common Areas</option>
+            <option>Parking</option>
+            <option>Pool &amp; Amenities</option>
+            <option>Other</option>
+          </select>
+          <span class="select-arrow">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="label" for="select-period">Billing Period</label>
+        <div class="select-wrapper">
+          <select class="select" id="select-period">
+            <option>April 2026</option>
+            <option>March 2026</option>
+            <option>February 2026</option>
+            <option>January 2026</option>
+          </select>
+          <span class="select-arrow">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="label" for="select-disabled">HOA Property</label>
+        <div class="select-wrapper">
+          <select class="select" id="select-disabled" disabled>
+            <option>Oakridge Commons</option>
+          </select>
+          <span class="select-arrow">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Checkboxes ────────────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Checkboxes</h2>
+    <p class="section-desc">16px custom checkbox with primary-600 checked state and spring-animated checkmark.</p>
+
+    <div class="check-group">
+      <label class="check-label">
+        <input type="checkbox" checked />
+        <span class="checkbox-box">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M1.5 5.5L4 8L8.5 2.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        Notify me when payment is processed
+      </label>
+
+      <label class="check-label">
+        <input type="checkbox" />
+        <span class="checkbox-box">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M1.5 5.5L4 8L8.5 2.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        Receive SMS reminders before due date
+      </label>
+
+      <label class="check-label">
+        <input type="checkbox" />
+        <span class="checkbox-box">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M1.5 5.5L4 8L8.5 2.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        Subscribe to community announcements
+      </label>
+
+      <label class="check-label" style="opacity: 0.5; cursor: not-allowed;">
+        <input type="checkbox" disabled />
+        <span class="checkbox-box" style="cursor: not-allowed;">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M1.5 5.5L4 8L8.5 2.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        Share data with third-party services (unavailable)
+      </label>
+    </div>
+  </div>
+
+  <!-- ── Radios ────────────────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Radio Buttons</h2>
+    <p class="section-desc">16px custom radio with primary-600 selection dot and spring-in transition.</p>
+
+    <div class="radio-group">
+      <label class="radio-label">
+        <input type="radio" name="priority-demo" value="low" />
+        <span class="radio-circle"><span class="radio-dot"></span></span>
+        Low — cosmetic or minor inconvenience
+      </label>
+
+      <label class="radio-label">
+        <input type="radio" name="priority-demo" value="medium" checked />
+        <span class="radio-circle"><span class="radio-dot"></span></span>
+        Medium — affects day-to-day use of common areas
+      </label>
+
+      <label class="radio-label">
+        <input type="radio" name="priority-demo" value="high" />
+        <span class="radio-circle"><span class="radio-dot"></span></span>
+        High — safety concern or significant damage
+      </label>
+
+      <label class="radio-label" style="opacity: 0.5; cursor: not-allowed;">
+        <input type="radio" name="priority-demo" value="emergency" disabled />
+        <span class="radio-circle" style="cursor: not-allowed;"><span class="radio-dot"></span></span>
+        Emergency — requires immediate response (contact front desk)
+      </label>
+    </div>
+  </div>
+
+  <!-- ── Toggle Switch ─────────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Toggle Switch</h2>
+    <p class="section-desc">44×24px track, 20px thumb. Off: neutral-400. On: primary-600 with spring slide.</p>
+
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+      <label class="toggle-label">
+        <input type="checkbox" checked />
+        <span class="toggle-track">
+          <span class="toggle-thumb"></span>
+        </span>
+        Email notifications — payment confirmations
+      </label>
+
+      <label class="toggle-label">
+        <input type="checkbox" />
+        <span class="toggle-track">
+          <span class="toggle-thumb"></span>
+        </span>
+        Push notifications — violation alerts
+      </label>
+
+      <label class="toggle-label">
+        <input type="checkbox" checked />
+        <span class="toggle-track">
+          <span class="toggle-thumb"></span>
+        </span>
+        Community digest — weekly summary email
+      </label>
+
+      <label class="toggle-label" style="opacity: 0.5; cursor: not-allowed;">
+        <input type="checkbox" disabled />
+        <span class="toggle-track" style="cursor: not-allowed;">
+          <span class="toggle-thumb"></span>
+        </span>
+        Marketing emails (feature not available in your plan)
+      </label>
+    </div>
+  </div>
+
+  <!-- ── Complete Form Example ──────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Complete Form Example</h2>
+    <p class="section-desc">A real HOA maintenance request form demonstrating all input types working together.</p>
+
+    <div class="form-card">
+      <div class="form-title">Submit Maintenance Request</div>
+      <div class="form-subtitle">Report an issue with common areas, amenities, or shared property at Oakridge Commons.</div>
+
+      <div class="form-group">
+        <label class="label label-required" for="maint-category">Category</label>
+        <div class="select-wrapper">
+          <select class="select" id="maint-category">
+            <option value="" disabled selected>Select a category…</option>
+            <option>Plumbing</option>
+            <option>Electrical</option>
+            <option>Landscaping</option>
+            <option>Pool &amp; Amenities</option>
+            <option>Parking &amp; Signage</option>
+            <option>Common Areas</option>
+            <option>Security</option>
+            <option>Other</option>
+          </select>
+          <span class="select-arrow">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="label label-required" for="maint-subject">Subject</label>
+        <input class="input" id="maint-subject" type="text" placeholder="Brief description of the issue" />
+      </div>
+
+      <div class="form-group">
+        <label class="label label-required" for="maint-description">Description</label>
+        <textarea class="textarea" id="maint-description" style="min-height: 120px;" placeholder="Please describe the issue in detail — location, when it started, and how it affects residents…"></textarea>
+        <div class="field-hint">Include the exact location (e.g., "Pool gate near Unit 12")</div>
+      </div>
+
+      <div class="form-group">
+        <div class="label label-required">Priority</div>
+        <div class="radio-inline-group" style="margin-top: var(--space-2);">
+          <label class="radio-label">
+            <input type="radio" name="maint-priority" value="low" />
+            <span class="radio-circle"><span class="radio-dot"></span></span>
+            Low
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="maint-priority" value="medium" checked />
+            <span class="radio-circle"><span class="radio-dot"></span></span>
+            Medium
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="maint-priority" value="high" />
+            <span class="radio-circle"><span class="radio-dot"></span></span>
+            High
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="label">Attach Photo <span class="label-optional">optional</span></div>
+        <label class="file-area" tabindex="0">
+          <input type="file" accept="image/*" />
+          <div class="file-area__icon">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <rect x="3" y="5" width="26" height="22" rx="2" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="11" cy="12" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M3 22l7-6 5 5 4-3 10 7" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="file-area__text"><strong>Click to upload</strong> or drag and drop</div>
+          <div class="file-area__hint">PNG, JPG, HEIC up to 10 MB</div>
+        </label>
+      </div>
+
+      <hr class="divider" />
+
+      <div class="form-group">
+        <label class="toggle-label">
+          <input type="checkbox" checked />
+          <span class="toggle-track">
+            <span class="toggle-thumb"></span>
+          </span>
+          Notify me of updates to this request
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label class="check-label">
+          <input type="checkbox" />
+          <span class="checkbox-box">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M1.5 5.5L4 8L8.5 2.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          I confirm this issue is in a common area, not within my private unit
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn--primary" type="submit">Submit Request</button>
+        <button class="btn btn--secondary" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    }
+  </script>
+</body>
+</html>
