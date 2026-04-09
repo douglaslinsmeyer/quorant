@@ -40,6 +40,8 @@ func RegisterRoutes(
 	mux.Handle("POST /api/v1/organizations/{org_id}/assessments", permMw("fin.assessment.create", assessmentHandler.CreateAssessment))
 	mux.Handle("GET /api/v1/organizations/{org_id}/assessments", permMw("fin.assessment.read", assessmentHandler.ListAssessments))
 	mux.Handle("GET /api/v1/organizations/{org_id}/assessments/{assessment_id}", permMw("fin.assessment.read", assessmentHandler.GetAssessment))
+	mux.Handle("PATCH /api/v1/organizations/{org_id}/assessments/{assessment_id}", permMw("fin.assessment.create", assessmentHandler.UpdateAssessment))
+	mux.Handle("DELETE /api/v1/organizations/{org_id}/assessments/{assessment_id}", permMw("fin.assessment.create", assessmentHandler.DeleteAssessment))
 
 	// Ledger
 	mux.Handle("GET /api/v1/organizations/{org_id}/units/{unit_id}/ledger", permMw("fin.ledger.read", assessmentHandler.GetUnitLedger))
@@ -60,6 +62,7 @@ func RegisterRoutes(
 	mux.Handle("GET /api/v1/organizations/{org_id}/budgets", permMw("fin.budget.read", budgetHandler.ListBudgets))
 	mux.Handle("GET /api/v1/organizations/{org_id}/budgets/{budget_id}", permMw("fin.budget.read", budgetHandler.GetBudget))
 	mux.Handle("PATCH /api/v1/organizations/{org_id}/budgets/{budget_id}", permMw("fin.budget.create", budgetHandler.UpdateBudget))
+	mux.Handle("GET /api/v1/organizations/{org_id}/budgets/{budget_id}/report", permMw("fin.budget.read", budgetHandler.GetBudgetReport))
 	mux.Handle("POST /api/v1/organizations/{org_id}/budgets/{budget_id}/propose", permMw("fin.budget.approve", budgetHandler.ProposeBudget))
 	mux.Handle("POST /api/v1/organizations/{org_id}/budgets/{budget_id}/approve", permMw("fin.budget.approve", budgetHandler.ApproveBudget))
 	mux.Handle("POST /api/v1/organizations/{org_id}/budgets/{budget_id}/line-items", permMw("fin.budget.create", budgetHandler.CreateLineItem))
@@ -69,11 +72,13 @@ func RegisterRoutes(
 	// Budget Categories
 	mux.Handle("POST /api/v1/organizations/{org_id}/budget-categories", permMw("fin.budget.create", budgetHandler.CreateCategory))
 	mux.Handle("GET /api/v1/organizations/{org_id}/budget-categories", permMw("fin.budget.read", budgetHandler.ListCategories))
+	mux.Handle("PATCH /api/v1/organizations/{org_id}/budget-categories/{category_id}", permMw("fin.budget.create", budgetHandler.UpdateCategory))
 
 	// Expenses
 	mux.Handle("POST /api/v1/organizations/{org_id}/expenses", permMw("fin.expense.submit", budgetHandler.CreateExpense))
 	mux.Handle("GET /api/v1/organizations/{org_id}/expenses", permMw("fin.expense.read", budgetHandler.ListExpenses))
 	mux.Handle("GET /api/v1/organizations/{org_id}/expenses/{expense_id}", permMw("fin.expense.read", budgetHandler.GetExpense))
+	mux.Handle("PATCH /api/v1/organizations/{org_id}/expenses/{expense_id}", permMw("fin.expense.submit", budgetHandler.UpdateExpense))
 	mux.Handle("POST /api/v1/organizations/{org_id}/expenses/{expense_id}/approve", permMw("fin.expense.approve", budgetHandler.ApproveExpense))
 	mux.Handle("POST /api/v1/organizations/{org_id}/expenses/{expense_id}/pay", permMw("fin.expense.approve", budgetHandler.PayExpense))
 
@@ -81,6 +86,7 @@ func RegisterRoutes(
 	mux.Handle("POST /api/v1/organizations/{org_id}/funds", permMw("fin.fund.manage", fundHandler.CreateFund))
 	mux.Handle("GET /api/v1/organizations/{org_id}/funds", permMw("fin.fund.read", fundHandler.ListFunds))
 	mux.Handle("GET /api/v1/organizations/{org_id}/funds/{fund_id}", permMw("fin.fund.read", fundHandler.GetFund))
+	mux.Handle("PATCH /api/v1/organizations/{org_id}/funds/{fund_id}", permMw("fin.fund.manage", fundHandler.UpdateFund))
 	mux.Handle("GET /api/v1/organizations/{org_id}/funds/{fund_id}/transactions", permMw("fin.fund.read", fundHandler.GetFundTransactions))
 	mux.Handle("POST /api/v1/organizations/{org_id}/fund-transfers", permMw("fin.fund.transfer", fundHandler.CreateFundTransfer))
 	mux.Handle("GET /api/v1/organizations/{org_id}/fund-transfers", permMw("fin.fund.read", fundHandler.ListFundTransfers))
@@ -93,4 +99,5 @@ func RegisterRoutes(
 	mux.Handle("POST /api/v1/organizations/{org_id}/collections/{case_id}/payment-plans", permMw("fin.payment_plan.manage", collectionHandler.CreatePaymentPlan))
 	mux.Handle("GET /api/v1/organizations/{org_id}/collections/{case_id}/payment-plans", permMw("fin.payment_plan.manage", collectionHandler.ListPaymentPlans))
 	mux.Handle("GET /api/v1/organizations/{org_id}/units/{unit_id}/collection-status", permMw("fin.collection.read", collectionHandler.GetUnitCollectionStatus))
+	mux.Handle("PATCH /api/v1/organizations/{org_id}/payment-plans/{plan_id}", permMw("fin.payment_plan.manage", collectionHandler.UpdatePaymentPlan))
 }

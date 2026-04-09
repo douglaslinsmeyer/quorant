@@ -552,3 +552,44 @@ func (s *OrgService) EndUnitMembership(ctx context.Context, id uuid.UUID) error 
 	s.logger.InfoContext(ctx, "unit membership ended", "unit_membership_id", id)
 	return nil
 }
+
+// ─── Ownership History operations ────────────────────────────────────────────
+
+// TransferOwnership validates the request and records an ownership transfer for a unit.
+func (s *OrgService) TransferOwnership(ctx context.Context, orgID uuid.UUID, unitID uuid.UUID, recordedBy uuid.UUID, req TransferOwnershipRequest) (*UnitOwnershipHistory, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	h := &UnitOwnershipHistory{
+		UnitID:                  unitID,
+		OrgID:                   orgID,
+		FromUserID:              req.FromUserID,
+		ToUserID:                req.ToUserID,
+		TransferType:            req.TransferType,
+		TransferDate:            req.TransferDate,
+		SalePriceCents:          req.SalePriceCents,
+		OutstandingBalanceCents: req.OutstandingBalanceCents,
+		BalanceSettled:          req.BalanceSettled,
+		RecordingRef:            req.RecordingRef,
+		Notes:                   req.Notes,
+		RecordedBy:              recordedBy,
+	}
+
+	created, err := s.unitRepo.CreateOwnershipHistory(ctx, h)
+	if err != nil {
+		return nil, fmt.Errorf("org service: TransferOwnership: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "ownership transferred", "unit_id", unitID, "to_user_id", req.ToUserID)
+	return created, nil
+}
+
+// GetOwnershipHistory returns all ownership history records for the given unit.
+func (s *OrgService) GetOwnershipHistory(ctx context.Context, unitID uuid.UUID) ([]UnitOwnershipHistory, error) {
+	history, err := s.unitRepo.ListOwnershipHistoryByUnit(ctx, unitID)
+	if err != nil {
+		return nil, fmt.Errorf("org service: GetOwnershipHistory: %w", err)
+	}
+	return history, nil
+}

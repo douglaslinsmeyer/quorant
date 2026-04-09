@@ -1,6 +1,8 @@
 package org
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
 )
@@ -170,6 +172,34 @@ type UpdateUnitMembershipRequest struct {
 	Relationship *string `json:"relationship,omitempty"`
 	IsVoter      *bool   `json:"is_voter,omitempty"`
 	Notes        *string `json:"notes,omitempty"`
+}
+
+// TransferOwnershipRequest is the request body for
+// POST /api/v1/organizations/{org_id}/units/{unit_id}/transfer.
+type TransferOwnershipRequest struct {
+	ToUserID                uuid.UUID  `json:"to_user_id"`    // required
+	TransferType            string     `json:"transfer_type"` // required: sale|gift|inheritance|foreclosure|other
+	TransferDate            time.Time  `json:"transfer_date"` // required
+	FromUserID              *uuid.UUID `json:"from_user_id,omitempty"`
+	SalePriceCents          *int64     `json:"sale_price_cents,omitempty"`
+	OutstandingBalanceCents *int64     `json:"outstanding_balance_cents,omitempty"`
+	BalanceSettled          bool       `json:"balance_settled"`
+	RecordingRef            *string    `json:"recording_ref,omitempty"`
+	Notes                   *string    `json:"notes,omitempty"`
+}
+
+// Validate checks that the required fields are present.
+func (r TransferOwnershipRequest) Validate() error {
+	if r.ToUserID == (uuid.UUID{}) {
+		return api.NewValidationError("to_user_id is required", "to_user_id")
+	}
+	if r.TransferType == "" {
+		return api.NewValidationError("transfer_type is required", "transfer_type")
+	}
+	if r.TransferDate.IsZero() {
+		return api.NewValidationError("transfer_date is required", "transfer_date")
+	}
+	return nil
 }
 
 // ConnectManagementRequest is the request body for

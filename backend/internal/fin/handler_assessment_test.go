@@ -60,6 +60,8 @@ func setupAssessmentTestServer(t *testing.T) *assessmentTestServer {
 	mux.HandleFunc("POST /organizations/{org_id}/assessments", assessHandler.CreateAssessment)
 	mux.HandleFunc("GET /organizations/{org_id}/assessments", assessHandler.ListAssessments)
 	mux.HandleFunc("GET /organizations/{org_id}/assessments/{assessment_id}", assessHandler.GetAssessment)
+	mux.HandleFunc("PATCH /organizations/{org_id}/assessments/{assessment_id}", assessHandler.UpdateAssessment)
+	mux.HandleFunc("DELETE /organizations/{org_id}/assessments/{assessment_id}", assessHandler.DeleteAssessment)
 	mux.HandleFunc("GET /organizations/{org_id}/units/{unit_id}/ledger", assessHandler.GetUnitLedger)
 	mux.HandleFunc("GET /organizations/{org_id}/ledger", assessHandler.GetOrgLedger)
 
@@ -496,4 +498,69 @@ func TestGetOrgLedger_Success(t *testing.T) {
 	}
 	decodeFinBody(t, resp, &envelope)
 	assert.Len(t, envelope.Data, 2)
+}
+
+// ── UpdateAssessment tests ────────────────────────────────────────────────────
+
+func TestUpdateAssessment_Success(t *testing.T) {
+	ts := setupAssessmentTestServer(t)
+	orgID := uuid.New()
+	unitID := uuid.New()
+	assessment := seedAssessment(t, ts.mockAssessRepo, orgID, unitID)
+
+	newDesc := "Updated Q1 Assessment"
+	body := map[string]any{
+		"description":  newDesc,
+		"amount_cents": 30000,
+		"due_date":     time.Now().Add(30 * 24 * time.Hour).Format(time.RFC3339),
+	}
+	resp := doFinRequest(t, ts.server.URL, http.MethodPatch,
+		fmt.Sprintf("/organizations/%s/assessments/%s", orgID, assessment.ID), body)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var envelope struct {
+		Data *fin.Assessment `json:"data"`
+	}
+	decodeFinBody(t, resp, &envelope)
+	require.NotNil(t, envelope.Data)
+	assert.Equal(t, newDesc, envelope.Data.Description)
+}
+
+func TestUpdateAssessment_NotFound(t *testing.T) {
+	ts := setupAssessmentTestServer(t)
+	orgID := uuid.New()
+
+	body := map[string]any{
+		"description":  "Ghost",
+		"amount_cents": 10000,
+		"due_date":     time.Now().Add(30 * 24 * time.Hour).Format(time.RFC3339),
+	}
+	resp := doFinRequest(t, ts.server.URL, http.MethodPatch,
+		fmt.Sprintf("/organizations/%s/assessments/%s", orgID, uuid.New()), body)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	resp.Body.Close()
+}
+
+// ── DeleteAssessment tests ────────────────────────────────────────────────────
+
+func TestDeleteAssessment_Success(t *testing.T) {
+	ts := setupAssessmentTestServer(t)
+	orgID := uuid.New()
+	unitID := uuid.New()
+	assessment := seedAssessment(t, ts.mockAssessRepo, orgID, unitID)
+
+	resp := doFinRequest(t, ts.server.URL, http.MethodDelete,
+		fmt.Sprintf("/organizations/%s/assessments/%s", orgID, assessment.ID), nil)
+	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+	resp.Body.Close()
+}
+
+func TestDeleteAssessment_NotFound(t *testing.T) {
+	ts := setupAssessmentTestServer(t)
+	orgID := uuid.New()
+
+	resp := doFinRequest(t, ts.server.URL, http.MethodDelete,
+		fmt.Sprintf("/organizations/%s/assessments/%s", orgID, uuid.New()), nil)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	resp.Body.Close()
 }

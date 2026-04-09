@@ -64,4 +64,6 @@ func RegisterRoutes(
 	mux.Handle("GET /api/v1/organizations/{org_id}/units/{unit_id}/memberships", permMw("org.unit_membership.read", unitHandler.ListUnitMemberships))
 	mux.Handle("PATCH /api/v1/organizations/{org_id}/units/{unit_id}/memberships/{id}", permMw("org.unit_membership.manage", unitHandler.UpdateUnitMembership))
 	mux.Handle("DELETE /api/v1/organizations/{org_id}/units/{unit_id}/memberships/{id}", permMw("org.unit_membership.manage", unitHandler.EndUnitMembership))
+	mux.Handle("POST /api/v1/organizations/{org_id}/units/{unit_id}/transfer", permMw("org.unit.update", unitHandler.TransferOwnership))
+	mux.Handle("GET /api/v1/organizations/{org_id}/units/{unit_id}/ownership-history", permMw("org.unit.read", unitHandler.GetOwnershipHistory))
 }

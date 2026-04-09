@@ -52,6 +52,7 @@ func setupFundTestServer(t *testing.T) *fundTestServer {
 	mux.HandleFunc("POST /organizations/{org_id}/funds", fundHandler.CreateFund)
 	mux.HandleFunc("GET /organizations/{org_id}/funds", fundHandler.ListFunds)
 	mux.HandleFunc("GET /organizations/{org_id}/funds/{fund_id}", fundHandler.GetFund)
+	mux.HandleFunc("PATCH /organizations/{org_id}/funds/{fund_id}", fundHandler.UpdateFund)
 	mux.HandleFunc("GET /organizations/{org_id}/funds/{fund_id}/transactions", fundHandler.GetFundTransactions)
 	mux.HandleFunc("POST /organizations/{org_id}/fund-transfers", fundHandler.CreateFundTransfer)
 	mux.HandleFunc("GET /organizations/{org_id}/fund-transfers", fundHandler.ListFundTransfers)
@@ -292,4 +293,43 @@ func TestListFundTransfers_Success(t *testing.T) {
 	}
 	decodeFinBody(t, resp, &envelope)
 	assert.Len(t, envelope.Data, 1)
+}
+
+// ── UpdateFund tests ──────────────────────────────────────────────────────────
+
+func TestUpdateFund_Success(t *testing.T) {
+	ts := setupFundTestServer(t)
+	orgID := uuid.New()
+	fund := seedFund(t, ts.mockFundRepo, orgID)
+
+	body := map[string]any{
+		"name":      "Updated Reserve Fund",
+		"fund_type": "reserve",
+	}
+	resp := doFinRequest(t, ts.server.URL, http.MethodPatch,
+		fmt.Sprintf("/organizations/%s/funds/%s", orgID, fund.ID), body)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var envelope struct {
+		Data *fin.Fund `json:"data"`
+	}
+	decodeFinBody(t, resp, &envelope)
+	require.NotNil(t, envelope.Data)
+	assert.Equal(t, fund.ID, envelope.Data.ID)
+	assert.Equal(t, orgID, envelope.Data.OrgID)
+	assert.Equal(t, "Updated Reserve Fund", envelope.Data.Name)
+	assert.Equal(t, "reserve", envelope.Data.FundType)
+}
+
+func TestUpdateFund_NotFound(t *testing.T) {
+	ts := setupFundTestServer(t)
+	orgID := uuid.New()
+
+	body := map[string]any{
+		"name":      "Ghost Fund",
+		"fund_type": "reserve",
+	}
+	resp := doFinRequest(t, ts.server.URL, http.MethodPatch,
+		fmt.Sprintf("/organizations/%s/funds/%s", orgID, uuid.New()), body)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }

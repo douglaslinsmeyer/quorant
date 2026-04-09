@@ -215,6 +215,12 @@ type FundTransfer struct {
 	CreatedAt    time.Time  `json:"created_at"`
 }
 
+// BudgetReport combines a Budget with its line items for reporting.
+type BudgetReport struct {
+	Budget    *Budget          `json:"budget"`
+	LineItems []BudgetLineItem `json:"line_items"`
+}
+
 // CollectionCase tracks outstanding debt collection for a unit.
 type CollectionCase struct {
 	ID                uuid.UUID      `json:"id"`

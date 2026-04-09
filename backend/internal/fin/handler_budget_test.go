@@ -60,11 +60,14 @@ func setupBudgetTestServer(t *testing.T) *budgetTestServer {
 	mux.HandleFunc("POST /organizations/{org_id}/budgets/{budget_id}/line-items", budgetHandler.CreateLineItem)
 	mux.HandleFunc("PATCH /organizations/{org_id}/budgets/{budget_id}/line-items/{item_id}", budgetHandler.UpdateLineItem)
 	mux.HandleFunc("DELETE /organizations/{org_id}/budgets/{budget_id}/line-items/{item_id}", budgetHandler.DeleteLineItem)
+	mux.HandleFunc("GET /organizations/{org_id}/budgets/{budget_id}/report", budgetHandler.GetBudgetReport)
 	mux.HandleFunc("POST /organizations/{org_id}/budget-categories", budgetHandler.CreateCategory)
 	mux.HandleFunc("GET /organizations/{org_id}/budget-categories", budgetHandler.ListCategories)
+	mux.HandleFunc("PATCH /organizations/{org_id}/budget-categories/{category_id}", budgetHandler.UpdateCategory)
 	mux.HandleFunc("POST /organizations/{org_id}/expenses", budgetHandler.CreateExpense)
 	mux.HandleFunc("GET /organizations/{org_id}/expenses", budgetHandler.ListExpenses)
 	mux.HandleFunc("GET /organizations/{org_id}/expenses/{expense_id}", budgetHandler.GetExpense)
+	mux.HandleFunc("PATCH /organizations/{org_id}/expenses/{expense_id}", budgetHandler.UpdateExpense)
 	mux.HandleFunc("POST /organizations/{org_id}/expenses/{expense_id}/approve", budgetHandler.ApproveExpense)
 	mux.HandleFunc("POST /organizations/{org_id}/expenses/{expense_id}/pay", budgetHandler.PayExpense)
 
@@ -442,4 +445,113 @@ func TestPayExpense_WrongStatus(t *testing.T) {
 	resp := doFinRequest(t, ts.server.URL, http.MethodPost,
 		fmt.Sprintf("/organizations/%s/expenses/%s/pay", orgID, expense.ID), nil)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+// ── GetBudgetReport tests ─────────────────────────────────────────────────────
+
+func TestGetBudgetReport_Success(t *testing.T) {
+	ts := setupBudgetTestServer(t)
+	orgID := uuid.New()
+	budget := seedBudget(t, ts.mockBudgetRepo, orgID)
+	// Add a line item to the budget.
+	ts.mockBudgetRepo.lineItems = append(ts.mockBudgetRepo.lineItems, fin.BudgetLineItem{
+		ID:           uuid.New(),
+		BudgetID:     budget.ID,
+		CategoryID:   uuid.New(),
+		PlannedCents: 100000,
+		ActualCents:  80000,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	})
+
+	resp := doFinRequest(t, ts.server.URL, http.MethodGet,
+		fmt.Sprintf("/organizations/%s/budgets/%s/report", orgID, budget.ID), nil)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var envelope struct {
+		Data *fin.BudgetReport `json:"data"`
+	}
+	decodeFinBody(t, resp, &envelope)
+	require.NotNil(t, envelope.Data)
+	require.NotNil(t, envelope.Data.Budget)
+	assert.Equal(t, budget.ID, envelope.Data.Budget.ID)
+	assert.Len(t, envelope.Data.LineItems, 1)
+}
+
+func TestGetBudgetReport_NotFound(t *testing.T) {
+	ts := setupBudgetTestServer(t)
+	orgID := uuid.New()
+
+	resp := doFinRequest(t, ts.server.URL, http.MethodGet,
+		fmt.Sprintf("/organizations/%s/budgets/%s/report", orgID, uuid.New()), nil)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	resp.Body.Close()
+}
+
+// ── UpdateCategory tests ──────────────────────────────────────────────────────
+
+func TestUpdateCategory_Success(t *testing.T) {
+	ts := setupBudgetTestServer(t)
+	orgID := uuid.New()
+	cat := fin.BudgetCategory{
+		ID:           uuid.New(),
+		OrgID:        orgID,
+		Name:         "Landscaping",
+		CategoryType: "expense",
+		CreatedAt:    time.Now(),
+	}
+	ts.mockBudgetRepo.categories = append(ts.mockBudgetRepo.categories, cat)
+
+	body := map[string]any{"name": "Landscaping & Grounds", "category_type": "expense"}
+	resp := doFinRequest(t, ts.server.URL, http.MethodPatch,
+		fmt.Sprintf("/organizations/%s/budget-categories/%s", orgID, cat.ID), body)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var envelope struct {
+		Data *fin.BudgetCategory `json:"data"`
+	}
+	decodeFinBody(t, resp, &envelope)
+	require.NotNil(t, envelope.Data)
+	assert.Equal(t, "Landscaping & Grounds", envelope.Data.Name)
+}
+
+// ── UpdateExpense tests ───────────────────────────────────────────────────────
+
+func TestUpdateExpense_Success(t *testing.T) {
+	ts := setupBudgetTestServer(t)
+	orgID := uuid.New()
+	expense := seedExpense(t, ts.mockBudgetRepo, orgID, "pending")
+
+	body := map[string]any{
+		"description":  "Updated vendor invoice",
+		"amount_cents": 75000,
+		"expense_date": time.Now().Format(time.RFC3339),
+		"status":       "pending",
+	}
+	resp := doFinRequest(t, ts.server.URL, http.MethodPatch,
+		fmt.Sprintf("/organizations/%s/expenses/%s", orgID, expense.ID), body)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var envelope struct {
+		Data *fin.Expense `json:"data"`
+	}
+	decodeFinBody(t, resp, &envelope)
+	require.NotNil(t, envelope.Data)
+	assert.Equal(t, "Updated vendor invoice", envelope.Data.Description)
+}
+
+func TestUpdateExpense_NotFound(t *testing.T) {
+	ts := setupBudgetTestServer(t)
+	orgID := uuid.New()
+
+	body := map[string]any{
+		"description":  "Ghost",
+		"amount_cents": 1000,
+		"expense_date": time.Now().Format(time.RFC3339),
+		"status":       "pending",
+	}
+	resp := doFinRequest(t, ts.server.URL, http.MethodPatch,
+		fmt.Sprintf("/organizations/%s/expenses/%s", orgID, uuid.New()), body)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	resp.Body.Close()
 }

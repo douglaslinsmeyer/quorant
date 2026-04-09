@@ -28,4 +28,8 @@ type UnitRepository interface {
 	ListUnitMemberships(ctx context.Context, unitID uuid.UUID) ([]UnitMembership, error)
 	UpdateUnitMembership(ctx context.Context, m *UnitMembership) (*UnitMembership, error)
 	EndUnitMembership(ctx context.Context, id uuid.UUID) error // sets ended_at
+
+	// Ownership History
+	CreateOwnershipHistory(ctx context.Context, h *UnitOwnershipHistory) (*UnitOwnershipHistory, error)
+	ListOwnershipHistoryByUnit(ctx context.Context, unitID uuid.UUID) ([]UnitOwnershipHistory, error)
 }

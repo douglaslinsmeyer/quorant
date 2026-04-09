@@ -254,13 +254,14 @@ func (m *mockMembershipRepo) SoftDelete(_ context.Context, id uuid.UUID) error {
 
 // mockUnitRepo is an in-memory UnitRepository for unit tests.
 type mockUnitRepo struct {
-	units           map[uuid.UUID]*org.Unit
-	properties      map[uuid.UUID]*org.Property
-	unitMemberships map[uuid.UUID]*org.UnitMembership
-	createErr       error
-	findErr         error
-	updateErr       error
-	deleteErr       error
+	units            map[uuid.UUID]*org.Unit
+	properties       map[uuid.UUID]*org.Property
+	unitMemberships  map[uuid.UUID]*org.UnitMembership
+	ownershipHistory []org.UnitOwnershipHistory
+	createErr        error
+	findErr          error
+	updateErr        error
+	deleteErr        error
 }
 
 func newMockUnitRepo() *mockUnitRepo {
@@ -419,6 +420,35 @@ func (m *mockUnitRepo) EndUnitMembership(_ context.Context, id uuid.UUID) error 
 		um.EndedAt = &now
 	}
 	return nil
+}
+
+func (m *mockUnitRepo) CreateOwnershipHistory(_ context.Context, h *org.UnitOwnershipHistory) (*org.UnitOwnershipHistory, error) {
+	if m.createErr != nil {
+		return nil, m.createErr
+	}
+	if h.ID == uuid.Nil {
+		h.ID = uuid.New()
+	}
+	h.CreatedAt = time.Now()
+	copy := *h
+	m.ownershipHistory = append(m.ownershipHistory, copy)
+	return &copy, nil
+}
+
+func (m *mockUnitRepo) ListOwnershipHistoryByUnit(_ context.Context, unitID uuid.UUID) ([]org.UnitOwnershipHistory, error) {
+	if m.findErr != nil {
+		return nil, m.findErr
+	}
+	var result []org.UnitOwnershipHistory
+	for _, h := range m.ownershipHistory {
+		if h.UnitID == unitID {
+			result = append(result, h)
+		}
+	}
+	if result == nil {
+		return []org.UnitOwnershipHistory{}, nil
+	}
+	return result, nil
 }
 
 // mockUserRepo is a minimal iam.UserRepository for unit tests.

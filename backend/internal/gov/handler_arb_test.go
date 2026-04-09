@@ -47,6 +47,7 @@ func setupARBTestServer(t *testing.T) *arbTestServer {
 	mux.HandleFunc("GET /organizations/{org_id}/arb-requests/{request_id}", handler.GetARBRequest)
 	mux.HandleFunc("PATCH /organizations/{org_id}/arb-requests/{request_id}", handler.UpdateARBRequest)
 	mux.HandleFunc("POST /organizations/{org_id}/arb-requests/{request_id}/votes", handler.CastARBVote)
+	mux.HandleFunc("POST /organizations/{org_id}/arb-requests/{request_id}/conditions/{condition_id}/verify", handler.VerifyCondition)
 	mux.HandleFunc("POST /organizations/{org_id}/arb-requests/{request_id}/request-revision", handler.RequestRevision)
 
 	testUserID := uuid.New()
@@ -272,5 +273,65 @@ func TestRequestRevision_NotFound(t *testing.T) {
 
 	resp := doARBRequest(t, ts.server.URL, http.MethodPost,
 		fmt.Sprintf("/organizations/%s/arb-requests/%s/request-revision", orgID, uuid.New()), nil)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+// ── VerifyCondition tests ─────────────────────────────────────────────────────
+
+func TestVerifyCondition_Success(t *testing.T) {
+	ts := setupARBTestServer(t)
+	orgID := uuid.New()
+	arb := seedARBRequest(t, ts.mockARB, orgID)
+
+	// Attach a conditions array to the ARB request.
+	conditionID := uuid.New()
+	conditionsJSON, err := json.Marshal([]map[string]any{
+		{"id": conditionID.String(), "text": "Install privacy fence", "verified": false},
+	})
+	require.NoError(t, err)
+	arb.Conditions = conditionsJSON
+	ts.mockARB.requests[arb.ID] = arb
+
+	resp := doARBRequest(t, ts.server.URL, http.MethodPost,
+		fmt.Sprintf("/organizations/%s/arb-requests/%s/conditions/%s/verify", orgID, arb.ID, conditionID), nil)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var envelope struct {
+		Data *gov.ARBRequest `json:"data"`
+	}
+	decodeARBBody(t, resp, &envelope)
+	require.NotNil(t, envelope.Data)
+
+	// Verify that the condition is marked as verified in the response.
+	var updatedConditions []map[string]any
+	require.NoError(t, json.Unmarshal(envelope.Data.Conditions, &updatedConditions))
+	require.Len(t, updatedConditions, 1)
+	assert.Equal(t, true, updatedConditions[0]["verified"])
+}
+
+func TestVerifyCondition_ConditionNotFound(t *testing.T) {
+	ts := setupARBTestServer(t)
+	orgID := uuid.New()
+	arb := seedARBRequest(t, ts.mockARB, orgID)
+
+	// Conditions with a different ID than the one we'll request.
+	conditionsJSON, err := json.Marshal([]map[string]any{
+		{"id": uuid.New().String(), "text": "Some condition", "verified": false},
+	})
+	require.NoError(t, err)
+	arb.Conditions = conditionsJSON
+	ts.mockARB.requests[arb.ID] = arb
+
+	resp := doARBRequest(t, ts.server.URL, http.MethodPost,
+		fmt.Sprintf("/organizations/%s/arb-requests/%s/conditions/%s/verify", orgID, arb.ID, uuid.New()), nil)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func TestVerifyCondition_RequestNotFound(t *testing.T) {
+	ts := setupARBTestServer(t)
+	orgID := uuid.New()
+
+	resp := doARBRequest(t, ts.server.URL, http.MethodPost,
+		fmt.Sprintf("/organizations/%s/arb-requests/%s/conditions/%s/verify", orgID, uuid.New(), uuid.New()), nil)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
