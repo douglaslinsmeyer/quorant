@@ -15,6 +15,7 @@ import (
 
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/fin"
+	"github.com/quorant/quorant/internal/gov"
 	"github.com/quorant/quorant/internal/iam"
 	"github.com/quorant/quorant/internal/org"
 	"github.com/quorant/quorant/internal/platform/auth"
@@ -131,6 +132,18 @@ func run() error {
 	fundHandler := fin.NewFundHandler(finService, logger)
 	collectionHandler := fin.NewCollectionHandler(finService, logger)
 	fin.RegisterRoutes(mux, assessmentHandler, paymentHandler, budgetHandler, fundHandler, collectionHandler, tokenValidator)
+
+	// Gov module
+	violationRepo := gov.NewPostgresViolationRepository(pool)
+	arbRepo := gov.NewPostgresARBRepository(pool)
+	ballotRepo := gov.NewPostgresBallotRepository(pool)
+	meetingRepo := gov.NewPostgresMeetingRepository(pool)
+	govService := gov.NewGovService(violationRepo, arbRepo, ballotRepo, meetingRepo, logger)
+	violationHandler := gov.NewViolationHandler(govService, logger)
+	arbHandler := gov.NewARBHandler(govService, logger)
+	ballotHandler := gov.NewBallotHandler(govService, logger)
+	meetingHandler := gov.NewMeetingHandler(govService, logger)
+	gov.RegisterRoutes(mux, violationHandler, arbHandler, ballotHandler, meetingHandler, tokenValidator)
 
 	// 10. Middleware chain (innermost to outermost)
 	var handler http.Handler = mux
