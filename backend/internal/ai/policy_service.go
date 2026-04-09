@@ -82,6 +82,11 @@ func (s *PolicyService) ReindexGoverningDoc(ctx context.Context, id uuid.UUID) (
 	return s.repo.UpdateGoverningDoc(ctx, doc)
 }
 
+// UpdateGoverningDoc updates a governing document.
+func (s *PolicyService) UpdateGoverningDoc(ctx context.Context, doc *GoverningDocument) (*GoverningDocument, error) {
+	return s.repo.UpdateGoverningDoc(ctx, doc)
+}
+
 // ─── Policy Extractions ───────────────────────────────────────────────────────
 
 // ListExtractions returns all policy extractions for the given org.

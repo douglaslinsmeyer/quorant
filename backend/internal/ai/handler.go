@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/org"
@@ -96,15 +97,30 @@ func (h *AIHandler) GetGoverningDoc(w http.ResponseWriter, r *http.Request) {
 }
 
 // RemoveGoverningDoc handles DELETE /organizations/{org_id}/governing-documents/{doc_id}
-// TODO: arch doc specifies "supersede, not delete" — implement supersession when doc versioning is added.
+// Per the arch doc: "supersede, not delete" — marks the document as superseded
+// by updating its indexing_status and leaving it in place for audit history.
 func (h *AIHandler) RemoveGoverningDoc(w http.ResponseWriter, r *http.Request) {
-	_, err := uuid.Parse(r.PathValue("doc_id"))
+	docID, err := uuid.Parse(r.PathValue("doc_id"))
 	if err != nil {
 		api.WriteError(w, api.NewValidationError("doc_id must be a valid UUID", "doc_id"))
 		return
 	}
 
-	// TODO: supersede the document rather than hard-deleting.
+	doc, err := h.policyService.GetGoverningDoc(r.Context(), docID)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	// Mark as superseded by setting indexing_status to a terminal state
+	indexedAt := time.Now()
+	doc.IndexingStatus = "failed" // reuse "failed" status to indicate no longer active
+	doc.IndexedAt = &indexedAt
+	if _, err := h.policyService.UpdateGoverningDoc(r.Context(), doc); err != nil {
+		api.WriteError(w, api.NewInternalError(err))
+		return
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 
