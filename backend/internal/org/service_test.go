@@ -989,7 +989,7 @@ func TestUpdateUnit_Success(t *testing.T) {
 	unitRepo.units[id] = &org.Unit{ID: id, Label: "Old Label", VotingWeight: 1.0}
 
 	newLabel := "New Label"
-	updated, err := svc.UpdateUnit(context.Background(), id, &newLabel, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	updated, err := svc.UpdateUnit(context.Background(), id, org.UpdateUnitRequest{Label: &newLabel})
 
 	require.NoError(t, err)
 	assert.Equal(t, "New Label", updated.Label)
@@ -999,7 +999,7 @@ func TestUpdateUnit_NotFound(t *testing.T) {
 	svc, _, _, _, _ := newDefaultTestService()
 
 	newLabel := "Anything"
-	_, err := svc.UpdateUnit(context.Background(), uuid.New(), &newLabel, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	_, err := svc.UpdateUnit(context.Background(), uuid.New(), org.UpdateUnitRequest{Label: &newLabel})
 
 	require.Error(t, err)
 	var notFound *api.NotFoundError
