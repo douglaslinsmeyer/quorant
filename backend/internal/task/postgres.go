@@ -185,8 +185,10 @@ func (r *PostgresTaskRepository) FindTaskByID(ctx context.Context, id uuid.UUID)
 	return result, nil
 }
 
-// ListTasksByOrg returns all tasks belonging to an organization.
-func (r *PostgresTaskRepository) ListTasksByOrg(ctx context.Context, orgID uuid.UUID) ([]Task, error) {
+// ListTasksByOrg returns tasks belonging to an organization, supporting
+// cursor-based pagination ordered by id DESC.
+// afterID is the cursor from the previous page; hasMore is true when more items exist.
+func (r *PostgresTaskRepository) ListTasksByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Task, bool, error) {
 	const q = `
 		SELECT id, org_id, task_type_id, title, description, status, priority,
 		       current_stage, resource_type, resource_id, unit_id,
@@ -197,15 +199,26 @@ func (r *PostgresTaskRepository) ListTasksByOrg(ctx context.Context, orgID uuid.
 		       created_by, metadata, created_at, updated_at
 		FROM tasks
 		WHERE org_id = $1
-		ORDER BY created_at DESC`
+		  AND ($3::uuid IS NULL OR id < $3)
+		ORDER BY id DESC
+		LIMIT $2`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.pool.Query(ctx, q, orgID, limit+1, afterID)
 	if err != nil {
-		return nil, fmt.Errorf("task: ListTasksByOrg: %w", err)
+		return nil, false, fmt.Errorf("task: ListTasksByOrg: %w", err)
 	}
 	defer rows.Close()
 
-	return collectTasks(rows, "ListTasksByOrg")
+	results, err := collectTasks(rows, "ListTasksByOrg")
+	if err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(results) > limit
+	if hasMore {
+		results = results[:limit]
+	}
+	return results, hasMore, nil
 }
 
 // ListTasksByAssignee returns all tasks assigned to a user across orgs.

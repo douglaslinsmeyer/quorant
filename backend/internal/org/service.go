@@ -94,25 +94,26 @@ func (s *OrgService) GetOrganization(ctx context.Context, id uuid.UUID) (*Organi
 
 // ListOrganizations returns the organizations accessible by the authenticated user.
 // It extracts the user from the JWT claims stored in the context.
-func (s *OrgService) ListOrganizations(ctx context.Context) ([]Organization, error) {
+// limit controls the page size; afterID is the cursor from the previous page.
+func (s *OrgService) ListOrganizations(ctx context.Context, limit int, afterID *uuid.UUID) ([]Organization, bool, error) {
 	claims, ok := auth.ClaimsFromContext(ctx)
 	if !ok {
-		return nil, api.NewUnauthenticatedError("no claims in context")
+		return nil, false, api.NewUnauthenticatedError("no claims in context")
 	}
 
 	user, err := s.userRepo.FindByIDPUserID(ctx, claims.Subject)
 	if err != nil {
-		return nil, fmt.Errorf("org service: ListOrganizations find user: %w", err)
+		return nil, false, fmt.Errorf("org service: ListOrganizations find user: %w", err)
 	}
 	if user == nil {
-		return nil, api.NewNotFoundError("user not found")
+		return nil, false, api.NewNotFoundError("user not found")
 	}
 
-	orgs, err := s.orgRepo.ListByUserAccess(ctx, user.ID)
+	orgs, hasMore, err := s.orgRepo.ListByUserAccess(ctx, user.ID, limit, afterID)
 	if err != nil {
-		return nil, fmt.Errorf("org service: ListOrganizations: %w", err)
+		return nil, false, fmt.Errorf("org service: ListOrganizations: %w", err)
 	}
-	return orgs, nil
+	return orgs, hasMore, nil
 }
 
 // UpdateOrganization validates the request, applies changes, and persists the update.
@@ -379,13 +380,14 @@ func (s *OrgService) GetUnit(ctx context.Context, id uuid.UUID) (*Unit, error) {
 	return unit, nil
 }
 
-// ListUnits returns all units belonging to the given org.
-func (s *OrgService) ListUnits(ctx context.Context, orgID uuid.UUID) ([]Unit, error) {
-	units, err := s.unitRepo.ListUnitsByOrg(ctx, orgID)
+// ListUnits returns units belonging to the given org, supporting cursor-based pagination.
+// limit controls the page size; afterID is the cursor from the previous page.
+func (s *OrgService) ListUnits(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Unit, bool, error) {
+	units, hasMore, err := s.unitRepo.ListUnitsByOrg(ctx, orgID, limit, afterID)
 	if err != nil {
-		return nil, fmt.Errorf("org service: ListUnits: %w", err)
+		return nil, false, fmt.Errorf("org service: ListUnits: %w", err)
 	}
-	return units, nil
+	return units, hasMore, nil
 }
 
 // UpdateUnit applies partial updates to a unit.

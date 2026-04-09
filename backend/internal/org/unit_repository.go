@@ -11,7 +11,10 @@ type UnitRepository interface {
 	// Unit CRUD
 	CreateUnit(ctx context.Context, unit *Unit) (*Unit, error)
 	FindUnitByID(ctx context.Context, id uuid.UUID) (*Unit, error)
-	ListUnitsByOrg(ctx context.Context, orgID uuid.UUID) ([]Unit, error)
+	// ListUnitsByOrg returns units for the org, supporting cursor-based pagination.
+	// afterID is an optional cursor (ID of the last item from the previous page).
+	// hasMore is true when additional items exist beyond the returned page.
+	ListUnitsByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Unit, bool, error)
 	UpdateUnit(ctx context.Context, unit *Unit) (*Unit, error)
 	SoftDeleteUnit(ctx context.Context, id uuid.UUID) error
 

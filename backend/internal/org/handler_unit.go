@@ -53,14 +53,30 @@ func (h *UnitHandler) ListUnits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	units, err := h.service.ListUnits(r.Context(), orgID)
+	page := api.ParsePageRequest(r)
+
+	afterID, err := parseCursorID(page.Cursor)
+	if err != nil {
+		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		return
+	}
+
+	units, hasMore, err := h.service.ListUnits(r.Context(), orgID, page.Limit, afterID)
 	if err != nil {
 		h.logger.Error("ListUnits failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, units)
+	var meta *api.Meta
+	if hasMore && len(units) > 0 {
+		meta = &api.Meta{
+			Cursor:  api.EncodeCursor(map[string]string{"id": units[len(units)-1].ID.String()}),
+			HasMore: true,
+		}
+	}
+
+	api.WriteJSONWithMeta(w, http.StatusOK, units, meta)
 }
 
 // GetUnit handles GET /api/v1/organizations/{org_id}/units/{unit_id}.

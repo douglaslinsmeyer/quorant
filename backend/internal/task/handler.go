@@ -110,14 +110,29 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tasks, err := h.service.ListTasks(r.Context(), orgID)
+	page := api.ParsePageRequest(r)
+	afterID, err := parseTaskCursorID(page.Cursor)
+	if err != nil {
+		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		return
+	}
+
+	tasks, hasMore, err := h.service.ListTasks(r.Context(), orgID, page.Limit, afterID)
 	if err != nil {
 		h.logger.Error("ListTasks failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, tasks)
+	var meta *api.Meta
+	if hasMore && len(tasks) > 0 {
+		meta = &api.Meta{
+			Cursor:  api.EncodeCursor(map[string]string{"id": tasks[len(tasks)-1].ID.String()}),
+			HasMore: true,
+		}
+	}
+
+	api.WriteJSONWithMeta(w, http.StatusOK, tasks, meta)
 }
 
 // Get handles GET /api/v1/organizations/{org_id}/tasks/{task_id}.
@@ -331,6 +346,23 @@ func (h *TaskHandler) UpdateType(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// parseTaskCursorID decodes a pagination cursor and returns the ID it encodes.
+// Returns nil, nil when cursor is empty (first page).
+func parseTaskCursorID(cursor string) (*uuid.UUID, error) {
+	if cursor == "" {
+		return nil, nil
+	}
+	vals, err := api.DecodeCursor(cursor)
+	if err != nil {
+		return nil, err
+	}
+	id, err := uuid.Parse(vals["id"])
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
+}
 
 // parseTaskPathUUID extracts and parses a UUID path value by the given key.
 func parseTaskPathUUID(r *http.Request, key string) (uuid.UUID, error) {

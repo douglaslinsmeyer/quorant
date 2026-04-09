@@ -86,13 +86,14 @@ func (s *ComService) CreateAnnouncement(ctx context.Context, orgID uuid.UUID, re
 	return created, nil
 }
 
-// ListAnnouncements returns all announcements for an organization.
-func (s *ComService) ListAnnouncements(ctx context.Context, orgID uuid.UUID) ([]Announcement, error) {
-	result, err := s.announcements.ListByOrg(ctx, orgID)
+// ListAnnouncements returns announcements for an organization, supporting cursor-based pagination.
+// limit controls the page size; afterID is the cursor from the previous page.
+func (s *ComService) ListAnnouncements(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Announcement, bool, error) {
+	result, hasMore, err := s.announcements.ListByOrg(ctx, orgID, limit, afterID)
 	if err != nil {
-		return nil, fmt.Errorf("com service: ListAnnouncements: %w", err)
+		return nil, false, fmt.Errorf("com service: ListAnnouncements: %w", err)
 	}
-	return result, nil
+	return result, hasMore, nil
 }
 
 // GetAnnouncement returns an announcement by ID, or a 404 if not found.

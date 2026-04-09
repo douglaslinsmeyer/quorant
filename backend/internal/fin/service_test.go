@@ -99,7 +99,7 @@ func (m *mockAssessmentRepo) FindAssessmentByID(_ context.Context, id uuid.UUID)
 	return nil, nil
 }
 
-func (m *mockAssessmentRepo) ListAssessmentsByOrg(_ context.Context, orgID uuid.UUID) ([]fin.Assessment, error) {
+func (m *mockAssessmentRepo) ListAssessmentsByOrg(_ context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]fin.Assessment, bool, error) {
 	var result []fin.Assessment
 	for _, a := range m.assessments {
 		if a.OrgID == orgID {
@@ -107,9 +107,13 @@ func (m *mockAssessmentRepo) ListAssessmentsByOrg(_ context.Context, orgID uuid.
 		}
 	}
 	if result == nil {
-		return []fin.Assessment{}, nil
+		return []fin.Assessment{}, false, nil
 	}
-	return result, nil
+	hasMore := limit > 0 && len(result) > limit
+	if hasMore {
+		result = result[:limit]
+	}
+	return result, hasMore, nil
 }
 
 func (m *mockAssessmentRepo) ListAssessmentsByUnit(_ context.Context, unitID uuid.UUID) ([]fin.Assessment, error) {
@@ -163,7 +167,7 @@ func (m *mockAssessmentRepo) CreateLedgerEntry(_ context.Context, entry *fin.Led
 	return &out, nil
 }
 
-func (m *mockAssessmentRepo) ListLedgerByUnit(_ context.Context, unitID uuid.UUID) ([]fin.LedgerEntry, error) {
+func (m *mockAssessmentRepo) ListLedgerByUnit(_ context.Context, unitID uuid.UUID, limit int, afterID *uuid.UUID) ([]fin.LedgerEntry, bool, error) {
 	var result []fin.LedgerEntry
 	for _, e := range m.ledger {
 		if e.UnitID == unitID {
@@ -171,9 +175,13 @@ func (m *mockAssessmentRepo) ListLedgerByUnit(_ context.Context, unitID uuid.UUI
 		}
 	}
 	if result == nil {
-		return []fin.LedgerEntry{}, nil
+		return []fin.LedgerEntry{}, false, nil
 	}
-	return result, nil
+	hasMore := limit > 0 && len(result) > limit
+	if hasMore {
+		result = result[:limit]
+	}
+	return result, hasMore, nil
 }
 
 func (m *mockAssessmentRepo) ListLedgerByOrg(_ context.Context, orgID uuid.UUID) ([]fin.LedgerEntry, error) {
@@ -224,7 +232,7 @@ func (m *mockPaymentRepo) FindPaymentByID(_ context.Context, id uuid.UUID) (*fin
 	return nil, nil
 }
 
-func (m *mockPaymentRepo) ListPaymentsByOrg(_ context.Context, orgID uuid.UUID) ([]fin.Payment, error) {
+func (m *mockPaymentRepo) ListPaymentsByOrg(_ context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]fin.Payment, bool, error) {
 	var result []fin.Payment
 	for _, p := range m.payments {
 		if p.OrgID == orgID {
@@ -232,9 +240,13 @@ func (m *mockPaymentRepo) ListPaymentsByOrg(_ context.Context, orgID uuid.UUID) 
 		}
 	}
 	if result == nil {
-		return []fin.Payment{}, nil
+		return []fin.Payment{}, false, nil
 	}
-	return result, nil
+	hasMore := limit > 0 && len(result) > limit
+	if hasMore {
+		result = result[:limit]
+	}
+	return result, hasMore, nil
 }
 
 func (m *mockPaymentRepo) ListPaymentsByUnit(_ context.Context, unitID uuid.UUID) ([]fin.Payment, error) {

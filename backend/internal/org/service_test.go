@@ -80,15 +80,19 @@ func (m *mockOrgRepo) FindBySlug(_ context.Context, slug string) (*org.Organizat
 	return nil, nil
 }
 
-func (m *mockOrgRepo) ListByUserAccess(_ context.Context, _ uuid.UUID) ([]org.Organization, error) {
+func (m *mockOrgRepo) ListByUserAccess(_ context.Context, _ uuid.UUID, limit int, afterID *uuid.UUID) ([]org.Organization, bool, error) {
 	if m.findErr != nil {
-		return nil, m.findErr
+		return nil, false, m.findErr
 	}
 	result := make([]org.Organization, 0, len(m.orgs))
 	for _, o := range m.orgs {
 		result = append(result, *o)
 	}
-	return result, nil
+	hasMore := limit > 0 && len(result) > limit
+	if hasMore {
+		result = result[:limit]
+	}
+	return result, hasMore, nil
 }
 
 func (m *mockOrgRepo) Update(_ context.Context, o *org.Organization) (*org.Organization, error) {
@@ -296,9 +300,9 @@ func (m *mockUnitRepo) FindUnitByID(_ context.Context, id uuid.UUID) (*org.Unit,
 	return &copy, nil
 }
 
-func (m *mockUnitRepo) ListUnitsByOrg(_ context.Context, orgID uuid.UUID) ([]org.Unit, error) {
+func (m *mockUnitRepo) ListUnitsByOrg(_ context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]org.Unit, bool, error) {
 	if m.findErr != nil {
-		return nil, m.findErr
+		return nil, false, m.findErr
 	}
 	result := []org.Unit{}
 	for _, u := range m.units {
@@ -306,7 +310,11 @@ func (m *mockUnitRepo) ListUnitsByOrg(_ context.Context, orgID uuid.UUID) ([]org
 			result = append(result, *u)
 		}
 	}
-	return result, nil
+	hasMore := limit > 0 && len(result) > limit
+	if hasMore {
+		result = result[:limit]
+	}
+	return result, hasMore, nil
 }
 
 func (m *mockUnitRepo) UpdateUnit(_ context.Context, u *org.Unit) (*org.Unit, error) {
@@ -594,7 +602,7 @@ func TestListOrganizations_UsesClaimsFromContext(t *testing.T) {
 		Name:    "Alice",
 	})
 
-	orgs, err := svc.ListOrganizations(ctx)
+	orgs, _, err := svc.ListOrganizations(ctx, 25, nil)
 
 	require.NoError(t, err)
 	assert.NotEmpty(t, orgs)
@@ -603,7 +611,7 @@ func TestListOrganizations_UsesClaimsFromContext(t *testing.T) {
 func TestListOrganizations_NoClaimsInContext(t *testing.T) {
 	svc, _, _, _, _ := newDefaultTestService()
 
-	_, err := svc.ListOrganizations(context.Background())
+	_, _, err := svc.ListOrganizations(context.Background(), 25, nil)
 
 	require.Error(t, err)
 	var unauthErr *api.UnauthenticatedError
@@ -619,7 +627,7 @@ func TestListOrganizations_UserNotFound(t *testing.T) {
 		Name:    "Ghost",
 	})
 
-	_, err := svc.ListOrganizations(ctx)
+	_, _, err := svc.ListOrganizations(ctx, 25, nil)
 
 	require.Error(t, err)
 	var notFound *api.NotFoundError
@@ -967,7 +975,7 @@ func TestListUnits_ReturnsUnitsForOrg(t *testing.T) {
 	unitRepo.units[uuid.New()] = &org.Unit{ID: uuid.New(), OrgID: orgID, Label: "Unit A"}
 	unitRepo.units[uuid.New()] = &org.Unit{ID: uuid.New(), OrgID: otherOrgID, Label: "Unit B"}
 
-	units, err := svc.ListUnits(context.Background(), orgID)
+	units, _, err := svc.ListUnits(context.Background(), orgID, 25, nil)
 
 	require.NoError(t, err)
 	require.Len(t, units, 1)

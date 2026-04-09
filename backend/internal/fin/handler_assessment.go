@@ -175,14 +175,29 @@ func (h *AssessmentHandler) ListAssessments(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	assessments, err := h.service.ListAssessments(r.Context(), orgID)
+	page := api.ParsePageRequest(r)
+	afterID, err := parseFinCursorID(page.Cursor)
+	if err != nil {
+		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		return
+	}
+
+	assessments, hasMore, err := h.service.ListAssessments(r.Context(), orgID, page.Limit, afterID)
 	if err != nil {
 		h.logger.Error("ListAssessments failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, assessments)
+	var meta *api.Meta
+	if hasMore && len(assessments) > 0 {
+		meta = &api.Meta{
+			Cursor:  api.EncodeCursor(map[string]string{"id": assessments[len(assessments)-1].ID.String()}),
+			HasMore: true,
+		}
+	}
+
+	api.WriteJSONWithMeta(w, http.StatusOK, assessments, meta)
 }
 
 // GetAssessment handles GET /organizations/{org_id}/assessments/{assessment_id}.
@@ -225,14 +240,29 @@ func (h *AssessmentHandler) GetUnitLedger(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	entries, err := h.service.GetUnitLedger(r.Context(), unitID)
+	page := api.ParsePageRequest(r)
+	afterID, err := parseFinCursorID(page.Cursor)
+	if err != nil {
+		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		return
+	}
+
+	entries, hasMore, err := h.service.GetUnitLedger(r.Context(), unitID, page.Limit, afterID)
 	if err != nil {
 		h.logger.Error("GetUnitLedger failed", "unit_id", unitID, "error", err)
 		api.WriteError(w, err)
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, entries)
+	var meta *api.Meta
+	if hasMore && len(entries) > 0 {
+		meta = &api.Meta{
+			Cursor:  api.EncodeCursor(map[string]string{"id": entries[len(entries)-1].ID.String()}),
+			HasMore: true,
+		}
+	}
+
+	api.WriteJSONWithMeta(w, http.StatusOK, entries, meta)
 }
 
 // GetOrgLedger handles GET /organizations/{org_id}/ledger.
@@ -254,6 +284,23 @@ func (h *AssessmentHandler) GetOrgLedger(w http.ResponseWriter, r *http.Request)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// parseFinCursorID decodes a pagination cursor and returns the ID it encodes.
+// Returns nil, nil when cursor is empty (first page).
+func parseFinCursorID(cursor string) (*uuid.UUID, error) {
+	if cursor == "" {
+		return nil, nil
+	}
+	vals, err := api.DecodeCursor(cursor)
+	if err != nil {
+		return nil, err
+	}
+	id, err := uuid.Parse(vals["id"])
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
+}
 
 // parseFinOrgID extracts and parses the {org_id} path value from the request.
 // Returns a ValidationError if the value is missing or not a valid UUID.

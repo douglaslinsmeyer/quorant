@@ -105,8 +105,9 @@ func (r *PostgresUnitRepository) FindUnitByID(ctx context.Context, id uuid.UUID)
 
 // ─── ListUnitsByOrg ──────────────────────────────────────────────────────────
 
-// ListUnitsByOrg returns all non-deleted units for the given org, ordered by label.
-func (r *PostgresUnitRepository) ListUnitsByOrg(ctx context.Context, orgID uuid.UUID) ([]Unit, error) {
+// ListUnitsByOrg returns non-deleted units for the given org, supporting cursor-based
+// pagination ordered by id. afterID is the ID of the last item from the previous page.
+func (r *PostgresUnitRepository) ListUnitsByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Unit, bool, error) {
 	const q = `
 		SELECT id, org_id, label, unit_type,
 		       address_line1, address_line2, city, state, zip,
@@ -114,15 +115,26 @@ func (r *PostgresUnitRepository) ListUnitsByOrg(ctx context.Context, orgID uuid.
 		       created_at, updated_at, deleted_at
 		FROM units
 		WHERE org_id = $1 AND deleted_at IS NULL
-		ORDER BY label`
+		  AND ($3::uuid IS NULL OR id > $3)
+		ORDER BY id
+		LIMIT $2`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.pool.Query(ctx, q, orgID, limit+1, afterID)
 	if err != nil {
-		return nil, fmt.Errorf("unit: ListUnitsByOrg: %w", err)
+		return nil, false, fmt.Errorf("unit: ListUnitsByOrg: %w", err)
 	}
 	defer rows.Close()
 
-	return collectUnits(rows, "ListUnitsByOrg")
+	units, err := collectUnits(rows, "ListUnitsByOrg")
+	if err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(units) > limit
+	if hasMore {
+		units = units[:limit]
+	}
+	return units, hasMore, nil
 }
 
 // ─── UpdateUnit ──────────────────────────────────────────────────────────────
