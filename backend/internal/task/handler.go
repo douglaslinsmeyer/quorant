@@ -12,12 +12,12 @@ import (
 
 // TaskHandler handles HTTP requests for the task module.
 type TaskHandler struct {
-	service *TaskService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewTaskHandler constructs a TaskHandler backed by the given service.
-func NewTaskHandler(service *TaskService, logger *slog.Logger) *TaskHandler {
+func NewTaskHandler(service Service, logger *slog.Logger) *TaskHandler {
 	return &TaskHandler{service: service, logger: logger}
 }
 

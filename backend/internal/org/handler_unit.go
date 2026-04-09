@@ -11,12 +11,12 @@ import (
 
 // UnitHandler handles unit, property, and unit membership HTTP requests.
 type UnitHandler struct {
-	service *OrgService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewUnitHandler constructs a UnitHandler backed by the given service.
-func NewUnitHandler(service *OrgService, logger *slog.Logger) *UnitHandler {
+func NewUnitHandler(service Service, logger *slog.Logger) *UnitHandler {
 	return &UnitHandler{service: service, logger: logger}
 }
 

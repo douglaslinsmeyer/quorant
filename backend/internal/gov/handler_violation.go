@@ -11,12 +11,12 @@ import (
 
 // ViolationHandler handles HTTP requests for the violations sub-domain.
 type ViolationHandler struct {
-	service *GovService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewViolationHandler constructs a ViolationHandler backed by the given service.
-func NewViolationHandler(service *GovService, logger *slog.Logger) *ViolationHandler {
+func NewViolationHandler(service Service, logger *slog.Logger) *ViolationHandler {
 	return &ViolationHandler{service: service, logger: logger}
 }
 

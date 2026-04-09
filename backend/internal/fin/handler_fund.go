@@ -9,12 +9,12 @@ import (
 
 // FundHandler handles HTTP requests for funds and fund transfers.
 type FundHandler struct {
-	service *FinService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewFundHandler constructs a FundHandler backed by the given service.
-func NewFundHandler(service *FinService, logger *slog.Logger) *FundHandler {
+func NewFundHandler(service Service, logger *slog.Logger) *FundHandler {
 	return &FundHandler{service: service, logger: logger}
 }
 

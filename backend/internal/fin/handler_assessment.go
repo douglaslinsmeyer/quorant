@@ -11,12 +11,12 @@ import (
 // AssessmentHandler handles HTTP requests for assessment schedules, assessments,
 // and the ledger.
 type AssessmentHandler struct {
-	service *FinService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewAssessmentHandler constructs an AssessmentHandler backed by the given service.
-func NewAssessmentHandler(service *FinService, logger *slog.Logger) *AssessmentHandler {
+func NewAssessmentHandler(service Service, logger *slog.Logger) *AssessmentHandler {
 	return &AssessmentHandler{service: service, logger: logger}
 }
 

@@ -10,12 +10,12 @@ import (
 
 // MembershipHandler handles membership HTTP requests.
 type MembershipHandler struct {
-	service *OrgService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewMembershipHandler constructs a MembershipHandler backed by the given service.
-func NewMembershipHandler(service *OrgService, logger *slog.Logger) *MembershipHandler {
+func NewMembershipHandler(service Service, logger *slog.Logger) *MembershipHandler {
 	return &MembershipHandler{service: service, logger: logger}
 }
 

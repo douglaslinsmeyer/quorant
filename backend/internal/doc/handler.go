@@ -11,12 +11,12 @@ import (
 
 // DocHandler handles HTTP requests for the document management module.
 type DocHandler struct {
-	service *DocService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewDocHandler constructs a DocHandler backed by the given service.
-func NewDocHandler(service *DocService, logger *slog.Logger) *DocHandler {
+func NewDocHandler(service Service, logger *slog.Logger) *DocHandler {
 	return &DocHandler{service: service, logger: logger}
 }
 

@@ -10,12 +10,12 @@ import (
 
 // AdminHandler handles admin HTTP requests.
 type AdminHandler struct {
-	service *AdminService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewAdminHandler constructs an AdminHandler backed by the given service and logger.
-func NewAdminHandler(service *AdminService, logger *slog.Logger) *AdminHandler {
+func NewAdminHandler(service Service, logger *slog.Logger) *AdminHandler {
 	return &AdminHandler{service: service, logger: logger}
 }
 

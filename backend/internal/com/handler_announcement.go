@@ -11,12 +11,12 @@ import (
 
 // AnnouncementHandler handles announcement HTTP requests.
 type AnnouncementHandler struct {
-	service *ComService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewAnnouncementHandler constructs an AnnouncementHandler backed by the given service.
-func NewAnnouncementHandler(service *ComService, logger *slog.Logger) *AnnouncementHandler {
+func NewAnnouncementHandler(service Service, logger *slog.Logger) *AnnouncementHandler {
 	return &AnnouncementHandler{service: service, logger: logger}
 }
 

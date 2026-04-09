@@ -10,12 +10,12 @@ import (
 
 // VendorHandler handles vendor and vendor assignment HTTP requests.
 type VendorHandler struct {
-	service *OrgService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewVendorHandler constructs a VendorHandler backed by the given service.
-func NewVendorHandler(service *OrgService, logger *slog.Logger) *VendorHandler {
+func NewVendorHandler(service Service, logger *slog.Logger) *VendorHandler {
 	return &VendorHandler{service: service, logger: logger}
 }
 
