@@ -2,10 +2,12 @@ package gov
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/ai"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/platform/api"
 	"github.com/quorant/quorant/internal/platform/queue"
@@ -19,6 +21,7 @@ type GovService struct {
 	meetings   MeetingRepository
 	auditor    audit.Auditor
 	publisher  queue.Publisher
+	policy     ai.PolicyResolver
 	logger     *slog.Logger
 }
 
@@ -30,6 +33,7 @@ func NewGovService(
 	meetings MeetingRepository,
 	auditor audit.Auditor,
 	publisher queue.Publisher,
+	policy ai.PolicyResolver,
 	logger *slog.Logger,
 ) *GovService {
 	return &GovService{
@@ -39,6 +43,7 @@ func NewGovService(
 		meetings:   meetings,
 		auditor:    auditor,
 		publisher:  publisher,
+		policy:     policy,
 		logger:     logger,
 	}
 }
@@ -74,6 +79,20 @@ func (s *GovService) ReportViolation(ctx context.Context, orgID uuid.UUID, req C
 		OffenseNumber: &offenseNum,
 		CreatedAt:     now,
 		UpdatedAt:     now,
+	}
+
+	// Optional: look up fine schedule policy to set cure deadline.
+	if s.policy != nil {
+		result, err := s.policy.GetPolicy(ctx, orgID, "fine_schedule")
+		if err == nil && result != nil {
+			var cfg struct {
+				CureDays int `json:"cure_days"`
+			}
+			if jsonErr := json.Unmarshal(result.Config, &cfg); jsonErr == nil && cfg.CureDays > 0 {
+				deadline := now.AddDate(0, 0, cfg.CureDays)
+				v.CureDeadline = &deadline
+			}
+		}
 	}
 
 	return s.violations.Create(ctx, v)

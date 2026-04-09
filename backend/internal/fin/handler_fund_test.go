@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/ai"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/fin"
 	"github.com/quorant/quorant/internal/platform/queue"
@@ -42,6 +43,7 @@ func setupFundTestServer(t *testing.T) *fundTestServer {
 		mockCollectionRepo,
 		audit.NewNoopAuditor(),
 		queue.NewInMemoryPublisher(),
+		ai.NewNoopPolicyResolver(),
 		logger,
 	)
 	fundHandler := fin.NewFundHandler(service, logger)

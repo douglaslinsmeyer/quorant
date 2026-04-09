@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/ai"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/gov"
 	"github.com/quorant/quorant/internal/platform/api"
@@ -357,7 +358,7 @@ func newTestService() (*gov.GovService, *mockViolationRepo, *mockARBRepo, *mockB
 	br := newMockBallotRepo()
 	mr := newMockMeetingRepo()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	svc := gov.NewGovService(vr, ar, br, mr, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
+	svc := gov.NewGovService(vr, ar, br, mr, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), ai.NewNoopPolicyResolver(), logger)
 	return svc, vr, ar, br, mr
 }
 

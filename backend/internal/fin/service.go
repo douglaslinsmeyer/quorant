@@ -2,11 +2,13 @@ package fin
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/ai"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/platform/api"
 	"github.com/quorant/quorant/internal/platform/queue"
@@ -36,6 +38,7 @@ type FinService struct {
 	collections CollectionRepository
 	auditor     audit.Auditor
 	publisher   queue.Publisher
+	policy      ai.PolicyResolver
 	logger      *slog.Logger
 }
 
@@ -48,6 +51,7 @@ func NewFinService(
 	collections CollectionRepository,
 	auditor audit.Auditor,
 	publisher queue.Publisher,
+	policy ai.PolicyResolver,
 	logger *slog.Logger,
 ) *FinService {
 	return &FinService{
@@ -58,6 +62,7 @@ func NewFinService(
 		collections: collections,
 		auditor:     auditor,
 		publisher:   publisher,
+		policy:      policy,
 		logger:      logger,
 	}
 }
@@ -166,6 +171,20 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 		DueDate:     req.DueDate,
 		GraceDays:   req.GraceDays,
 	}
+
+	// Optional: look up late fee policy to set late_fee_cents if not provided.
+	if s.policy != nil && a.LateFeeCents == nil {
+		result, err := s.policy.GetPolicy(ctx, orgID, "late_fee_schedule")
+		if err == nil && result != nil {
+			var cfg struct {
+				LateFeeCents int64 `json:"late_fee_cents"`
+			}
+			if jsonErr := json.Unmarshal(result.Config, &cfg); jsonErr == nil && cfg.LateFeeCents > 0 {
+				a.LateFeeCents = &cfg.LateFeeCents
+			}
+		}
+	}
+
 	created, err := s.assessments.CreateAssessment(ctx, a)
 	if err != nil {
 		return nil, err

@@ -167,13 +167,33 @@ func run() error {
 	unitHandler := org.NewUnitHandler(orgService, logger)
 	org.RegisterRoutes(mux, orgHandler, membershipHandler, unitHandler, tokenValidator, permChecker, resolveUserID)
 
+	// License module (initialized early — entitlementChecker is needed by AI and Webhook routes)
+	licenseRepo := license.NewPostgresLicenseRepository(pool)
+	entitlementChecker := license.NewPostgresEntitlementChecker(licenseRepo)
+	licenseService := license.NewLicenseService(licenseRepo, entitlementChecker, auditor, outboxPublisher, logger)
+	licenseHandler := license.NewLicenseHandler(licenseService, logger)
+	license.RegisterRoutes(mux, licenseHandler, tokenValidator, permChecker, resolveUserID)
+
+	// AI module (initialized before domain modules that depend on it)
+	contextChunkRepo := ai.NewPostgresContextChunkRepository(pool)
+	contextLakeService := ai.NewContextLakeService(contextChunkRepo, orgRepo, ai.StubEmbeddingFunc, logger)
+	policyRepo := ai.NewPostgresPolicyRepository(pool)
+	policyService := ai.NewPolicyService(policyRepo, logger)
+	aiHandler := ai.NewAIHandler(policyService, contextLakeService, orgRepo, logger)
+	ai.RegisterRoutes(mux, aiHandler, tokenValidator, permChecker, resolveUserID, entitlementChecker)
+
+	// Real implementations of AI interfaces injected into domain modules.
+	contextRetriever := ai.NewPostgresContextRetriever(contextLakeService)
+	_ = contextRetriever // reserved for future com module wiring
+	policyResolver := ai.NewPostgresPolicyResolver(policyService)
+
 	// Fin module
 	assessmentRepo := fin.NewPostgresAssessmentRepository(pool)
 	paymentRepo := fin.NewPostgresPaymentRepository(pool)
 	budgetRepo := fin.NewPostgresBudgetRepository(pool)
 	fundRepo := fin.NewPostgresFundRepository(pool)
 	collectionRepo := fin.NewPostgresCollectionRepository(pool)
-	finService := fin.NewFinService(assessmentRepo, paymentRepo, budgetRepo, fundRepo, collectionRepo, auditor, outboxPublisher, logger)
+	finService := fin.NewFinService(assessmentRepo, paymentRepo, budgetRepo, fundRepo, collectionRepo, auditor, outboxPublisher, policyResolver, logger)
 	assessmentHandler := fin.NewAssessmentHandler(finService, logger)
 	paymentHandler := fin.NewPaymentHandler(finService, logger)
 	budgetHandler := fin.NewBudgetHandler(finService, logger)
@@ -186,7 +206,7 @@ func run() error {
 	arbRepo := gov.NewPostgresARBRepository(pool)
 	ballotRepo := gov.NewPostgresBallotRepository(pool)
 	meetingRepo := gov.NewPostgresMeetingRepository(pool)
-	govService := gov.NewGovService(violationRepo, arbRepo, ballotRepo, meetingRepo, auditor, outboxPublisher, logger)
+	govService := gov.NewGovService(violationRepo, arbRepo, ballotRepo, meetingRepo, auditor, outboxPublisher, policyResolver, logger)
 	violationHandler := gov.NewViolationHandler(govService, logger)
 	arbHandler := gov.NewARBHandler(govService, logger)
 	ballotHandler := gov.NewBallotHandler(govService, logger)
@@ -215,13 +235,6 @@ func run() error {
 	taskHandler := task.NewTaskHandler(taskService, logger)
 	task.RegisterRoutes(mux, taskHandler, tokenValidator, permChecker, resolveUserID)
 
-	// License module
-	licenseRepo := license.NewPostgresLicenseRepository(pool)
-	entitlementChecker := license.NewPostgresEntitlementChecker(licenseRepo)
-	licenseService := license.NewLicenseService(licenseRepo, entitlementChecker, auditor, outboxPublisher, logger)
-	licenseHandler := license.NewLicenseHandler(licenseService, logger)
-	license.RegisterRoutes(mux, licenseHandler, tokenValidator, permChecker, resolveUserID)
-
 	// Billing module
 	billingRepo := billing.NewPostgresBillingRepository(pool)
 	billingService := billing.NewBillingService(billingRepo, auditor, outboxPublisher, logger)
@@ -233,20 +246,6 @@ func run() error {
 	adminService := admin.NewAdminService(adminRepo, auditor, outboxPublisher, logger)
 	adminHandler := admin.NewAdminHandler(adminService, logger)
 	admin.RegisterRoutes(mux, adminHandler, tokenValidator, permChecker, resolveUserID)
-
-	// AI module
-	contextChunkRepo := ai.NewPostgresContextChunkRepository(pool)
-	contextLakeService := ai.NewContextLakeService(contextChunkRepo, orgRepo, ai.StubEmbeddingFunc, logger)
-	policyRepo := ai.NewPostgresPolicyRepository(pool)
-	policyService := ai.NewPolicyService(policyRepo, logger)
-	aiHandler := ai.NewAIHandler(policyService, contextLakeService, orgRepo, logger)
-	ai.RegisterRoutes(mux, aiHandler, tokenValidator, permChecker, resolveUserID, entitlementChecker)
-
-	// Real implementations of AI interfaces (for future module injection).
-	contextRetriever := ai.NewPostgresContextRetriever(contextLakeService)
-	policyResolver := ai.NewPostgresPolicyResolver(policyService)
-	_ = contextRetriever
-	_ = policyResolver
 
 	// Webhook module
 	webhookRepo := webhook.NewPostgresWebhookRepository(pool)

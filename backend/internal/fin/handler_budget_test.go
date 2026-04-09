@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/ai"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/fin"
 	"github.com/quorant/quorant/internal/platform/middleware"
@@ -44,6 +45,7 @@ func setupBudgetTestServer(t *testing.T) *budgetTestServer {
 		mockCollectionRepo,
 		audit.NewNoopAuditor(),
 		queue.NewInMemoryPublisher(),
+		ai.NewNoopPolicyResolver(),
 		logger,
 	)
 	budgetHandler := fin.NewBudgetHandler(service, logger)

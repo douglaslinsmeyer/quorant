@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/ai"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/gov"
 	"github.com/quorant/quorant/internal/platform/middleware"
@@ -38,7 +39,7 @@ func setupViolationTestServer(t *testing.T) *violationTestServer {
 	mockMeeting := newMockMeetingRepo()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	service := gov.NewGovService(mockViolation, mockARB, mockBallot, mockMeeting, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
+	service := gov.NewGovService(mockViolation, mockARB, mockBallot, mockMeeting, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), ai.NewNoopPolicyResolver(), logger)
 	handler := gov.NewViolationHandler(service, logger)
 
 	mux := http.NewServeMux()
