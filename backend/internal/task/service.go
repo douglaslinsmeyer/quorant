@@ -209,9 +209,10 @@ func (s *TaskService) GetTask(ctx context.Context, id uuid.UUID) (*Task, error) 
 	return t, nil
 }
 
-// ListTasks returns all tasks for an org.
-func (s *TaskService) ListTasks(ctx context.Context, orgID uuid.UUID) ([]Task, error) {
-	return s.repo.ListTasksByOrg(ctx, orgID)
+// ListTasks returns tasks for an org, supporting cursor-based pagination.
+// limit controls the page size; afterID is the cursor from the previous page.
+func (s *TaskService) ListTasks(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Task, bool, error) {
+	return s.repo.ListTasksByOrg(ctx, orgID, limit, afterID)
 }
 
 // ListMyTasks returns all tasks assigned to a user across all orgs.

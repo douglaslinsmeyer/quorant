@@ -56,14 +56,18 @@ func (r *mockDocRepo) FindByID(_ context.Context, id uuid.UUID) (*doc.Document, 
 	return &copy, nil
 }
 
-func (r *mockDocRepo) ListByOrg(_ context.Context, orgID uuid.UUID) ([]doc.Document, error) {
+func (r *mockDocRepo) ListByOrg(_ context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]doc.Document, bool, error) {
 	var out []doc.Document
 	for _, d := range r.docs {
 		if d.OrgID == orgID && d.IsCurrent && d.DeletedAt == nil {
 			out = append(out, *d)
 		}
 	}
-	return out, nil
+	hasMore := limit > 0 && len(out) > limit
+	if hasMore {
+		out = out[:limit]
+	}
+	return out, hasMore, nil
 }
 
 func (r *mockDocRepo) Update(_ context.Context, d *doc.Document) (*doc.Document, error) {
@@ -409,7 +413,7 @@ func TestListDocuments_ReturnsCurrentDocuments(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	docs, err := svc.ListDocuments(ctx, orgID)
+	docs, _, err := svc.ListDocuments(ctx, orgID, 25, nil)
 	require.NoError(t, err)
 	assert.Len(t, docs, 2)
 }

@@ -97,8 +97,10 @@ func (r *PostgresDocRepository) FindByID(ctx context.Context, id uuid.UUID) (*Do
 	return result, nil
 }
 
-// ListByOrg returns all current, non-deleted documents for the given org, ordered by title.
-func (r *PostgresDocRepository) ListByOrg(ctx context.Context, orgID uuid.UUID) ([]Document, error) {
+// ListByOrg returns current, non-deleted documents for the given org, supporting
+// cursor-based pagination ordered by id. afterID is the cursor from the previous page;
+// hasMore is true when more items exist.
+func (r *PostgresDocRepository) ListByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Document, bool, error) {
 	const q = `
 		SELECT id, org_id, category_id, uploaded_by,
 		       title, file_name, content_type, size_bytes,
@@ -106,15 +108,26 @@ func (r *PostgresDocRepository) ListByOrg(ctx context.Context, orgID uuid.UUID) 
 		       is_current, metadata, created_at, updated_at, deleted_at
 		FROM documents
 		WHERE org_id = $1 AND is_current = TRUE AND deleted_at IS NULL
-		ORDER BY title`
+		  AND ($3::uuid IS NULL OR id > $3)
+		ORDER BY id
+		LIMIT $2`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.pool.Query(ctx, q, orgID, limit+1, afterID)
 	if err != nil {
-		return nil, fmt.Errorf("doc: ListByOrg: %w", err)
+		return nil, false, fmt.Errorf("doc: ListByOrg: %w", err)
 	}
 	defer rows.Close()
 
-	return collectDocuments(rows, "ListByOrg")
+	results, err := collectDocuments(rows, "ListByOrg")
+	if err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(results) > limit
+	if hasMore {
+		results = results[:limit]
+	}
+	return results, hasMore, nil
 }
 
 // Update persists changes to an existing document and returns the updated row.

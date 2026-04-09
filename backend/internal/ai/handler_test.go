@@ -53,8 +53,8 @@ func (r *handlerMockOrgRepo) FindBySlug(_ context.Context, _ string) (*org.Organ
 	return nil, nil
 }
 
-func (r *handlerMockOrgRepo) ListByUserAccess(_ context.Context, _ uuid.UUID) ([]org.Organization, error) {
-	return nil, nil
+func (r *handlerMockOrgRepo) ListByUserAccess(_ context.Context, _ uuid.UUID, limit int, afterID *uuid.UUID) ([]org.Organization, bool, error) {
+	return nil, false, nil
 }
 
 func (r *handlerMockOrgRepo) Update(_ context.Context, o *org.Organization) (*org.Organization, error) {

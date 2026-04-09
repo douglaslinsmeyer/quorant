@@ -28,8 +28,9 @@ type TaskRepository interface {
 	// FindTaskByID returns the task with the given ID, or nil if not found.
 	FindTaskByID(ctx context.Context, id uuid.UUID) (*Task, error)
 
-	// ListTasksByOrg returns all tasks belonging to an organization.
-	ListTasksByOrg(ctx context.Context, orgID uuid.UUID) ([]Task, error)
+	// ListTasksByOrg returns tasks belonging to an organization, supporting cursor-based pagination.
+	// afterID is the cursor from the previous page; hasMore is true when more items exist.
+	ListTasksByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Task, bool, error)
 
 	// ListTasksByAssignee returns all tasks assigned to a user across orgs.
 	ListTasksByAssignee(ctx context.Context, userID uuid.UUID) ([]Task, error)

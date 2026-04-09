@@ -77,23 +77,34 @@ func (r *PostgresPaymentRepository) FindPaymentByID(ctx context.Context, id uuid
 	return result, nil
 }
 
-// ListPaymentsByOrg returns all payments for the given org ordered by
-// created_at DESC. Returns an empty (non-nil) slice when none exist.
-func (r *PostgresPaymentRepository) ListPaymentsByOrg(ctx context.Context, orgID uuid.UUID) ([]Payment, error) {
+// ListPaymentsByOrg returns payments for the given org, supporting cursor-based
+// pagination ordered by id DESC. afterID is the cursor from the previous page.
+func (r *PostgresPaymentRepository) ListPaymentsByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Payment, bool, error) {
 	const q = `
 		SELECT id, org_id, unit_id, user_id, payment_method_id, amount_cents,
 		       status, provider_ref, description, paid_at, created_at, updated_at
 		FROM payments
 		WHERE org_id = $1
-		ORDER BY created_at DESC`
+		  AND ($3::uuid IS NULL OR id < $3)
+		ORDER BY id DESC
+		LIMIT $2`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.pool.Query(ctx, q, orgID, limit+1, afterID)
 	if err != nil {
-		return nil, fmt.Errorf("fin: ListPaymentsByOrg: %w", err)
+		return nil, false, fmt.Errorf("fin: ListPaymentsByOrg: %w", err)
 	}
 	defer rows.Close()
 
-	return collectPayments(rows, "ListPaymentsByOrg")
+	payments, err := collectPayments(rows, "ListPaymentsByOrg")
+	if err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(payments) > limit
+	if hasMore {
+		payments = payments[:limit]
+	}
+	return payments, hasMore, nil
 }
 
 // ListPaymentsByUnit returns all payments for the given unit ordered by

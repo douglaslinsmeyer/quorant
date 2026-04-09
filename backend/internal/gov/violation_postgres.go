@@ -117,8 +117,9 @@ func (r *PostgresViolationRepository) FindByID(ctx context.Context, id uuid.UUID
 
 // ─── ListByOrg ───────────────────────────────────────────────────────────────
 
-// ListByOrg returns all non-deleted violations for the given org, ordered by created_at DESC.
-func (r *PostgresViolationRepository) ListByOrg(ctx context.Context, orgID uuid.UUID) ([]Violation, error) {
+// ListByOrg returns non-deleted violations for the given org, supporting cursor-based
+// pagination ordered by id DESC. afterID is the cursor from the previous page.
+func (r *PostgresViolationRepository) ListByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Violation, bool, error) {
 	const q = `
 		SELECT id, org_id, unit_id, reported_by, assigned_to,
 		       title, description, category, status, severity,
@@ -128,15 +129,26 @@ func (r *PostgresViolationRepository) ListByOrg(ctx context.Context, orgID uuid.
 		       created_at, updated_at, deleted_at
 		FROM violations
 		WHERE org_id = $1 AND deleted_at IS NULL
-		ORDER BY created_at DESC`
+		  AND ($3::uuid IS NULL OR id < $3)
+		ORDER BY id DESC
+		LIMIT $2`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.pool.Query(ctx, q, orgID, limit+1, afterID)
 	if err != nil {
-		return nil, fmt.Errorf("violation: ListByOrg: %w", err)
+		return nil, false, fmt.Errorf("violation: ListByOrg: %w", err)
 	}
 	defer rows.Close()
 
-	return collectViolations(rows, "ListByOrg")
+	violations, err := collectViolations(rows, "ListByOrg")
+	if err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(violations) > limit
+	if hasMore {
+		violations = violations[:limit]
+	}
+	return violations, hasMore, nil
 }
 
 // ─── ListByUnit ──────────────────────────────────────────────────────────────

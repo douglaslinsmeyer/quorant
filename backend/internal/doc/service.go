@@ -76,9 +76,10 @@ func (s *DocService) GetDocument(ctx context.Context, id uuid.UUID) (*Document, 
 	return doc, nil
 }
 
-// ListDocuments returns all current documents for the given organization.
-func (s *DocService) ListDocuments(ctx context.Context, orgID uuid.UUID) ([]Document, error) {
-	return s.repo.ListByOrg(ctx, orgID)
+// ListDocuments returns current documents for the given organization, supporting cursor-based pagination.
+// limit controls the page size; afterID is the cursor from the previous page.
+func (s *DocService) ListDocuments(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Document, bool, error) {
+	return s.repo.ListByOrg(ctx, orgID, limit, afterID)
 }
 
 // UpdateDocument persists changes to an existing document and returns it.

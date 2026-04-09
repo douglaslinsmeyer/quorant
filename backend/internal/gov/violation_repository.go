@@ -10,7 +10,9 @@ import (
 type ViolationRepository interface {
 	Create(ctx context.Context, v *Violation) (*Violation, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Violation, error)
-	ListByOrg(ctx context.Context, orgID uuid.UUID) ([]Violation, error)
+	// ListByOrg returns violations for the org, supporting cursor-based pagination.
+	// afterID is the cursor from the previous page; hasMore is true when more items exist.
+	ListByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Violation, bool, error)
 	ListByUnit(ctx context.Context, unitID uuid.UUID) ([]Violation, error)
 	Update(ctx context.Context, v *Violation) (*Violation, error)
 	SoftDelete(ctx context.Context, id uuid.UUID) error

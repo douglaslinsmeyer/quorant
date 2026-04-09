@@ -70,14 +70,18 @@ func (r *mockTaskRepo) FindTaskByID(_ context.Context, id uuid.UUID) (*task.Task
 	return t, nil
 }
 
-func (r *mockTaskRepo) ListTasksByOrg(_ context.Context, orgID uuid.UUID) ([]task.Task, error) {
+func (r *mockTaskRepo) ListTasksByOrg(_ context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]task.Task, bool, error) {
 	var out []task.Task
 	for _, t := range r.tasks {
 		if t.OrgID == orgID {
 			out = append(out, *t)
 		}
 	}
-	return out, nil
+	hasMore := limit > 0 && len(out) > limit
+	if hasMore {
+		out = out[:limit]
+	}
+	return out, hasMore, nil
 }
 
 func (r *mockTaskRepo) ListTasksByAssignee(_ context.Context, userID uuid.UUID) ([]task.Task, error) {
@@ -527,7 +531,7 @@ func TestListTasks_ReturnsOrgTasks(t *testing.T) {
 	seedTask(t, repo, orgID)
 	seedTask(t, repo, otherOrgID) // different org — should not appear
 
-	tasks, err := svc.ListTasks(ctx, orgID)
+	tasks, _, err := svc.ListTasks(ctx, orgID, 25, nil)
 	require.NoError(t, err)
 	assert.Len(t, tasks, 2)
 }

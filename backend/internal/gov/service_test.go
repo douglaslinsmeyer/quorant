@@ -53,14 +53,18 @@ func (r *mockViolationRepo) FindByID(ctx context.Context, id uuid.UUID) (*gov.Vi
 	return v, nil
 }
 
-func (r *mockViolationRepo) ListByOrg(ctx context.Context, orgID uuid.UUID) ([]gov.Violation, error) {
+func (r *mockViolationRepo) ListByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]gov.Violation, bool, error) {
 	var out []gov.Violation
 	for _, v := range r.violations {
 		if v.OrgID == orgID {
 			out = append(out, *v)
 		}
 	}
-	return out, nil
+	hasMore := limit > 0 && len(out) > limit
+	if hasMore {
+		out = out[:limit]
+	}
+	return out, hasMore, nil
 }
 
 func (r *mockViolationRepo) ListByUnit(ctx context.Context, unitID uuid.UUID) ([]gov.Violation, error) {

@@ -17,9 +17,10 @@ type DocRepository interface {
 	// FindByID returns the document with the given ID, or nil if not found or soft-deleted.
 	FindByID(ctx context.Context, id uuid.UUID) (*Document, error)
 
-	// ListByOrg returns all current, non-deleted documents for the given org,
-	// ordered by title ascending.
-	ListByOrg(ctx context.Context, orgID uuid.UUID) ([]Document, error)
+	// ListByOrg returns current, non-deleted documents for the given org, supporting
+	// cursor-based pagination ordered by id. afterID is the cursor from the previous page;
+	// hasMore is true when more items exist.
+	ListByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Document, bool, error)
 
 	// Update persists changes to an existing document and returns the updated row.
 	Update(ctx context.Context, doc *Document) (*Document, error)

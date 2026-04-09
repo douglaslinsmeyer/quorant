@@ -98,9 +98,10 @@ func (s *GovService) ReportViolation(ctx context.Context, orgID uuid.UUID, req C
 	return s.violations.Create(ctx, v)
 }
 
-// ListViolations returns all violations for an org.
-func (s *GovService) ListViolations(ctx context.Context, orgID uuid.UUID) ([]Violation, error) {
-	return s.violations.ListByOrg(ctx, orgID)
+// ListViolations returns violations for an org, supporting cursor-based pagination.
+// limit controls the page size; afterID is the cursor from the previous page.
+func (s *GovService) ListViolations(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Violation, bool, error) {
+	return s.violations.ListByOrg(ctx, orgID, limit, afterID)
 }
 
 // GetViolation returns a single violation by ID or a 404 error if not found.

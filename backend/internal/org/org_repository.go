@@ -12,7 +12,9 @@ type OrgRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*Organization, error)
 	FindBySlug(ctx context.Context, slug string) (*Organization, error)
 	// ListByUserAccess returns orgs the given user has memberships in.
-	ListByUserAccess(ctx context.Context, userID uuid.UUID) ([]Organization, error)
+	// afterID is an optional cursor (ID of the last item from the previous page).
+	// hasMore is true when additional items exist beyond the returned page.
+	ListByUserAccess(ctx context.Context, userID uuid.UUID, limit int, afterID *uuid.UUID) ([]Organization, bool, error)
 	Update(ctx context.Context, org *Organization) (*Organization, error)
 	SoftDelete(ctx context.Context, id uuid.UUID) error
 	// ListChildren returns direct children of an org (same type).

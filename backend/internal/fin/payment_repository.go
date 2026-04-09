@@ -20,9 +20,10 @@ type PaymentRepository interface {
 	// no matching row exists.
 	FindPaymentByID(ctx context.Context, id uuid.UUID) (*Payment, error)
 
-	// ListPaymentsByOrg returns all payments for the given org ordered by
-	// created_at DESC. Returns an empty (non-nil) slice when none exist.
-	ListPaymentsByOrg(ctx context.Context, orgID uuid.UUID) ([]Payment, error)
+	// ListPaymentsByOrg returns payments for the given org, supporting cursor-based
+	// pagination ordered by id DESC.
+	// afterID is the cursor from the previous page; hasMore is true when more items exist.
+	ListPaymentsByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Payment, bool, error)
 
 	// ListPaymentsByUnit returns all payments for the given unit ordered by
 	// created_at DESC. Returns an empty (non-nil) slice when none exist.
