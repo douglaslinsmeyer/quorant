@@ -26,6 +26,13 @@ func setupGovTestDB(t *testing.T) *pgxpool.Pool {
 
 	t.Cleanup(func() {
 		cleanCtx := context.Background()
+		pool.Exec(cleanCtx, "DELETE FROM hearing_links")
+		pool.Exec(cleanCtx, "DELETE FROM meeting_motions")
+		pool.Exec(cleanCtx, "DELETE FROM meeting_attendees")
+		pool.Exec(cleanCtx, "DELETE FROM meetings")
+		pool.Exec(cleanCtx, "DELETE FROM proxy_authorizations")
+		pool.Exec(cleanCtx, "DELETE FROM ballot_votes")
+		pool.Exec(cleanCtx, "DELETE FROM ballots")
 		pool.Exec(cleanCtx, "DELETE FROM arb_votes")
 		pool.Exec(cleanCtx, "DELETE FROM arb_requests")
 		pool.Exec(cleanCtx, "DELETE FROM violation_actions")
