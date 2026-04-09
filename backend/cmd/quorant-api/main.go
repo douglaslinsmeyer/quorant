@@ -285,7 +285,9 @@ func run() error {
 	doc.RegisterRoutes(mux, docHandler, tokenValidator, permChecker, resolveUserID)
 
 	// 10. Middleware chain (innermost to outermost)
+	rateLimiter := middleware.NewRateLimiter(100, 100, time.Minute) // 100 req/min default
 	var handler http.Handler = mux
+	handler = middleware.RateLimit(rateLimiter)(handler)
 	handler = middleware.Logging(logger, handler)
 	handler = middleware.Recovery(logger, handler)
 	handler = middleware.RequestID(handler)
