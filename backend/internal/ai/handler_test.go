@@ -108,7 +108,7 @@ func setupAITestServer(t *testing.T) *aiTestServer {
 		ai.StubEmbeddingFunc,
 		logger,
 	)
-	handler := ai.NewAIHandler(policyService, contextService, orgRepo, logger)
+	handler := ai.NewAIHandler(policyService, contextService, orgRepo, nil, logger) // nil cfgStore in tests — falls back to org settings
 
 	mux := http.NewServeMux()
 

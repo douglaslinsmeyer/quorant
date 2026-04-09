@@ -16,6 +16,8 @@ import (
 
 	"github.com/quorant/quorant/internal/admin"
 	"github.com/quorant/quorant/internal/ai"
+	platformai "github.com/quorant/quorant/internal/platform/ai"
+	"github.com/quorant/quorant/internal/platform/cfgstore"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/billing"
 	"github.com/quorant/quorant/internal/com"
@@ -184,12 +186,49 @@ func run() error {
 	licenseHandler := license.NewLicenseHandler(licenseService, logger)
 	license.RegisterRoutes(mux, licenseHandler, tokenValidator, permChecker, resolveUserID)
 
+	// LLM client (used by AI module for embeddings and completions)
+	var llmClient platformai.Client
+	llmCfg := platformai.Config{
+		Provider: platformai.Provider(cfg.LLM.Provider),
+		APIKey:   cfg.LLM.APIKey,
+		BaseURL:  cfg.LLM.BaseURL,
+		Model:    cfg.LLM.Model,
+	}
+	if cfg.LLM.EmbedProvider != "" {
+		embedCfg := &platformai.Config{
+			Provider: platformai.Provider(cfg.LLM.EmbedProvider),
+			APIKey:   cfg.LLM.EmbedAPIKey,
+			BaseURL:  cfg.LLM.EmbedBaseURL,
+			Model:    cfg.LLM.EmbedModel,
+		}
+		llmClient, _ = platformai.NewClientFromEnv(llmCfg, embedCfg)
+	} else {
+		llmClient, _ = platformai.NewClientFromEnv(llmCfg, nil)
+	}
+	// Wrap with retry for transient failures (429, 5xx)
+	llmClient = platformai.NewRetryClient(llmClient, 3)
+
+	// Bridge: convert platform/ai.Client.Embed into internal/ai.EmbeddingFunc
+	embedFn := ai.EmbeddingFunc(func(ctx context.Context, text string) ([]float32, error) {
+		resp, err := llmClient.Embed(ctx, platformai.EmbeddingRequest{
+			Model: cfg.LLM.EmbedModel,
+			Input: text,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return resp.Embedding, nil
+	})
+
 	// AI module (initialized before domain modules that depend on it)
 	contextChunkRepo := ai.NewPostgresContextChunkRepository(pool)
-	contextLakeService := ai.NewContextLakeService(contextChunkRepo, orgRepo, ai.StubEmbeddingFunc, logger)
+	contextLakeService := ai.NewContextLakeService(contextChunkRepo, orgRepo, embedFn, logger)
 	policyRepo := ai.NewPostgresPolicyRepository(pool)
 	policyService := ai.NewPolicyService(policyRepo, logger)
-	aiHandler := ai.NewAIHandler(policyService, contextLakeService, orgRepo, logger)
+	cfgStore := cfgstore.Store(cfgstore.NewCachedStore(
+		cfgstore.NewPostgresStore(pool), rdb, 60*time.Second,
+	))
+	aiHandler := ai.NewAIHandler(policyService, contextLakeService, orgRepo, cfgStore, logger)
 	ai.RegisterRoutes(mux, aiHandler, tokenValidator, permChecker, resolveUserID, entitlementChecker)
 
 	// Real implementations of AI interfaces injected into domain modules.

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/cfgstore"
 	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
@@ -16,17 +17,19 @@ type AIHandler struct {
 	policyService  *PolicyService
 	contextService *ContextLakeService
 	policyResolver *PostgresPolicyResolver
-	orgRepo OrgLookup
+	orgRepo        OrgLookup
+	cfgStore       cfgstore.Store
 	logger         *slog.Logger
 }
 
 // NewAIHandler constructs an AIHandler.
-func NewAIHandler(policyService *PolicyService, contextService *ContextLakeService, orgRepo OrgLookup, logger *slog.Logger) *AIHandler {
+func NewAIHandler(policyService *PolicyService, contextService *ContextLakeService, orgRepo OrgLookup, cfgStore cfgstore.Store, logger *slog.Logger) *AIHandler {
 	return &AIHandler{
 		policyService:  policyService,
 		contextService: contextService,
 		policyResolver: NewPostgresPolicyResolver(policyService),
 		orgRepo:        orgRepo,
+		cfgStore:       cfgStore,
 		logger:         logger,
 	}
 }
@@ -372,6 +375,7 @@ func (h *AIHandler) DecideResolution(w http.ResponseWriter, r *http.Request) {
 // ─── AI Config ────────────────────────────────────────────────────────────────
 
 // GetAIConfig handles GET /organizations/{org_id}/ai/config
+// Resolves through the scope chain: org → firm → platform defaults.
 func (h *AIHandler) GetAIConfig(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseOrgID(r)
 	if err != nil {
@@ -379,6 +383,19 @@ func (h *AIHandler) GetAIConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Try cfgstore scope chain resolution first
+	if h.cfgStore != nil {
+		val, _, err := h.cfgStore.Get(r.Context(), orgID, "ai_config")
+		if err == nil && val != nil {
+			var cfg AIConfig
+			if json.Unmarshal(val, &cfg) == nil {
+				api.WriteJSON(w, http.StatusOK, cfg)
+				return
+			}
+		}
+	}
+
+	// Fallback: read from org settings directly (backward compatible)
 	o, err := h.orgRepo.FindByID(r.Context(), orgID)
 	if err != nil {
 		api.WriteError(w, err)
