@@ -13,6 +13,8 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/quorant/quorant/internal/iam"
+	"github.com/quorant/quorant/internal/platform/auth"
 	"github.com/quorant/quorant/internal/platform/config"
 	"github.com/quorant/quorant/internal/platform/db"
 	"github.com/quorant/quorant/internal/platform/health"
@@ -65,7 +67,19 @@ func run() error {
 		defer nc.Close()
 	}
 
-	// 6. Health handler
+	// 6. JWT validator
+	var tokenValidator auth.TokenValidator
+	jwksURL := fmt.Sprintf("http://%s/oauth/v2/keys", cfg.Zitadel.Domain)
+	validator, err := auth.NewJWKSValidator(ctx, jwksURL, cfg.Zitadel.Issuer)
+	if err != nil {
+		// Don't fail startup on Zitadel unavailable — use a fallback that rejects all tokens
+		logger.Warn("failed to initialize JWKS validator, auth will reject all tokens", "error", err)
+		tokenValidator = &auth.StaticValidator{Err: fmt.Errorf("JWKS not available")}
+	} else {
+		tokenValidator = validator
+	}
+
+	// 7. Health handler
 	healthHandler := health.NewHandler(
 		health.NewDBChecker(pool),
 		health.NewRedisChecker(rdb),
@@ -73,18 +87,24 @@ func run() error {
 		health.NewS3Checker(cfg.S3.Endpoint, cfg.S3.UseSSL),
 	)
 
-	// 7. Routes
+	// 8. Routes
 	mux := http.NewServeMux()
 	mux.Handle("GET /api/v1/health", healthHandler)
 
-	// 8. Middleware chain (innermost to outermost)
+	// IAM module
+	userRepo := iam.NewPostgresUserRepository(pool)
+	userService := iam.NewUserService(userRepo)
+	iamHandler := iam.NewHandler(userService, logger)
+	iam.RegisterRoutes(mux, iamHandler, tokenValidator)
+
+	// 9. Middleware chain (innermost to outermost)
 	var handler http.Handler = mux
 	handler = middleware.Logging(logger, handler)
 	handler = middleware.Recovery(logger, handler)
 	handler = middleware.RequestID(handler)
 	handler = middleware.CORS([]string{"*"}, handler) // permissive for dev; configured per-env in production
 
-	// 9. HTTP server
+	// 10. HTTP server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	server := &http.Server{
 		Addr:         addr,
@@ -94,7 +114,7 @@ func run() error {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// 10. Start server in goroutine
+	// 11. Start server in goroutine
 	errCh := make(chan error, 1)
 	go func() {
 		logger.Info("starting API server", "addr", addr)
@@ -103,7 +123,7 @@ func run() error {
 		}
 	}()
 
-	// 11. Graceful shutdown
+	// 12. Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 
