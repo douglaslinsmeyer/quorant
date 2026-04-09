@@ -550,3 +550,39 @@ func (s *ComService) ListUnitCommunications(ctx context.Context, unitID uuid.UUI
 	}
 	return result, nil
 }
+
+// CalendarItem represents a unified calendar entry from any module.
+type CalendarItem struct {
+	Source   string    `json:"source"`    // "community_event", "meeting", "ballot_deadline", "assessment_due"
+	SourceID uuid.UUID `json:"source_id"`
+	Title    string    `json:"title"`
+	StartsAt time.Time `json:"starts_at"`
+	EndsAt   *time.Time `json:"ends_at,omitempty"`
+	IsAllDay bool      `json:"is_all_day"`
+	Location string    `json:"location,omitempty"`
+}
+
+// GetUnifiedCalendar returns a merged view of calendar events for the org.
+// For now, this returns community events from the calendar module.
+// Future: aggregate meetings, ballot deadlines, assessment due dates, reservations.
+func (s *ComService) GetUnifiedCalendar(ctx context.Context, orgID uuid.UUID) ([]CalendarItem, error) {
+	events, err := s.calendar.ListEventsByOrg(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]CalendarItem, 0, len(events))
+	for _, e := range events {
+		items = append(items, CalendarItem{
+			Source:   "community_event",
+			SourceID: e.ID,
+			Title:    e.Title,
+			StartsAt: e.StartsAt,
+			EndsAt:   e.EndsAt,
+			IsAllDay: e.IsAllDay,
+			Location: func() string { if e.Location != nil { return *e.Location }; return "" }(),
+		})
+	}
+
+	return items, nil
+}
