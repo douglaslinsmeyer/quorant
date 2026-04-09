@@ -158,11 +158,14 @@ type Expense struct {
 	ExpenseDate   time.Time      `json:"expense_date"`
 	DueDate       *time.Time     `json:"due_date,omitempty"`
 	PaidDate      *time.Time     `json:"paid_date,omitempty"`
+	PaymentMethod *string        `json:"payment_method,omitempty"`
 	PaymentRef    *string        `json:"payment_ref,omitempty"`
+	InvoiceNumber *string        `json:"invoice_number,omitempty"`
 	ReceiptDocID  *uuid.UUID     `json:"receipt_doc_id,omitempty"`
 	SubmittedBy   uuid.UUID      `json:"submitted_by"`
 	ApprovedBy    *uuid.UUID     `json:"approved_by,omitempty"`
 	ApprovedAt    *time.Time     `json:"approved_at,omitempty"`
+	ApprovalNotes *string        `json:"approval_notes,omitempty"`
 	Metadata      map[string]any `json:"metadata"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
