@@ -141,3 +141,66 @@ func TestOpenAIClient_Embed(t *testing.T) {
 	assert.Len(t, resp.Embedding, 1536)
 	assert.Equal(t, 1536, resp.Dimensions)
 }
+
+func TestAnthropicClient_Complete(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "test-api-key", r.Header.Get("x-api-key"))
+		assert.Equal(t, "2023-06-01", r.Header.Get("anthropic-version"))
+		assert.Equal(t, "/v1/messages", r.URL.Path)
+
+		json.NewEncoder(w).Encode(map[string]any{
+			"content": []map[string]any{
+				{"type": "text", "text": "Claude says hello"},
+			},
+			"model": "claude-sonnet-4-6",
+			"usage": map[string]int{"input_tokens": 20, "output_tokens": 15},
+		})
+	}))
+	defer server.Close()
+
+	client, err := ai.NewAnthropicClient(ai.Config{
+		BaseURL: server.URL,
+		APIKey:  "test-api-key",
+		Model:   "claude-sonnet-4-6",
+	})
+	require.NoError(t, err)
+
+	resp, err := client.Complete(context.Background(), ai.CompletionRequest{
+		System:   "You are helpful.",
+		Messages: []ai.Message{{Role: "user", Content: "Hello"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "Claude says hello", resp.Content)
+	assert.Equal(t, "claude-sonnet-4-6", resp.Model)
+	assert.Equal(t, 20, resp.InputTokens)
+	assert.Equal(t, 15, resp.OutputTokens)
+}
+
+func TestOpenAIClient_ErrorStatusCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		w.Write([]byte(`{"error": {"message": "rate limit exceeded"}}`))
+	}))
+	defer server.Close()
+
+	client, _ := ai.NewOpenAIClient(ai.Config{BaseURL: server.URL, APIKey: "key"})
+	_, err := client.Complete(context.Background(), ai.CompletionRequest{
+		Messages: []ai.Message{{Role: "user", Content: "Hi"}},
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "429")
+}
+
+func TestOpenAIClient_MalformedResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`not json`))
+	}))
+	defer server.Close()
+
+	client, _ := ai.NewOpenAIClient(ai.Config{BaseURL: server.URL, APIKey: "key"})
+	_, err := client.Complete(context.Background(), ai.CompletionRequest{
+		Messages: []ai.Message{{Role: "user", Content: "Hi"}},
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "parse")
+}
