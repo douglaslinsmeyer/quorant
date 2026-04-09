@@ -1,4 +1,4 @@
-.PHONY: help build test test-integration lint docker-up docker-down migrate-up migrate-down generate clean
+.PHONY: help build test test-integration lint docker-up docker-down migrate-up migrate-down generate seed clean
 
 ## help: list available make targets (default)
 help:
@@ -13,6 +13,7 @@ help:
 	@echo "  migrate-up        apply database migrations (placeholder)"
 	@echo "  migrate-down      roll back database migrations (placeholder)"
 	@echo "  generate          run code generators, e.g. sqlc (placeholder)"
+	@echo "  seed              load development seed data"
 	@echo "  clean             remove compiled binaries"
 	@echo ""
 
@@ -58,6 +59,10 @@ migrate-down:
 ## generate: run code generators such as sqlc (placeholder)
 generate:
 	@echo "TODO: go generate ./..."
+
+## seed: load development seed data
+seed: ## Load development seed data
+	docker compose exec -T postgres psql -U quorant -d quorant_dev < backend/seeds/seed.sql
 
 ## clean: remove compiled binaries
 clean:
