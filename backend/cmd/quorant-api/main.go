@@ -15,6 +15,7 @@ import (
 
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/com"
+	"github.com/quorant/quorant/internal/doc"
 	"github.com/quorant/quorant/internal/fin"
 	"github.com/quorant/quorant/internal/gov"
 	"github.com/quorant/quorant/internal/iam"
@@ -26,6 +27,7 @@ import (
 	"github.com/quorant/quorant/internal/platform/health"
 	"github.com/quorant/quorant/internal/platform/logging"
 	"github.com/quorant/quorant/internal/platform/middleware"
+	"github.com/quorant/quorant/internal/platform/storage"
 )
 
 func main() {
@@ -161,6 +163,26 @@ func run() error {
 	notificationHandler := com.NewNotificationHandler(comService, logger)
 	commLogHandler := com.NewCommLogHandler(comService, logger)
 	com.RegisterRoutes(mux, announcementHandler, threadHandler, calendarHandler, notificationHandler, commLogHandler, tokenValidator)
+
+	// Doc module
+	s3Client, err := storage.NewS3Client(cfg.S3)
+	if err != nil {
+		logger.Warn("failed to initialize S3 client", "error", err)
+	}
+	if s3Client != nil {
+		if err := s3Client.EnsureBucket(ctx); err != nil {
+			logger.Warn("failed to ensure S3 bucket", "error", err)
+		}
+	}
+	docRepo := doc.NewPostgresDocRepository(pool)
+	// Use MockStorageClient if s3Client is nil (S3 unavailable)
+	var storageClient storage.StorageClient = s3Client
+	if storageClient == nil {
+		storageClient = storage.NewMockStorageClient()
+	}
+	docService := doc.NewDocService(docRepo, storageClient, cfg.S3.Bucket, logger)
+	docHandler := doc.NewDocHandler(docService, logger)
+	doc.RegisterRoutes(mux, docHandler, tokenValidator)
 
 	// 10. Middleware chain (innermost to outermost)
 	var handler http.Handler = mux
