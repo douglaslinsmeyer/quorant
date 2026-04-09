@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cards — Quorant Design System</title>
+
+  <link rel="stylesheet" href="../tokens/colors.css" />
+  <link rel="stylesheet" href="../tokens/typography.css" />
+  <link rel="stylesheet" href="../tokens/spacing.css" />
+  <link rel="stylesheet" href="../tokens/elevation.css" />
+  <link rel="stylesheet" href="../tokens/motion.css" />
+
+  <style>
+    /* ── Reset & Base ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: var(--type-body-size);
+      line-height: var(--type-body-line-height);
+      color: var(--color-neutral-900);
+      background: var(--surface-page);
+      padding: var(--space-8);
+      animation: page-enter var(--duration-slow) var(--ease-out) both;
+    }
+
+    /* ── Dark Mode Toggle ──────────────────────────────────────── */
+    .theme-btn {
+      position: fixed;
+      top: var(--space-4);
+      right: var(--space-4);
+      background: var(--surface-card);
+      border: 1px solid var(--color-neutral-200);
+      color: var(--color-neutral-700);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition:
+        background var(--duration-normal) var(--ease-smooth),
+        color var(--duration-normal) var(--ease-smooth),
+        box-shadow var(--duration-normal) var(--ease-smooth);
+      z-index: 100;
+    }
+
+    .theme-btn:hover {
+      box-shadow: var(--shadow-md);
+      background: var(--surface-elevated);
+    }
+
+    /* ── Page Header ────────────────────────────────────────────── */
+    .page-header {
+      margin-bottom: var(--space-8);
+    }
+
+    .page-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--type-h1-size);
+      font-weight: var(--type-h1-weight);
+      line-height: var(--type-h1-line-height);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-2);
+    }
+
+    .page-header p {
+      font-size: var(--type-body-lg-size);
+      color: var(--color-neutral-600);
+    }
+
+    /* ── Section Wrapper ────────────────────────────────────────── */
+    .section {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-8);
+      margin-bottom: var(--space-6);
+    }
+
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h3-size);
+      font-weight: var(--type-h3-weight);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-1);
+    }
+
+    .section-desc {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-6);
+    }
+
+    .overline {
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-3);
+    }
+
+    /* ── Card Grid Layouts ──────────────────────────────────────── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--space-4);
+    }
+
+    .card-grid--stat {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    @media (max-width: 700px) {
+      .card-grid--stat {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    /* ── 1. Default Card ────────────────────────────────────────── */
+    .card {
+      background: var(--surface-card);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-6);
+      transition:
+        box-shadow var(--duration-normal) var(--ease-smooth),
+        transform var(--duration-normal) var(--ease-smooth);
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .card__title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h4-size);
+      font-weight: var(--type-h4-weight);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-2);
+    }
+
+    .card__body {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-600);
+      line-height: 1.6;
+    }
+
+    .card__meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-top: var(--space-4);
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-500);
+    }
+
+    /* ── 2. Stat Card ───────────────────────────────────────────── */
+    .stat-card {
+      background: var(--surface-card);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-5) var(--space-6);
+      transition:
+        box-shadow var(--duration-normal) var(--ease-smooth),
+        transform var(--duration-normal) var(--ease-smooth);
+    }
+
+    .stat-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .stat-card--primary   { border-top: 3px solid var(--color-primary-500); }
+    .stat-card--secondary { border-top: 3px solid var(--color-secondary-500); }
+    .stat-card--error     { border-top: 3px solid var(--color-error-600); }
+    .stat-card--success   { border-top: 3px solid var(--color-success-600); }
+
+    .stat-card__label {
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      color: var(--color-neutral-500);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-2);
+    }
+
+    .stat-card__value {
+      font-family: var(--font-heading);
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1.1;
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-2);
+    }
+
+    .stat-card__delta {
+      font-size: var(--type-caption-size);
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+    }
+
+    .stat-card__delta--up   { color: var(--color-success-600); }
+    .stat-card__delta--down { color: var(--color-error-600); }
+    .stat-card__delta--neu  { color: var(--color-neutral-500); }
+
+    /* ── 3. Conversational Card ─────────────────────────────────── */
+    .convo-card {
+      background: var(--surface-card);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-8);
+      animation: hero-entrance 500ms ease-out both;
+    }
+
+    .convo-card__label {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: var(--color-primary-600);
+      margin-bottom: var(--space-4);
+    }
+
+    .convo-card__label .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-success-600);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    .convo-card__text {
+      font-size: var(--type-body-lg-size);
+      line-height: 1.7;
+      color: var(--color-neutral-800);
+    }
+
+    .convo-card__text .amount {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      color: var(--color-primary-600);
+    }
+
+    .convo-card__text .date {
+      font-weight: 600;
+      color: var(--color-secondary-600);
+    }
+
+    .convo-card__text .status-good {
+      font-weight: 600;
+      color: var(--color-success-600);
+    }
+
+    .convo-card__text .status-warn {
+      font-weight: 600;
+      color: var(--color-warning-600);
+    }
+
+    .convo-card__actions {
+      display: flex;
+      gap: var(--space-3);
+      margin-top: var(--space-6);
+    }
+
+    /* ── 4. Feed Item Card ──────────────────────────────────────── */
+    .feed-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .feed-item {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-4) var(--space-5);
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-4);
+      opacity: 0;
+      animation: stagger-up var(--duration-normal) var(--ease-out) both;
+    }
+
+    .feed-item:nth-child(1) { animation-delay: calc(var(--duration-stagger) * 1); }
+    .feed-item:nth-child(2) { animation-delay: calc(var(--duration-stagger) * 2); }
+    .feed-item:nth-child(3) { animation-delay: calc(var(--duration-stagger) * 3); }
+    .feed-item:nth-child(4) { animation-delay: calc(var(--duration-stagger) * 4); }
+
+    .feed-item__avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-heading);
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+      color: #ffffff;
+    }
+
+    .feed-item__avatar--teal   { background: var(--color-primary-600); }
+    .feed-item__avatar--amber  { background: var(--color-secondary-500); }
+    .feed-item__avatar--green  { background: var(--color-success-600); }
+    .feed-item__avatar--red    { background: var(--color-error-600); }
+
+    .feed-item__content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .feed-item__text {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-800);
+      line-height: 1.5;
+    }
+
+    .feed-item__text strong {
+      font-weight: 600;
+      color: var(--color-neutral-900);
+    }
+
+    .feed-item__text .amount {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      color: var(--color-primary-600);
+    }
+
+    .feed-item__meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-top: var(--space-1);
+    }
+
+    .feed-item__time {
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-400);
+    }
+
+    .feed-item__tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: var(--radius-sm);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .feed-item__tag--payment  { background: var(--color-success-100); color: var(--color-success-600); }
+    .feed-item__tag--meeting  { background: var(--color-warning-100); color: var(--color-warning-600); }
+    .feed-item__tag--notice   { background: var(--color-primary-100); color: var(--color-primary-600); }
+    .feed-item__tag--request  { background: var(--color-info-100);    color: var(--color-info-600); }
+
+    /* ── 5. Interactive / Property Card ─────────────────────────── */
+    .property-card {
+      background: var(--surface-card);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-6);
+      cursor: pointer;
+      user-select: none;
+      transition:
+        box-shadow var(--duration-normal) var(--ease-smooth),
+        transform var(--duration-normal) var(--ease-smooth),
+        background var(--duration-normal) var(--ease-smooth);
+      border: 1.5px solid transparent;
+    }
+
+    .property-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+      border-color: var(--color-primary-200);
+    }
+
+    .property-card:active {
+      transform: translateY(0) scale(0.99);
+      box-shadow: var(--shadow-xs);
+    }
+
+    .property-card:focus-visible {
+      outline: none;
+      border-color: var(--color-primary-400);
+      box-shadow: 0 0 0 3px var(--color-primary-300), var(--shadow-sm);
+    }
+
+    .property-card__header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+
+    .property-card__icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      background: var(--color-primary-50);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .property-card__name {
+      font-family: var(--font-heading);
+      font-size: var(--type-h4-size);
+      font-weight: var(--type-h4-weight);
+      color: var(--color-neutral-900);
+    }
+
+    .property-card__address {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      margin-top: 2px;
+    }
+
+    .property-card__stats {
+      display: flex;
+      gap: var(--space-4);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--color-neutral-200);
+    }
+
+    .property-card__stat {
+      flex: 1;
+    }
+
+    .property-card__stat-label {
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-500);
+      margin-bottom: 2px;
+    }
+
+    .property-card__stat-value {
+      font-family: var(--font-heading);
+      font-size: var(--type-h4-size);
+      font-weight: 700;
+      color: var(--color-neutral-900);
+    }
+
+    .property-card__stat-value--primary { color: var(--color-primary-600); }
+    .property-card__stat-value--success { color: var(--color-success-600); }
+
+    /* ── Replay Button ──────────────────────────────────────────── */
+    .replay-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      background: var(--color-primary-50);
+      color: var(--color-primary-700);
+      border: 1.5px solid var(--color-primary-200);
+      border-radius: var(--radius-full);
+      padding: var(--space-2) var(--space-4);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: var(--space-5);
+      transition:
+        background var(--duration-fast) var(--ease-default),
+        box-shadow var(--duration-fast) var(--ease-default);
+    }
+
+    .replay-btn:hover {
+      background: var(--color-primary-100);
+      box-shadow: var(--shadow-xs);
+    }
+
+    /* ── Utility ────────────────────────────────────────────────── */
+    .btn-inline {
+      display: inline-flex;
+      align-items: center;
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      padding: 10px 20px;
+      transition: all var(--duration-fast) var(--ease-default);
+    }
+
+    .btn-inline--primary {
+      background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
+      color: #ffffff;
+    }
+
+    .btn-inline--ghost {
+      background: transparent;
+      color: var(--color-primary-600);
+    }
+
+    .btn-inline--ghost:hover {
+      background: var(--color-neutral-100);
+    }
+  </style>
+</head>
+<body>
+
+  <button class="theme-btn" onclick="toggleTheme()">Toggle Dark Mode</button>
+
+  <div class="page-header">
+    <h1>Cards</h1>
+    <p>All five card types used across the Quorant HOA platform — from data-dense stat tiles to conversational feed items.</p>
+  </div>
+
+  <!-- ── 1. Default Card ───────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Default Card</h2>
+    <p class="section-desc">Surface card with border-radius, shadow, and hover lift. The foundational card primitive.</p>
+
+    <div class="card-grid">
+      <div class="card">
+        <h3 class="card__title">Upcoming Board Meeting</h3>
+        <p class="card__body">The quarterly board meeting is scheduled for April 15. Agenda items include landscaping budget and pool renovation proposals.</p>
+        <div class="card__meta">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect x="2" y="3" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M5 1v3M11 1v3M2 7h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          April 15, 2026
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card__title">Pool Hours Notice</h3>
+        <p class="card__body">Summer pool hours begin May 1. The pool will be open daily from 7 AM to 9 PM. Guest passes are limited to two per unit per day.</p>
+        <div class="card__meta">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          2 min read
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card__title">Landscaping Proposal</h3>
+        <p class="card__body">Three bids received for the common area irrigation upgrade. Review period closes April 30. Board vote in May meeting.</p>
+        <div class="card__meta">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="8" cy="6" r="3" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          Posted by Admin
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2. Stat Cards ─────────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Stat Cards</h2>
+    <p class="section-desc">Color-coded top-border cards for at-a-glance performance metrics.</p>
+
+    <div class="card-grid card-grid--stat">
+      <div class="stat-card stat-card--primary">
+        <div class="stat-card__label">Collection Rate</div>
+        <div class="stat-card__value">94.2%</div>
+        <div class="stat-card__delta stat-card__delta--up">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+            <path d="M6 2L10 7H2L6 2Z" fill="currentColor"/>
+          </svg>
+          +1.8% from last month
+        </div>
+      </div>
+
+      <div class="stat-card stat-card--secondary">
+        <div class="stat-card__label">Outstanding</div>
+        <div class="stat-card__value">$12.4k</div>
+        <div class="stat-card__delta stat-card__delta--down">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+            <path d="M6 10L2 5H10L6 10Z" fill="currentColor"/>
+          </svg>
+          $2.1k more than March
+        </div>
+      </div>
+
+      <div class="stat-card stat-card--error">
+        <div class="stat-card__label">Violations</div>
+        <div class="stat-card__value">7</div>
+        <div class="stat-card__delta stat-card__delta--neu">
+          — same as last month
+        </div>
+      </div>
+
+      <div class="stat-card stat-card--success">
+        <div class="stat-card__label">Work Orders</div>
+        <div class="stat-card__value">23</div>
+        <div class="stat-card__delta stat-card__delta--up">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+            <path d="M6 2L10 7H2L6 2Z" fill="currentColor"/>
+          </svg>
+          5 resolved this week
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 3. Conversational Card ─────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Conversational Card</h2>
+    <p class="section-desc">Member App–style narrative card with animated entrance and semantic inline formatting.</p>
+
+    <div id="convo-container">
+      <div class="convo-card">
+        <div class="convo-card__label">
+          <span class="dot"></span>
+          April Summary — Oakridge Commons
+        </div>
+        <p class="convo-card__text">
+          Oakridge Commons is in <span class="status-good">good shape this month</span>.
+          Collections are at <span class="amount">94.2%</span> — up from
+          <span class="amount">92.4%</span> in March.
+          Your next assessment of <span class="amount">$285.00</span> is due
+          <span class="date">May 1st</span>.
+          <br /><br />
+          <span class="status-warn">3 accounts need attention</span> — two are in grace period and one is approaching a late fee threshold.
+          The board meeting is scheduled for <span class="date">April 15 at 7 PM</span>.
+          Pool hours change on <span class="date">May 1st</span>.
+        </p>
+        <div class="convo-card__actions">
+          <button class="btn-inline btn-inline--primary">View My Account</button>
+          <button class="btn-inline btn-inline--ghost">See All Updates</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="replay-btn" onclick="replayConvo()" style="margin-top: var(--space-5);">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+        <path d="M2 8a6 6 0 1 0 1.5-3.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M2 4v4h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Replay Animation
+    </button>
+  </div>
+
+  <!-- ── 4. Feed Items ─────────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Feed Items</h2>
+    <p class="section-desc">Activity-feed cards with avatar, content, timestamp, and category tag. Staggered entrance animation.</p>
+
+    <button class="replay-btn" onclick="replayFeed()">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+        <path d="M2 8a6 6 0 1 0 1.5-3.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M2 4v4h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Replay Animations
+    </button>
+
+    <div class="feed-list" id="feed-list">
+      <div class="feed-item">
+        <div class="feed-item__avatar feed-item__avatar--teal">SC</div>
+        <div class="feed-item__content">
+          <div class="feed-item__text">
+            <strong>Sarah Chen</strong> paid April assessment —
+            <span class="amount">$285.00</span>
+          </div>
+          <div class="feed-item__meta">
+            <span class="feed-item__time">Today, 9:14 AM</span>
+            <span class="feed-item__tag feed-item__tag--payment">Payment</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="feed-item">
+        <div class="feed-item__avatar feed-item__avatar--amber">BM</div>
+        <div class="feed-item__content">
+          <div class="feed-item__text">
+            <strong>Board Announcement:</strong> Next meeting is Tuesday, April 15 at 7 PM in the clubhouse.
+          </div>
+          <div class="feed-item__meta">
+            <span class="feed-item__time">Yesterday, 3:30 PM</span>
+            <span class="feed-item__tag feed-item__tag--meeting">Meeting</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="feed-item">
+        <div class="feed-item__avatar feed-item__avatar--green">MG</div>
+        <div class="feed-item__content">
+          <div class="feed-item__text">
+            <strong>Maintenance Update:</strong> Pool pump replacement completed. Pool is now open. Work order #WO-0412 closed.
+          </div>
+          <div class="feed-item__meta">
+            <span class="feed-item__time">Apr 7, 11:00 AM</span>
+            <span class="feed-item__tag feed-item__tag--notice">Notice</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="feed-item">
+        <div class="feed-item__avatar feed-item__avatar--red">JR</div>
+        <div class="feed-item__content">
+          <div class="feed-item__text">
+            <strong>James Rivera</strong> submitted a maintenance request — "Parking lot light out near Unit 42."
+          </div>
+          <div class="feed-item__meta">
+            <span class="feed-item__time">Apr 6, 8:45 PM</span>
+            <span class="feed-item__tag feed-item__tag--request">Request</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5. Interactive / Property Card ────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Interactive Card</h2>
+    <p class="section-desc">Pointer-interactive cards with hover lift, active press, and keyboard focus state. Click or tab to them.</p>
+
+    <div class="card-grid">
+      <div class="property-card" tabindex="0" role="button" aria-label="Oakridge Commons HOA">
+        <div class="property-card__header">
+          <div class="property-card__icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5Z" stroke="var(--color-primary-600)" stroke-width="1.5"/>
+              <path d="M9 22V12h6v10" stroke="var(--color-primary-600)" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="property-card__name">Oakridge Commons</div>
+            <div class="property-card__address">4200–4280 Oak Tree Drive, Springfield</div>
+          </div>
+        </div>
+        <div class="property-card__stats">
+          <div class="property-card__stat">
+            <div class="property-card__stat-label">Units</div>
+            <div class="property-card__stat-value">48</div>
+          </div>
+          <div class="property-card__stat">
+            <div class="property-card__stat-label">Collection</div>
+            <div class="property-card__stat-value property-card__stat-value--success">94%</div>
+          </div>
+          <div class="property-card__stat">
+            <div class="property-card__stat-label">Open Orders</div>
+            <div class="property-card__stat-value property-card__stat-value--primary">3</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="property-card" tabindex="0" role="button" aria-label="Maplewood Heights HOA">
+        <div class="property-card__header">
+          <div class="property-card__icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5Z" stroke="var(--color-primary-600)" stroke-width="1.5"/>
+              <path d="M9 22V12h6v10" stroke="var(--color-primary-600)" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="property-card__name">Maplewood Heights</div>
+            <div class="property-card__address">800–900 Maple Court, Riverside</div>
+          </div>
+        </div>
+        <div class="property-card__stats">
+          <div class="property-card__stat">
+            <div class="property-card__stat-label">Units</div>
+            <div class="property-card__stat-value">120</div>
+          </div>
+          <div class="property-card__stat">
+            <div class="property-card__stat-label">Collection</div>
+            <div class="property-card__stat-value property-card__stat-value--success">89%</div>
+          </div>
+          <div class="property-card__stat">
+            <div class="property-card__stat-label">Open Orders</div>
+            <div class="property-card__stat-value property-card__stat-value--primary">11</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="property-card" tabindex="0" role="button" aria-label="Pinecrest Village HOA">
+        <div class="property-card__header">
+          <div class="property-card__icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5Z" stroke="var(--color-primary-600)" stroke-width="1.5"/>
+              <path d="M9 22V12h6v10" stroke="var(--color-primary-600)" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="property-card__name">Pinecrest Village</div>
+            <div class="property-card__address">2200 Pinecrest Blvd, Lakewood</div>
+          </div>
+        </div>
+        <div class="property-card__stats">
+          <div class="property-card__stat">
+            <div class="property-card__stat-label">Units</div>
+            <div class="property-card__stat-value">72</div>
+          </div>
+          <div class="property-card__stat">
+            <div class="property-card__stat-label">Collection</div>
+            <div class="property-card__stat-value property-card__stat-value--success">97%</div>
+          </div>
+          <div class="property-card__stat">
+            <div class="property-card__stat-label">Open Orders</div>
+            <div class="property-card__stat-value property-card__stat-value--primary">2</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    }
+
+    function replayFeed() {
+      const feedList = document.getElementById('feed-list');
+      const items = [...feedList.querySelectorAll('.feed-item')];
+      items.forEach(item => {
+        item.style.animation = 'none';
+        item.offsetHeight; // reflow
+      });
+      items.forEach(item => {
+        item.style.animation = '';
+      });
+    }
+
+    function replayConvo() {
+      const container = document.getElementById('convo-container');
+      const card = container.querySelector('.convo-card');
+      card.style.animation = 'none';
+      card.offsetHeight; // reflow
+      card.style.animation = '';
+    }
+  </script>
+</body>
+</html>
