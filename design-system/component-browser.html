@@ -51,17 +51,17 @@
 
     .sidebar__brand-name {
       font-family: var(--font-heading);
-      font-size: var(--type-h3-size);
-      font-weight: var(--type-h3-weight);
-      line-height: var(--type-h3-line-height);
+      font-size: var(--text-h3-size);
+      font-weight: var(--text-h3-weight);
+      line-height: var(--text-h3-line-height);
       color: #ffffff;
       letter-spacing: -0.01em;
     }
 
     .sidebar__brand-caption {
       font-family: var(--font-body);
-      font-size: var(--type-caption-size);
-      font-weight: var(--type-caption-weight);
+      font-size: var(--text-caption-size);
+      font-weight: var(--text-caption-weight);
       color: rgba(255, 255, 255, 0.55);
       margin-top: var(--space-1);
     }
@@ -75,60 +75,50 @@
       gap: var(--space-3);
     }
 
-    .toggle-label {
-      font-size: var(--type-caption-size);
-      font-weight: 500;
-      color: rgba(255,255,255,0.6);
-      user-select: none;
-      min-width: 36px;
-    }
-
-    .toggle-switch {
-      position: relative;
-      display: inline-flex;
+    .dark-toggle-btn {
+      display: flex;
       align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.8);
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 500;
       cursor: pointer;
+      transition: background 0.15s ease;
+      width: 100%;
     }
-
-    .toggle-switch input {
-      position: absolute;
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .toggle-track {
-      width: 40px;
-      height: 22px;
+    .dark-toggle-btn:hover {
       background: rgba(255,255,255,0.15);
-      border-radius: var(--radius-full);
-      transition: background var(--duration-normal) var(--ease-smooth);
-      position: relative;
     }
-
-    .toggle-switch input:checked ~ .toggle-track {
+    .dark-toggle-btn .toggle-indicator {
+      width: 32px;
+      height: 18px;
+      border-radius: 9px;
+      background: rgba(255,255,255,0.2);
+      position: relative;
+      flex-shrink: 0;
+      transition: background 0.2s ease;
+    }
+    .dark-toggle-btn.active .toggle-indicator {
       background: var(--color-primary-400);
     }
-
-    .toggle-track::after {
+    .dark-toggle-btn .toggle-indicator::after {
       content: '';
       position: absolute;
-      left: 3px;
-      top: 3px;
-      width: 16px;
-      height: 16px;
-      background: #ffffff;
-      border-radius: var(--radius-full);
-      transition: transform var(--duration-normal) var(--ease-spring);
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s ease;
     }
-
-    .toggle-switch input:checked ~ .toggle-track::after {
-      transform: translateX(18px);
-    }
-
-    .toggle-icon {
-      font-size: 14px;
-      color: rgba(255,255,255,0.55);
+    .dark-toggle-btn.active .toggle-indicator::after {
+      transform: translateX(14px);
     }
 
     /* Navigation */
@@ -143,10 +133,10 @@
 
     .nav-section__label {
       font-family: var(--font-body);
-      font-size: var(--type-overline-size);
-      font-weight: var(--type-overline-weight);
-      letter-spacing: var(--type-overline-letter-spacing);
-      text-transform: var(--type-overline-text-transform);
+      font-size: var(--text-overline-size);
+      font-weight: var(--text-overline-weight);
+      letter-spacing: var(--text-overline-letter-spacing);
+      text-transform: var(--text-overline-text-transform);
       color: rgba(255,255,255,0.35);
       padding: var(--space-3) var(--space-5) var(--space-2);
     }
@@ -154,7 +144,7 @@
     .nav-link {
       display: block;
       padding: var(--space-2) var(--space-5);
-      font-size: var(--type-body-sm-size);
+      font-size: var(--text-body-sm-size);
       font-weight: 500;
       color: rgba(255,255,255,0.7);
       text-decoration: none;
@@ -201,15 +191,15 @@
     }
 
     .toolbar__label {
-      font-size: var(--type-overline-size);
-      font-weight: var(--type-overline-weight);
-      letter-spacing: var(--type-overline-letter-spacing);
-      text-transform: var(--type-overline-text-transform);
+      font-size: var(--text-overline-size);
+      font-weight: var(--text-overline-weight);
+      letter-spacing: var(--text-overline-letter-spacing);
+      text-transform: var(--text-overline-text-transform);
       color: var(--color-neutral-500);
     }
 
     .toolbar__page {
-      font-size: var(--type-body-sm-size);
+      font-size: var(--text-body-sm-size);
       font-weight: 600;
       color: var(--color-neutral-800);
     }
@@ -257,13 +247,10 @@
       </div>
 
       <div class="sidebar__toggle">
-        <span class="toggle-icon" aria-hidden="true">☀</span>
-        <label class="toggle-switch" title="Toggle dark mode">
-          <input type="checkbox" id="dark-mode-checkbox" onchange="handleDarkModeToggle(this.checked)" />
-          <span class="toggle-track"></span>
-        </label>
-        <span class="toggle-icon" aria-hidden="true">🌙</span>
-        <span class="toggle-label" id="theme-label">Light</span>
+        <button type="button" class="dark-toggle-btn" id="dark-toggle-btn" onclick="toggleDarkMode()">
+          <span class="toggle-indicator"></span>
+          <span id="theme-label">Light Mode</span>
+        </button>
       </div>
 
       <nav class="sidebar__nav" aria-label="Design system navigation">
@@ -372,11 +359,10 @@
     }
 
     /**
-     * Toggle dark mode on the shell <html> and the iframe content.
-     * @param {boolean} checked - Whether the toggle is in "dark" position
+     * Toggle dark mode on the shell and iframe content.
      */
-    function handleDarkModeToggle(checked) {
-      isDark = checked;
+    function toggleDarkMode() {
+      isDark = !isDark;
 
       // Apply to shell
       if (isDark) {
@@ -385,11 +371,17 @@
         document.documentElement.removeAttribute('data-theme');
       }
 
-      // Apply to label
-      document.getElementById('theme-label').textContent = isDark ? 'Dark' : 'Light';
+      // Update button state
+      var btn = document.getElementById('dark-toggle-btn');
+      if (isDark) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+      document.getElementById('theme-label').textContent = isDark ? 'Dark Mode' : 'Light Mode';
 
       // Apply to iframe
-      const frame = document.getElementById('preview-frame');
+      var frame = document.getElementById('preview-frame');
       applyDarkModeToFrame(frame, isDark);
     }
 
