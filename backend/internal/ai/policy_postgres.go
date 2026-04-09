@@ -223,6 +223,30 @@ func (r *PostgresPolicyRepository) ListExtractionsByOrg(ctx context.Context, org
 	return collectExtractions(rows, "ListExtractionsByOrg")
 }
 
+// ListActiveExtractionsByOrg returns all active (not superseded, approved or pending) extractions
+// for the given org, ordered by policy_key, effective_at DESC.
+func (r *PostgresPolicyRepository) ListActiveExtractionsByOrg(ctx context.Context, orgID uuid.UUID) ([]PolicyExtraction, error) {
+	const q = `
+		SELECT id, org_id, domain, policy_key, config,
+		       confidence, source_doc_id, source_text,
+		       source_section, source_page,
+		       review_status, reviewed_by, reviewed_at, human_override,
+		       model_version, effective_at, superseded_by, created_at
+		FROM policy_extractions
+		WHERE org_id = $1
+		  AND superseded_by IS NULL
+		  AND review_status IN ('approved', 'pending')
+		ORDER BY policy_key, effective_at DESC`
+
+	rows, err := r.pool.Query(ctx, q, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("ai: ListActiveExtractionsByOrg: %w", err)
+	}
+	defer rows.Close()
+
+	return collectExtractions(rows, "ListActiveExtractionsByOrg")
+}
+
 // FindActiveExtraction returns the active (not superseded, approved or pending) extraction
 // for the given org and policy key, or nil if none exists.
 func (r *PostgresPolicyRepository) FindActiveExtraction(ctx context.Context, orgID uuid.UUID, policyKey string) (*PolicyExtraction, error) {

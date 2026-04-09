@@ -300,6 +300,82 @@ func TestFindActiveExtraction_RejectedNotReturned(t *testing.T) {
 	assert.Nil(t, active, "rejected extractions should not be returned as active")
 }
 
+func TestListActiveExtractionsByOrg_FiltersCorrectly(t *testing.T) {
+	f := setupPolicyFixture(t)
+	repo := ai.NewPostgresPolicyRepository(f.pool)
+	ctx := context.Background()
+
+	govDoc, err := repo.CreateGoverningDoc(ctx, &ai.GoverningDocument{
+		OrgID: f.orgID, DocumentID: f.docID,
+		DocType: "ccr", Title: "CC&Rs",
+		EffectiveDate:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		IndexingStatus: "indexed",
+	})
+	require.NoError(t, err)
+
+	// active: approved
+	approved, err := repo.CreateExtraction(ctx, &ai.PolicyExtraction{
+		OrgID: f.orgID, Domain: "financial", PolicyKey: "late_fee",
+		Config: json.RawMessage(`{}`), Confidence: 0.9,
+		SourceDocID: govDoc.ID, SourceText: "...",
+		ReviewStatus: "approved", ModelVersion: "gpt-4o", EffectiveAt: time.Now().UTC(),
+	})
+	require.NoError(t, err)
+
+	// active: pending
+	pending, err := repo.CreateExtraction(ctx, &ai.PolicyExtraction{
+		OrgID: f.orgID, Domain: "governance", PolicyKey: "quorum_rule",
+		Config: json.RawMessage(`{}`), Confidence: 0.7,
+		SourceDocID: govDoc.ID, SourceText: "...",
+		ReviewStatus: "pending", ModelVersion: "gpt-4o", EffectiveAt: time.Now().UTC(),
+	})
+	require.NoError(t, err)
+
+	// inactive: rejected
+	_, err = repo.CreateExtraction(ctx, &ai.PolicyExtraction{
+		OrgID: f.orgID, Domain: "financial", PolicyKey: "fee_cap",
+		Config: json.RawMessage(`{}`), Confidence: 0.6,
+		SourceDocID: govDoc.ID, SourceText: "...",
+		ReviewStatus: "rejected", ModelVersion: "gpt-4o", EffectiveAt: time.Now().UTC(),
+	})
+	require.NoError(t, err)
+
+	// inactive: superseded — first create a superseding extraction then update to set superseded_by
+	old, err := repo.CreateExtraction(ctx, &ai.PolicyExtraction{
+		OrgID: f.orgID, Domain: "financial", PolicyKey: "old_policy",
+		Config: json.RawMessage(`{}`), Confidence: 0.8,
+		SourceDocID: govDoc.ID, SourceText: "...",
+		ReviewStatus: "approved", ModelVersion: "gpt-4o", EffectiveAt: time.Now().UTC(),
+	})
+	require.NoError(t, err)
+	superseder, err := repo.CreateExtraction(ctx, &ai.PolicyExtraction{
+		OrgID: f.orgID, Domain: "financial", PolicyKey: "old_policy",
+		Config: json.RawMessage(`{}`), Confidence: 0.9,
+		SourceDocID: govDoc.ID, SourceText: "...",
+		ReviewStatus: "approved", ModelVersion: "gpt-4o", EffectiveAt: time.Now().UTC(),
+	})
+	require.NoError(t, err)
+	old.SupersededBy = &superseder.ID
+	_, err = repo.UpdateExtraction(ctx, old)
+	require.NoError(t, err)
+
+	results, err := repo.ListActiveExtractionsByOrg(ctx, f.orgID)
+	require.NoError(t, err)
+
+	// Should contain approved + pending + superseder (which itself is not superseded), but not rejected or old superseded
+	ids := make([]uuid.UUID, len(results))
+	for i, r := range results {
+		ids[i] = r.ID
+	}
+	assert.Contains(t, ids, approved.ID)
+	assert.Contains(t, ids, pending.ID)
+	assert.Contains(t, ids, superseder.ID)
+	assert.NotContains(t, ids, old.ID, "superseded extraction should not appear")
+	for _, r := range results {
+		assert.NotEqual(t, "rejected", r.ReviewStatus, "rejected extractions should not appear")
+	}
+}
+
 // ─── Policy Resolutions ───────────────────────────────────────────────────────
 
 func TestCreateResolution_AndListByOrg(t *testing.T) {

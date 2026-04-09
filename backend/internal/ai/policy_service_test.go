@@ -90,6 +90,17 @@ func (r *mockPolicyRepo) ListExtractionsByOrg(_ context.Context, orgID uuid.UUID
 	return out, nil
 }
 
+func (r *mockPolicyRepo) ListActiveExtractionsByOrg(_ context.Context, orgID uuid.UUID) ([]ai.PolicyExtraction, error) {
+	var out []ai.PolicyExtraction
+	for _, e := range r.extractions {
+		if e.OrgID == orgID && e.SupersededBy == nil &&
+			(e.ReviewStatus == "approved" || e.ReviewStatus == "pending") {
+			out = append(out, *e)
+		}
+	}
+	return out, nil
+}
+
 func (r *mockPolicyRepo) FindActiveExtraction(_ context.Context, orgID uuid.UUID, policyKey string) (*ai.PolicyExtraction, error) {
 	for _, e := range r.extractions {
 		if e.OrgID == orgID && e.PolicyKey == policyKey &&
@@ -314,6 +325,53 @@ func TestModifyExtraction_SetsOverrideAndStatus(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "modified", updated.ReviewStatus)
 	assert.JSONEq(t, `{"rate": 8}`, string(updated.HumanOverride))
+}
+
+func TestListActivePolicies_ReturnsOnlyActiveExtractions(t *testing.T) {
+	repo := newMockPolicyRepo()
+	svc := ai.NewPolicyService(repo, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	ctx := context.Background()
+	orgID := uuid.New()
+	supersededID := uuid.New()
+
+	// active — approved, not superseded
+	repo.CreateExtraction(ctx, &ai.PolicyExtraction{
+		OrgID: orgID, Domain: "financial", PolicyKey: "late_fee",
+		Config: json.RawMessage(`{}`), Confidence: 0.9,
+		SourceDocID: uuid.New(), SourceText: "...",
+		ReviewStatus: "approved", ModelVersion: "gpt-4o", EffectiveAt: time.Now(),
+	})
+	// active — pending, not superseded
+	repo.CreateExtraction(ctx, &ai.PolicyExtraction{
+		OrgID: orgID, Domain: "governance", PolicyKey: "quorum_rule",
+		Config: json.RawMessage(`{}`), Confidence: 0.7,
+		SourceDocID: uuid.New(), SourceText: "...",
+		ReviewStatus: "pending", ModelVersion: "gpt-4o", EffectiveAt: time.Now(),
+	})
+	// inactive — rejected
+	repo.CreateExtraction(ctx, &ai.PolicyExtraction{
+		OrgID: orgID, Domain: "financial", PolicyKey: "fee_cap",
+		Config: json.RawMessage(`{}`), Confidence: 0.6,
+		SourceDocID: uuid.New(), SourceText: "...",
+		ReviewStatus: "rejected", ModelVersion: "gpt-4o", EffectiveAt: time.Now(),
+	})
+	// inactive — superseded
+	repo.CreateExtraction(ctx, &ai.PolicyExtraction{
+		OrgID: orgID, Domain: "financial", PolicyKey: "old_policy",
+		Config: json.RawMessage(`{}`), Confidence: 0.8,
+		SourceDocID: uuid.New(), SourceText: "...",
+		ReviewStatus: "approved", ModelVersion: "gpt-4o", EffectiveAt: time.Now(),
+		SupersededBy: &supersededID,
+	})
+
+	results, err := svc.ListActivePolicies(ctx, orgID)
+	require.NoError(t, err)
+	assert.Len(t, results, 2)
+	keys := make([]string, len(results))
+	for i, r := range results {
+		keys[i] = r.PolicyKey
+	}
+	assert.ElementsMatch(t, []string{"late_fee", "quorum_rule"}, keys)
 }
 
 func TestGetActivePolicy_ReturnsFromExtraction(t *testing.T) {

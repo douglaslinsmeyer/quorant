@@ -18,6 +18,7 @@ type PolicyRepository interface {
 	CreateExtraction(ctx context.Context, e *PolicyExtraction) (*PolicyExtraction, error)
 	FindExtractionByID(ctx context.Context, id uuid.UUID) (*PolicyExtraction, error)
 	ListExtractionsByOrg(ctx context.Context, orgID uuid.UUID) ([]PolicyExtraction, error)
+	ListActiveExtractionsByOrg(ctx context.Context, orgID uuid.UUID) ([]PolicyExtraction, error)
 	FindActiveExtraction(ctx context.Context, orgID uuid.UUID, policyKey string) (*PolicyExtraction, error)
 	UpdateExtraction(ctx context.Context, e *PolicyExtraction) (*PolicyExtraction, error)
 

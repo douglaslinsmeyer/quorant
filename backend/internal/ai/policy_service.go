@@ -89,6 +89,11 @@ func (s *PolicyService) ListExtractions(ctx context.Context, orgID uuid.UUID) ([
 	return s.repo.ListExtractionsByOrg(ctx, orgID)
 }
 
+// ListActivePolicies returns only active (not superseded, approved or pending) extractions for the given org.
+func (s *PolicyService) ListActivePolicies(ctx context.Context, orgID uuid.UUID) ([]PolicyExtraction, error) {
+	return s.repo.ListActiveExtractionsByOrg(ctx, orgID)
+}
+
 // GetExtraction returns a policy extraction by ID, or a 404 error if not found.
 func (s *PolicyService) GetExtraction(ctx context.Context, id uuid.UUID) (*PolicyExtraction, error) {
 	e, err := s.repo.FindExtractionByID(ctx, id)
