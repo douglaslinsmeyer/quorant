@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tables — Quorant Design System</title>
+
+  <link rel="stylesheet" href="../tokens/colors.css" />
+  <link rel="stylesheet" href="../tokens/typography.css" />
+  <link rel="stylesheet" href="../tokens/spacing.css" />
+  <link rel="stylesheet" href="../tokens/elevation.css" />
+  <link rel="stylesheet" href="../tokens/motion.css" />
+
+  <style>
+    /* ── Reset & Base ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: var(--type-body-size);
+      line-height: var(--type-body-line-height);
+      color: var(--color-neutral-900);
+      background: var(--surface-page);
+      padding: var(--space-8);
+      animation: page-enter var(--duration-slow) var(--ease-out) both;
+    }
+
+    /* ── Dark Mode Toggle ──────────────────────────────────────── */
+    .theme-btn {
+      position: fixed;
+      top: var(--space-4);
+      right: var(--space-4);
+      background: var(--surface-card);
+      border: 1px solid var(--color-neutral-200);
+      color: var(--color-neutral-700);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition:
+        background var(--duration-normal) var(--ease-smooth),
+        color var(--duration-normal) var(--ease-smooth),
+        box-shadow var(--duration-normal) var(--ease-smooth);
+      z-index: 100;
+    }
+
+    .theme-btn:hover {
+      box-shadow: var(--shadow-md);
+      background: var(--surface-elevated);
+    }
+
+    /* ── Page Header ────────────────────────────────────────────── */
+    .page-header {
+      margin-bottom: var(--space-8);
+      padding-right: 120px;
+    }
+
+    .page-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--type-h1-size);
+      font-weight: var(--type-h1-weight);
+      line-height: var(--type-h1-line-height);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-2);
+    }
+
+    .page-header p {
+      font-size: var(--type-body-lg-size);
+      color: var(--color-neutral-600);
+    }
+
+    /* ── Section ────────────────────────────────────────────────── */
+    .section {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-8);
+      margin-bottom: var(--space-6);
+    }
+
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h3-size);
+      font-weight: var(--type-h3-weight);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-1);
+    }
+
+    .section-desc {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-6);
+    }
+
+    .overline {
+      font-family: var(--font-body);
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-3);
+    }
+
+    /* ── Table Toolbar ──────────────────────────────────────────── */
+    .table-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      margin-bottom: var(--space-1);
+    }
+
+    .table-toolbar__heading {
+      font-family: var(--font-heading);
+      font-size: var(--type-h4-size);
+      font-weight: 700;
+      color: var(--color-neutral-900);
+    }
+
+    .table-toolbar__meta {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      margin-top: 2px;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .btn-toolbar {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: var(--radius-md);
+      padding: 7px 14px;
+      cursor: pointer;
+      border: 1px solid var(--color-neutral-200);
+      background: var(--surface-card);
+      color: var(--color-neutral-700);
+      transition:
+        background var(--duration-fast) var(--ease-default),
+        box-shadow var(--duration-fast) var(--ease-default);
+    }
+
+    .btn-toolbar:hover {
+      background: var(--color-neutral-50);
+      box-shadow: var(--shadow-xs);
+    }
+
+    .btn-toolbar--primary {
+      background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
+      color: #fff;
+      border-color: transparent;
+    }
+
+    .btn-toolbar--primary:hover {
+      background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-800));
+    }
+
+    /* ── Filter Tabs ────────────────────────────────────────────── */
+    .filter-tabs {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      border-bottom: 1px solid var(--color-neutral-200);
+      margin-bottom: var(--space-4);
+      padding-bottom: 0;
+    }
+
+    .filter-tab {
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 500;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
+      cursor: pointer;
+      color: var(--color-neutral-500);
+      background: none;
+      border: none;
+      position: relative;
+      transition:
+        background var(--duration-fast) var(--ease-default),
+        color var(--duration-fast) var(--ease-default);
+    }
+
+    .filter-tab:hover:not(.filter-tab--active) {
+      background: var(--color-neutral-50);
+      color: var(--color-neutral-700);
+    }
+
+    .filter-tab--active {
+      background: var(--color-primary-50);
+      color: var(--color-primary-600);
+      font-weight: 600;
+    }
+
+    .filter-tab--active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--color-primary-600);
+      border-radius: 1px 1px 0 0;
+    }
+
+    .filter-tab__count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: var(--radius-full);
+      background: var(--color-neutral-200);
+      color: var(--color-neutral-600);
+      margin-left: 5px;
+    }
+
+    .filter-tab--active .filter-tab__count {
+      background: var(--color-primary-100);
+      color: var(--color-primary-600);
+    }
+
+    /* ── Table Wrap ─────────────────────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-neutral-200);
+    }
+
+    /* ── Data Table ─────────────────────────────────────────────── */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--type-body-sm-size);
+    }
+
+    /* Header */
+    .data-table thead th {
+      background: var(--color-neutral-50);
+      font-family: var(--font-body);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--color-neutral-500);
+      padding: var(--space-3) var(--space-4);
+      text-align: left;
+      border-bottom: 1px solid var(--color-neutral-200);
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .data-table thead th.sortable {
+      cursor: pointer;
+    }
+
+    .data-table thead th.sortable:hover {
+      color: var(--color-neutral-700);
+      background: var(--color-neutral-100);
+    }
+
+    .sort-icon {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 1px;
+      margin-left: 5px;
+      vertical-align: middle;
+      opacity: 0.4;
+    }
+
+    .sort-icon--asc {
+      opacity: 1;
+    }
+
+    .sort-icon--desc {
+      opacity: 1;
+    }
+
+    .sort-icon svg {
+      width: 8px;
+      height: 8px;
+    }
+
+    /* Body rows */
+    .data-table tbody tr {
+      border-bottom: 1px solid var(--color-neutral-200);
+      transition: background var(--duration-fast) var(--ease-default);
+    }
+
+    .data-table tbody tr:nth-child(even) td {
+      background: var(--color-neutral-50);
+    }
+
+    .data-table tbody tr:nth-child(odd) td {
+      background: var(--color-white);
+    }
+
+    .data-table tbody tr:hover td {
+      background: var(--color-primary-50) !important;
+    }
+
+    .data-table tbody tr:last-child {
+      border-bottom: none;
+    }
+
+    .data-table tbody td {
+      padding: var(--space-3) var(--space-4);
+      color: var(--color-neutral-800);
+      vertical-align: middle;
+    }
+
+    /* Unit cell */
+    .cell-unit {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-neutral-700);
+      letter-spacing: 0.02em;
+    }
+
+    /* Avatar cell */
+    .cell-owner {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .avatar--teal     { background: #1A7A9A; }
+    .avatar--amber    { background: #C99A1A; }
+    .avatar--lteal    { background: #3DACC9; }
+    .avatar--red      { background: #C0392B; }
+    .avatar--dteal    { background: #0E4F65; }
+    .avatar--primary  { background: #13647E; }
+
+    .owner-name {
+      font-size: var(--type-body-sm-size);
+      font-weight: 500;
+      color: var(--color-neutral-900);
+    }
+
+    /* Amount cell */
+    .cell-amount {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 500;
+      text-align: right;
+    }
+
+    .amount--positive {
+      color: var(--color-success-600);
+    }
+
+    .amount--negative {
+      color: var(--color-error-600);
+    }
+
+    /* Status pill */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: var(--radius-full);
+      white-space: nowrap;
+    }
+
+    .status-pill::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+
+    .status--current {
+      background: var(--color-success-100);
+      color: var(--color-success-600);
+    }
+
+    .status--past-due {
+      background: var(--color-warning-100);
+      color: var(--color-warning-600);
+    }
+
+    .status--delinquent {
+      background: var(--color-error-100);
+      color: var(--color-error-600);
+    }
+
+    .status--grace {
+      background: var(--color-info-100);
+      color: var(--color-info-600);
+    }
+
+    /* Date cell */
+    .cell-date {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-600);
+      white-space: nowrap;
+    }
+
+    /* Action cell */
+    .cell-action {
+      text-align: right;
+    }
+
+    .row-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-md);
+      border: none;
+      background: none;
+      color: var(--color-neutral-400);
+      cursor: pointer;
+      transition:
+        background var(--duration-fast) var(--ease-default),
+        color var(--duration-fast) var(--ease-default);
+    }
+
+    .row-action:hover {
+      background: var(--color-neutral-100);
+      color: var(--color-neutral-700);
+    }
+
+    /* ── Table Footer ───────────────────────────────────────────── */
+    .table-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-3) var(--space-4);
+      border-top: 1px solid var(--color-neutral-200);
+      background: var(--color-neutral-50);
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      border-radius: 0 0 var(--radius-md) var(--radius-md);
+    }
+
+    .pagination {
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+    }
+
+    .page-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-neutral-200);
+      background: var(--surface-card);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--color-neutral-600);
+      cursor: pointer;
+      transition:
+        background var(--duration-fast) var(--ease-default),
+        color var(--duration-fast) var(--ease-default);
+    }
+
+    .page-btn:hover {
+      background: var(--color-primary-50);
+      color: var(--color-primary-600);
+      border-color: var(--color-primary-200);
+    }
+
+    .page-btn--active {
+      background: var(--color-primary-600);
+      color: #fff;
+      border-color: var(--color-primary-600);
+    }
+
+    /* ── Spec Grid ──────────────────────────────────────────────── */
+    .spec-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+      margin-top: var(--space-6);
+    }
+
+    .spec-item {
+      background: var(--surface-page);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+    }
+
+    .spec-item__label {
+      font-size: var(--type-overline-size);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-2);
+    }
+
+    .spec-item__value {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--color-primary-600);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <button class="theme-btn" id="themeToggle" aria-label="Toggle dark mode">☀ Light</button>
+
+  <!-- ── Page Header ──────────────────────────────────────────────── -->
+  <header class="page-header">
+    <h1>Tables</h1>
+    <p>Management-style data tables for resident ledgers, assessment tracking, violation logs, and financial reporting.</p>
+  </header>
+
+  <!-- ── Section 1: Main Assessment Table ─────────────────────────── -->
+  <section class="section">
+    <div class="table-toolbar">
+      <div>
+        <div class="table-toolbar__heading">Assessment Ledger</div>
+        <div class="table-toolbar__meta">Oakridge Commons · 48 units · Fiscal Year 2025</div>
+      </div>
+      <div class="toolbar-actions">
+        <button class="btn-toolbar">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M4 7h6M6 10h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Filter
+        </button>
+        <button class="btn-toolbar">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2h10v2L8 8v4l-2-1V8L2 4V2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          Export
+        </button>
+        <button class="btn-toolbar btn-toolbar--primary">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="white" stroke-width="1.75" stroke-linecap="round"/></svg>
+          Record Payment
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="filter-tabs" role="tablist">
+      <button class="filter-tab filter-tab--active" role="tab" aria-selected="true">
+        All
+        <span class="filter-tab__count">48</span>
+      </button>
+      <button class="filter-tab" role="tab" aria-selected="false">
+        Past Due
+        <span class="filter-tab__count">3</span>
+      </button>
+      <button class="filter-tab" role="tab" aria-selected="false">
+        Delinquent
+        <span class="filter-tab__count">1</span>
+      </button>
+      <button class="filter-tab" role="tab" aria-selected="false">
+        Violations
+        <span class="filter-tab__count">5</span>
+      </button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <table class="data-table" aria-label="Assessment ledger for Oakridge Commons">
+        <thead>
+          <tr>
+            <th class="sortable">
+              Unit
+              <span class="sort-icon sort-icon--asc" aria-hidden="true">
+                <svg viewBox="0 0 8 5"><path d="M4 0L8 5H0L4 0Z" fill="currentColor"/></svg>
+              </span>
+            </th>
+            <th>Owner</th>
+            <th class="sortable" style="text-align:right">
+              Balance
+              <span class="sort-icon" aria-hidden="true">
+                <svg viewBox="0 0 8 5"><path d="M4 5L0 0H8L4 5Z" fill="currentColor"/></svg>
+              </span>
+            </th>
+            <th class="sortable">
+              Status
+              <span class="sort-icon" aria-hidden="true">
+                <svg viewBox="0 0 8 5"><path d="M4 5L0 0H8L4 5Z" fill="currentColor"/></svg>
+              </span>
+            </th>
+            <th class="sortable">
+              Last Payment
+              <span class="sort-icon" aria-hidden="true">
+                <svg viewBox="0 0 8 5"><path d="M4 5L0 0H8L4 5Z" fill="currentColor"/></svg>
+              </span>
+            </th>
+            <th><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Row 1: Sarah Chen — Current -->
+          <tr>
+            <td><span class="cell-unit">101-A</span></td>
+            <td>
+              <div class="cell-owner">
+                <div class="avatar avatar--teal" aria-hidden="true">SC</div>
+                <span class="owner-name">Sarah Chen</span>
+              </div>
+            </td>
+            <td><span class="cell-amount amount--positive">$0.00</span></td>
+            <td><span class="status-pill status--current">Current</span></td>
+            <td><span class="cell-date">Apr 1, 2025</span></td>
+            <td class="cell-action">
+              <button class="row-action" aria-label="More options for Sarah Chen">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="3" r="1.25" fill="currentColor"/><circle cx="8" cy="8" r="1.25" fill="currentColor"/><circle cx="8" cy="13" r="1.25" fill="currentColor"/></svg>
+              </button>
+            </td>
+          </tr>
+          <!-- Row 2: Marcus Johnson — Past Due -->
+          <tr>
+            <td><span class="cell-unit">102-B</span></td>
+            <td>
+              <div class="cell-owner">
+                <div class="avatar avatar--amber" aria-hidden="true">MJ</div>
+                <span class="owner-name">Marcus Johnson</span>
+              </div>
+            </td>
+            <td><span class="cell-amount amount--negative">$570.00</span></td>
+            <td><span class="status-pill status--past-due">Past Due</span></td>
+            <td><span class="cell-date">Feb 15, 2025</span></td>
+            <td class="cell-action">
+              <button class="row-action" aria-label="More options for Marcus Johnson">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="3" r="1.25" fill="currentColor"/><circle cx="8" cy="8" r="1.25" fill="currentColor"/><circle cx="8" cy="13" r="1.25" fill="currentColor"/></svg>
+              </button>
+            </td>
+          </tr>
+          <!-- Row 3: Priya Patel — Current -->
+          <tr>
+            <td><span class="cell-unit">103-A</span></td>
+            <td>
+              <div class="cell-owner">
+                <div class="avatar avatar--lteal" aria-hidden="true">PP</div>
+                <span class="owner-name">Priya Patel</span>
+              </div>
+            </td>
+            <td><span class="cell-amount amount--positive">$0.00</span></td>
+            <td><span class="status-pill status--current">Current</span></td>
+            <td><span class="cell-date">Mar 30, 2025</span></td>
+            <td class="cell-action">
+              <button class="row-action" aria-label="More options for Priya Patel">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="3" r="1.25" fill="currentColor"/><circle cx="8" cy="8" r="1.25" fill="currentColor"/><circle cx="8" cy="13" r="1.25" fill="currentColor"/></svg>
+              </button>
+            </td>
+          </tr>
+          <!-- Row 4: James Wright — Delinquent -->
+          <tr>
+            <td><span class="cell-unit">104-C</span></td>
+            <td>
+              <div class="cell-owner">
+                <div class="avatar avatar--red" aria-hidden="true">JW</div>
+                <span class="owner-name">James Wright</span>
+              </div>
+            </td>
+            <td><span class="cell-amount amount--negative">$1,140.00</span></td>
+            <td><span class="status-pill status--delinquent">Delinquent</span></td>
+            <td><span class="cell-date">Dec 3, 2024</span></td>
+            <td class="cell-action">
+              <button class="row-action" aria-label="More options for James Wright">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="3" r="1.25" fill="currentColor"/><circle cx="8" cy="8" r="1.25" fill="currentColor"/><circle cx="8" cy="13" r="1.25" fill="currentColor"/></svg>
+              </button>
+            </td>
+          </tr>
+          <!-- Row 5: Lisa Nguyen — Current -->
+          <tr>
+            <td><span class="cell-unit">105-B</span></td>
+            <td>
+              <div class="cell-owner">
+                <div class="avatar avatar--dteal" aria-hidden="true">LN</div>
+                <span class="owner-name">Lisa Nguyen</span>
+              </div>
+            </td>
+            <td><span class="cell-amount amount--positive">$0.00</span></td>
+            <td><span class="status-pill status--current">Current</span></td>
+            <td><span class="cell-date">Apr 2, 2025</span></td>
+            <td class="cell-action">
+              <button class="row-action" aria-label="More options for Lisa Nguyen">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="3" r="1.25" fill="currentColor"/><circle cx="8" cy="8" r="1.25" fill="currentColor"/><circle cx="8" cy="13" r="1.25" fill="currentColor"/></svg>
+              </button>
+            </td>
+          </tr>
+          <!-- Row 6: David Kim — Grace Period -->
+          <tr>
+            <td><span class="cell-unit">106-A</span></td>
+            <td>
+              <div class="cell-owner">
+                <div class="avatar avatar--primary" aria-hidden="true">DK</div>
+                <span class="owner-name">David Kim</span>
+              </div>
+            </td>
+            <td><span class="cell-amount amount--negative">$285.00</span></td>
+            <td><span class="status-pill status--grace">Grace Period</span></td>
+            <td><span class="cell-date">Mar 15, 2025</span></td>
+            <td class="cell-action">
+              <button class="row-action" aria-label="More options for David Kim">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="3" r="1.25" fill="currentColor"/><circle cx="8" cy="8" r="1.25" fill="currentColor"/><circle cx="8" cy="13" r="1.25" fill="currentColor"/></svg>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Table Footer / Pagination -->
+      <div class="table-footer">
+        <span>Showing 6 of 48 residents</span>
+        <div class="pagination">
+          <button class="page-btn" aria-label="Previous page">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M6.5 2L3.5 5L6.5 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="page-btn page-btn--active">1</button>
+          <button class="page-btn">2</button>
+          <button class="page-btn">3</button>
+          <span style="font-size:12px;color:var(--color-neutral-400);padding:0 4px">…</span>
+          <button class="page-btn">8</button>
+          <button class="page-btn" aria-label="Next page">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3.5 2L6.5 5L3.5 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Spec Grid -->
+    <div class="spec-grid">
+      <div class="spec-item">
+        <div class="spec-item__label">Header BG</div>
+        <div class="spec-item__value">var(--color-neutral-50)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Header Font</div>
+        <div class="spec-item__value">10px uppercase, weight 600<br>letter-spacing: 0.05em</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Row Padding</div>
+        <div class="spec-item__value">var(--space-3) var(--space-4)<br>12px 16px</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Row Hover BG</div>
+        <div class="spec-item__value">var(--color-primary-50)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Amount Font</div>
+        <div class="spec-item__value">var(--font-mono)<br>JetBrains Mono</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Avatar Size</div>
+        <div class="spec-item__value">28px × 28px<br>border-radius: var(--radius-md)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 2: Status Pill Reference ──────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Status Pills Reference</h2>
+    <p class="section-desc">Status pills communicate payment state at a glance. Each uses a semantic color pair from the token system, with a leading dot indicator.</p>
+
+    <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);margin-top:var(--space-4)">
+      <span class="status-pill status--current">Current</span>
+      <span class="status-pill status--past-due">Past Due</span>
+      <span class="status-pill status--delinquent">Delinquent</span>
+      <span class="status-pill status--grace">Grace Period</span>
+    </div>
+
+    <div class="spec-grid" style="margin-top:var(--space-6)">
+      <div class="spec-item">
+        <div class="spec-item__label">Current</div>
+        <div class="spec-item__value">success-100 bg · success-600 text</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Past Due</div>
+        <div class="spec-item__value">warning-100 bg · warning-600 text</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Delinquent</div>
+        <div class="spec-item__value">error-100 bg · error-600 text</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Grace Period</div>
+        <div class="spec-item__value">info-100 bg · info-600 text</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Negative Amount</div>
+        <div class="spec-item__value">var(--color-error-600)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Zero / Paid</div>
+        <div class="spec-item__value">var(--color-success-600)</div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const btn = document.getElementById('themeToggle');
+    const html = document.documentElement;
+
+    btn.addEventListener('click', () => {
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        html.removeAttribute('data-theme');
+        btn.textContent = '☀ Light';
+      } else {
+        html.setAttribute('data-theme', 'dark');
+        btn.textContent = '☾ Dark';
+      }
+    });
+
+    // Filter tabs visual behavior
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.filter-tab').forEach(t => {
+          t.classList.remove('filter-tab--active');
+          t.setAttribute('aria-selected', 'false');
+        });
+        tab.classList.add('filter-tab--active');
+        tab.setAttribute('aria-selected', 'true');
+      });
+    });
+  </script>
+</body>
+</html>
