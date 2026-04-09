@@ -17,7 +17,7 @@ type EmbeddingFunc func(ctx context.Context, text string) ([]float32, error)
 
 // StubEmbeddingFunc returns a zero vector. Used until real LLM integration.
 func StubEmbeddingFunc(ctx context.Context, text string) ([]float32, error) {
-	return make([]float32, 1536), nil
+	return make([]float32, EmbeddingDimensions), nil
 }
 
 // ContextLakeService provides high-level access to context lake ingestion and retrieval.

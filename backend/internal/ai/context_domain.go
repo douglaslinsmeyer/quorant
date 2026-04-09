@@ -7,6 +7,10 @@ import (
 	"github.com/google/uuid"
 )
 
+// EmbeddingDimensions is the vector size for all context lake embeddings.
+// Change this constant when migrating to a different embedding model.
+const EmbeddingDimensions = 1536
+
 // ContextChunk is a single embedded chunk of content stored in the context lake.
 type ContextChunk struct {
 	ID           uuid.UUID      `json:"id"`
@@ -19,7 +23,7 @@ type ContextChunk struct {
 	Content      string         `json:"content"`
 	SectionRef   *string        `json:"section_ref,omitempty"`
 	PageNumber   *int           `json:"page_number,omitempty"`
-	Embedding    []float32      `json:"embedding"` // 1536-dim vector
+	Embedding    []float32      `json:"embedding"` // EmbeddingDimensions-dim vector
 	TokenCount   int            `json:"token_count"`
 	Metadata     map[string]any `json:"metadata"`
 	CreatedAt    time.Time      `json:"created_at"`

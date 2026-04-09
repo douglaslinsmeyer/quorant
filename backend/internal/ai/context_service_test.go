@@ -130,7 +130,7 @@ func TestIngestChunks_CallsCreateBatch(t *testing.T) {
 			SourceID:   uuid.New(),
 			ChunkIndex: 0,
 			Content:    "Test chunk",
-			Embedding:  make([]float32, 1536),
+			Embedding:  make([]float32, ai.EmbeddingDimensions),
 			TokenCount: 2,
 			Metadata:   map[string]any{},
 		},
@@ -156,7 +156,7 @@ func TestIngestChunks_PropagatesRepoError(t *testing.T) {
 		OrgID:      func() *uuid.UUID { id := uuid.New(); return &id }(),
 		SourceType: "governing_document",
 		SourceID:   uuid.New(),
-		Embedding:  make([]float32, 1536),
+		Embedding:  make([]float32, ai.EmbeddingDimensions),
 		Metadata:   map[string]any{},
 	}})
 
@@ -181,7 +181,7 @@ func TestDeleteSourceChunks_CallsDeleteBySource(t *testing.T) {
 
 func TestSearch_UsesEmbeddingFunc(t *testing.T) {
 	capturedText := ""
-	customEmbedding := make([]float32, 1536)
+	customEmbedding := make([]float32, ai.EmbeddingDimensions)
 	customEmbedding[42] = 0.9
 
 	embedFn := func(ctx context.Context, text string) ([]float32, error) {

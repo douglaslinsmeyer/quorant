@@ -52,20 +52,20 @@ func setupOrg(t *testing.T, pool *pgxpool.Pool, orgType string) *org.Organizatio
 	return created
 }
 
-// makeEmbedding creates a 1536-dim float32 slice with specific non-zero values at given indices.
+// makeEmbedding creates an EmbeddingDimensions-dim float32 slice with specific non-zero values at given indices.
 func makeEmbedding(nonZeroIndices map[int]float32) []float32 {
-	v := make([]float32, 1536)
+	v := make([]float32, ai.EmbeddingDimensions)
 	for i, val := range nonZeroIndices {
-		if i < 1536 {
+		if i < ai.EmbeddingDimensions {
 			v[i] = val
 		}
 	}
 	return v
 }
 
-// zeroEmbedding returns a zero 1536-dim vector.
+// zeroEmbedding returns a zero EmbeddingDimensions-dim vector.
 func zeroEmbedding() []float32 {
-	return make([]float32, 1536)
+	return make([]float32, ai.EmbeddingDimensions)
 }
 
 // ─── Create ──────────────────────────────────────────────────────────────────
