@@ -13,9 +13,11 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/iam"
 	"github.com/quorant/quorant/internal/org"
 	"github.com/quorant/quorant/internal/platform/auth"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/quorant/quorant/internal/platform/config"
 	"github.com/quorant/quorant/internal/platform/db"
 	"github.com/quorant/quorant/internal/platform/health"
@@ -50,7 +52,14 @@ func run() error {
 	}
 	defer pool.Close()
 
-	// 4. Redis
+	// 4. Audit and event infrastructure
+	auditor := audit.NewPostgresAuditor(pool)
+	_ = auditor
+	outboxPublisher := queue.NewOutboxPublisher(pool)
+	_ = outboxPublisher
+	logger.Info("audit and event infrastructure initialized")
+
+	// 5. Redis
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     cfg.Redis.Addr,
 		Password: cfg.Redis.Password,
@@ -58,7 +67,7 @@ func run() error {
 	})
 	defer rdb.Close()
 
-	// 5. NATS
+	// 6. NATS
 	var nc *nats.Conn
 	nc, err = nats.Connect(cfg.NATS.URL)
 	if err != nil {
@@ -68,7 +77,7 @@ func run() error {
 		defer nc.Close()
 	}
 
-	// 6. JWT validator
+	// 7. JWT validator
 	var tokenValidator auth.TokenValidator
 	jwksURL := fmt.Sprintf("http://%s/oauth/v2/keys", cfg.Zitadel.Domain)
 	validator, err := auth.NewJWKSValidator(ctx, jwksURL, cfg.Zitadel.Issuer)
@@ -80,7 +89,7 @@ func run() error {
 		tokenValidator = validator
 	}
 
-	// 7. Health handler
+	// 8. Health handler
 	healthHandler := health.NewHandler(
 		health.NewDBChecker(pool),
 		health.NewRedisChecker(rdb),
@@ -88,7 +97,7 @@ func run() error {
 		health.NewS3Checker(cfg.S3.Endpoint, cfg.S3.UseSSL),
 	)
 
-	// 8. Routes
+	// 9. Routes
 	mux := http.NewServeMux()
 	mux.Handle("GET /api/v1/health", healthHandler)
 
@@ -108,14 +117,14 @@ func run() error {
 	unitHandler := org.NewUnitHandler(orgService, logger)
 	org.RegisterRoutes(mux, orgHandler, membershipHandler, unitHandler, tokenValidator)
 
-	// 9. Middleware chain (innermost to outermost)
+	// 10. Middleware chain (innermost to outermost)
 	var handler http.Handler = mux
 	handler = middleware.Logging(logger, handler)
 	handler = middleware.Recovery(logger, handler)
 	handler = middleware.RequestID(handler)
 	handler = middleware.CORS([]string{"*"}, handler) // permissive for dev; configured per-env in production
 
-	// 10. HTTP server
+	// 11. HTTP server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	server := &http.Server{
 		Addr:         addr,
@@ -125,7 +134,7 @@ func run() error {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// 11. Start server in goroutine
+	// 12. Start server in goroutine
 	errCh := make(chan error, 1)
 	go func() {
 		logger.Info("starting API server", "addr", addr)
@@ -134,7 +143,7 @@ func run() error {
 		}
 	}()
 
-	// 12. Graceful shutdown
+	// 13. Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 
