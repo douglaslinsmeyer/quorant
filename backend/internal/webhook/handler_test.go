@@ -2,20 +2,40 @@ package webhook_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/platform/auth"
+	"github.com/quorant/quorant/internal/platform/middleware"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/quorant/quorant/internal/webhook"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"log/slog"
-	"os"
 )
+
+// allowAllWebhookChecker is a PermissionChecker that always grants access (for use in tests).
+type allowAllWebhookChecker struct{}
+
+func (allowAllWebhookChecker) HasPermission(_ context.Context, _, _ uuid.UUID, _ string) (bool, error) {
+	return true, nil
+}
+
+// fixedWebhookUserIDResolver returns a resolveUserID func that always returns the given UUID.
+func fixedWebhookUserIDResolver(id uuid.UUID) func(context.Context) (uuid.UUID, error) {
+	return func(_ context.Context) (uuid.UUID, error) {
+		return id, nil
+	}
+}
+
+var _ middleware.PermissionChecker = allowAllWebhookChecker{}
 
 // ─── Test server helpers ──────────────────────────────────────────────────────
 
@@ -24,10 +44,10 @@ import (
 func newWebhookTestServer(t *testing.T, repo *mockWebhookRepo, validator auth.TokenValidator) *httptest.Server {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	svc := webhook.NewWebhookService(repo, logger)
+	svc := webhook.NewWebhookService(repo, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 	handler := webhook.NewWebhookHandler(svc, logger)
 	mux := http.NewServeMux()
-	webhook.RegisterRoutes(mux, handler, validator)
+	webhook.RegisterRoutes(mux, handler, validator, allowAllWebhookChecker{}, fixedWebhookUserIDResolver(uuid.New()))
 	return httptest.NewServer(mux)
 }
 

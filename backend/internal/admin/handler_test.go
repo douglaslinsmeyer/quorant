@@ -2,30 +2,51 @@ package admin_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/admin"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/platform/auth"
+	"github.com/quorant/quorant/internal/platform/middleware"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"log/slog"
-	"os"
 )
+
+// allowAllChecker is a PermissionChecker that always grants access (for use in tests).
+type allowAllChecker struct{}
+
+func (allowAllChecker) HasPermission(_ context.Context, _, _ uuid.UUID, _ string) (bool, error) {
+	return true, nil
+}
+
+// fixedUserIDResolver returns a resolveUserID func that always returns the given UUID.
+func fixedUserIDResolver(id uuid.UUID) func(context.Context) (uuid.UUID, error) {
+	return func(_ context.Context) (uuid.UUID, error) {
+		return id, nil
+	}
+}
+
+// noopChecker satisfies middleware.PermissionChecker without importing extra packages.
+var _ middleware.PermissionChecker = allowAllChecker{}
 
 // newAdminTestServer builds a real http.ServeMux with admin routes registered,
 // backed by the mockAdminRepository defined in service_test.go.
 func newAdminTestServer(t *testing.T, repo *mockAdminRepository, validator auth.TokenValidator) *httptest.Server {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	svc := admin.NewAdminService(repo, logger)
+	svc := admin.NewAdminService(repo, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 	handler := admin.NewAdminHandler(svc, logger)
 	mux := http.NewServeMux()
-	admin.RegisterRoutes(mux, handler, validator)
+	admin.RegisterRoutes(mux, handler, validator, allowAllChecker{}, fixedUserIDResolver(uuid.New()))
 	return httptest.NewServer(mux)
 }
 
