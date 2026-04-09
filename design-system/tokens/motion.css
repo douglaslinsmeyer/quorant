@@ -1,0 +1,156 @@
+/**
+ * Quorant Design System — Motion Tokens
+ *
+ * Defines easing curves, duration tokens, and keyframe animations for
+ * consistent motion across the Quorant HOA management platform.
+ *
+ * Sections:
+ *   - Easing curves     --ease-{default|out|in|spring|smooth}
+ *   - Duration scale    --duration-{instant|fast|normal|moderate|slow|stagger}
+ *   - Keyframe animations: stagger-up, stagger-left, hero-entrance,
+ *                          page-enter, page-exit, fill-progress, pulse-dot
+ *   - Reduced motion    @media (prefers-reduced-motion: reduce)
+ *                       Collapses all durations and disables animations
+ *                       for users who prefer less motion.
+ */
+
+:root {
+  /* ============================================================
+     Easing Curves
+     ============================================================ */
+
+  /* Standard / default ease — balanced acceleration and deceleration */
+  --ease-default: cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  /* Ease out — fast start, decelerates to rest (good for entrances) */
+  --ease-out: cubic-bezier(0.0, 0.0, 0.2, 1);
+
+  /* Ease in — slow start, accelerates (good for exits) */
+  --ease-in: cubic-bezier(0.4, 0.0, 1, 1);
+
+  /* Spring — slight overshoot for a physical, bouncy feel */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Smooth — material-style standard ease, good for interactive elements */
+  --ease-smooth: cubic-bezier(0.4, 0.0, 0.2, 1);
+
+  /* ============================================================
+     Duration Scale
+     ============================================================ */
+  --duration-instant:  100ms;  /* Micro-interactions, hover states */
+  --duration-fast:     150ms;  /* Tooltips, small reveals */
+  --duration-normal:   200ms;  /* Default transitions */
+  --duration-moderate: 300ms;  /* Panel slides, modals */
+  --duration-slow:     400ms;  /* Page transitions, large reveals */
+  --duration-stagger:   60ms;  /* Stagger delay between list items */
+}
+
+/* ============================================================
+   Keyframe Animations
+   ============================================================ */
+
+/* Stagger up — list items / cards appearing from below */
+@keyframes stagger-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Stagger left — items appearing from the left */
+@keyframes stagger-left {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Hero entrance — large focal content entering from below */
+@keyframes hero-entrance {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Page enter — incoming route / view */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Page exit — outgoing route / view */
+@keyframes page-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* Fill progress — progress bar fill expanding from zero */
+@keyframes fill-progress {
+  from {
+    width: 0;
+  }
+  to {
+    width: auto;
+  }
+}
+
+/* Pulse dot — status indicator pulsing between visible and dim */
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.3);
+  }
+}
+
+/* ============================================================
+   Reduced Motion — honour user preference
+   Collapses all durations to 100ms (a near-instant cut) and
+   overrides any animation/transition on the page.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-instant:  100ms;
+    --duration-fast:     100ms;
+    --duration-normal:   100ms;
+    --duration-moderate: 100ms;
+    --duration-slow:     100ms;
+    --duration-stagger:    0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration:        100ms !important;
+    animation-delay:             0ms !important;
+    transition-duration:       100ms !important;
+  }
+}
