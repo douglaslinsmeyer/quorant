@@ -21,6 +21,19 @@ type Config struct {
 	Stripe    StripeConfig
 	Log       LogConfig
 	Telemetry TelemetryConfig
+	LLM       LLMConfig
+}
+
+// LLMConfig holds LLM provider configuration.
+type LLMConfig struct {
+	Provider       string // env: LLM_PROVIDER, default: "none" (disabled). Options: "anthropic", "openai", "none"
+	APIKey         string // env: LLM_API_KEY
+	BaseURL        string // env: LLM_BASE_URL (for OpenAI-compatible: Ollama, vLLM, etc.)
+	Model          string // env: LLM_MODEL, default: "" (uses provider default)
+	EmbedProvider  string // env: LLM_EMBED_PROVIDER, default: "" (same as Provider)
+	EmbedAPIKey    string // env: LLM_EMBED_API_KEY, default: "" (same as APIKey)
+	EmbedBaseURL   string // env: LLM_EMBED_BASE_URL
+	EmbedModel     string // env: LLM_EMBED_MODEL, default: "text-embedding-3-small"
 }
 
 // ServerConfig holds HTTP server settings.
@@ -225,6 +238,16 @@ func Load() (*Config, error) {
 			Enabled:     otelEnabled,
 			Endpoint:    getEnv("OTEL_ENDPOINT", "localhost:4318"),
 			ServiceName: getEnv("OTEL_SERVICE_NAME", "quorant-api"),
+		},
+		LLM: LLMConfig{
+			Provider:      getEnv("LLM_PROVIDER", "none"),
+			APIKey:        os.Getenv("LLM_API_KEY"),
+			BaseURL:       os.Getenv("LLM_BASE_URL"),
+			Model:         os.Getenv("LLM_MODEL"),
+			EmbedProvider: os.Getenv("LLM_EMBED_PROVIDER"),
+			EmbedAPIKey:   os.Getenv("LLM_EMBED_API_KEY"),
+			EmbedBaseURL:  os.Getenv("LLM_EMBED_BASE_URL"),
+			EmbedModel:    getEnv("LLM_EMBED_MODEL", "text-embedding-3-small"),
 		},
 	}
 
