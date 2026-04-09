@@ -391,7 +391,12 @@ func (s *OrgService) ListUnits(ctx context.Context, orgID uuid.UUID, limit int, 
 }
 
 // UpdateUnit applies partial updates to a unit.
-func (s *OrgService) UpdateUnit(ctx context.Context, id uuid.UUID, label *string, unitType *string, addressLine1 *string, addressLine2 *string, city *string, state *string, zip *string, lotSizeSqft *int, votingWeight *float64, status *string, metadata map[string]any) (*Unit, error) {
+func (s *OrgService) UpdateUnit(ctx context.Context, id uuid.UUID, req UpdateUnitRequest) (*Unit, error) {
+	label, unitType := req.Label, req.UnitType
+	addressLine1, addressLine2 := req.AddressLine1, req.AddressLine2
+	city, state, zip := req.City, req.State, req.Zip
+	lotSizeSqft, votingWeight, status, metadata := req.LotSizeSqft, req.VotingWeight, req.Status, req.Metadata
+	_ = metadata // used below
 	unit, err := s.GetUnit(ctx, id)
 	if err != nil {
 		return nil, err

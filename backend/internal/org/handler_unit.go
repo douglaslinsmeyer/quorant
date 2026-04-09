@@ -111,14 +111,7 @@ func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, err := h.service.UpdateUnit(
-		r.Context(), unitID,
-		req.Label, req.UnitType,
-		req.AddressLine1, req.AddressLine2,
-		req.City, req.State, req.Zip,
-		req.LotSizeSqft, req.VotingWeight, req.Status,
-		req.Metadata,
-	)
+	updated, err := h.service.UpdateUnit(r.Context(), unitID, req)
 	if err != nil {
 		h.logger.Error("UpdateUnit failed", "unit_id", unitID, "error", err)
 		api.WriteError(w, err)
