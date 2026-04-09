@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conversational UI — Quorant Design System</title>
+
+  <link rel="stylesheet" href="../tokens/colors.css" />
+  <link rel="stylesheet" href="../tokens/typography.css" />
+  <link rel="stylesheet" href="../tokens/spacing.css" />
+  <link rel="stylesheet" href="../tokens/elevation.css" />
+  <link rel="stylesheet" href="../tokens/motion.css" />
+
+  <style>
+    /* ── Reset & Base ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: var(--type-body-size);
+      line-height: var(--type-body-line-height);
+      color: var(--color-neutral-900);
+      background: var(--surface-page);
+      padding: var(--space-8);
+      animation: page-enter var(--duration-slow) var(--ease-out) both;
+    }
+
+    /* ── Dark Mode Toggle ──────────────────────────────────────── */
+    .theme-btn {
+      position: fixed;
+      top: var(--space-4);
+      right: var(--space-4);
+      background: var(--surface-card);
+      border: 1px solid var(--color-neutral-200);
+      color: var(--color-neutral-700);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition:
+        background var(--duration-normal) var(--ease-smooth),
+        color var(--duration-normal) var(--ease-smooth),
+        box-shadow var(--duration-normal) var(--ease-smooth);
+      z-index: 100;
+    }
+    .theme-btn:hover {
+      box-shadow: var(--shadow-md);
+      background: var(--surface-elevated);
+    }
+
+    /* ── Page Header ────────────────────────────────────────────── */
+    .page-header {
+      margin-bottom: var(--space-8);
+      padding-right: 120px;
+    }
+    .page-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--type-h1-size);
+      font-weight: var(--type-h1-weight);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-2);
+    }
+    .page-header p {
+      font-size: var(--type-body-lg-size);
+      color: var(--color-neutral-600);
+    }
+
+    /* ── Section Wrapper ────────────────────────────────────────── */
+    .section {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-8);
+      margin-bottom: var(--space-6);
+    }
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h3-size);
+      font-weight: var(--type-h3-weight);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-1);
+    }
+    .section-desc {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-6);
+    }
+
+    /* ── 1. Hero Statement ──────────────────────────────────────── */
+    .hero-statement {
+      text-align: center;
+      padding: var(--space-12) var(--space-8);
+    }
+
+    .hero-statement__quote {
+      font-family: var(--font-heading);
+      font-size: var(--type-h2-size);
+      font-weight: var(--type-h2-weight);
+      line-height: 1.3;
+      color: var(--color-neutral-900);
+      max-width: 680px;
+      margin: 0 auto var(--space-6);
+    }
+
+    .hero-statement__quote em {
+      font-style: normal;
+      color: var(--color-primary-600);
+    }
+
+    .hero-statement__sub {
+      font-size: var(--type-body-lg-size);
+      color: var(--color-neutral-500);
+    }
+
+    /* ── 2. Before/After Table ──────────────────────────────────── */
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .comparison-table th {
+      padding: var(--space-3) var(--space-4);
+      text-align: left;
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: var(--color-neutral-500);
+      border-bottom: 2px solid var(--color-neutral-200);
+    }
+
+    .comparison-table th:first-child {
+      width: 12%;
+    }
+
+    .comparison-table td {
+      padding: var(--space-4);
+      vertical-align: top;
+      border-bottom: 1px solid var(--color-neutral-100);
+    }
+
+    .comparison-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .context-label {
+      font-size: var(--type-caption-size);
+      font-weight: 700;
+      color: var(--color-neutral-700);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .traditional-text {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--color-neutral-500);
+      line-height: 1.5;
+      padding: var(--space-2) var(--space-3);
+      background: var(--color-neutral-50);
+      border-radius: var(--radius-sm);
+      border-left: 3px solid var(--color-neutral-300);
+    }
+
+    /* ── Mini Conversational Card (inside table) ─────────────────── */
+    .mini-convo-card {
+      background: var(--surface-card);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      font-size: var(--type-body-sm-size);
+      line-height: 1.55;
+      color: var(--color-neutral-800);
+      box-shadow: var(--shadow-xs);
+    }
+
+    .mini-convo-card--member {
+      border-left: 3px solid var(--color-secondary-400);
+    }
+
+    .mini-convo-card--mgmt {
+      border-left: 3px solid var(--color-primary-600);
+    }
+
+    .mini-convo-card .amount {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      color: var(--color-primary-600);
+    }
+
+    .mini-convo-card .date {
+      font-weight: 600;
+      color: var(--color-secondary-600);
+    }
+
+    .mini-convo-card .warn {
+      font-weight: 600;
+      color: var(--color-warning-600);
+    }
+
+    .mini-convo-card .name {
+      font-weight: 600;
+      color: var(--color-neutral-900);
+    }
+
+    /* ── 3. The 6 Rules ─────────────────────────────────────────── */
+    .rules-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+    }
+
+    @media (max-width: 700px) {
+      .rules-grid { grid-template-columns: 1fr; }
+    }
+
+    .rule-card {
+      background: var(--surface-elevated);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-neutral-100);
+      padding: var(--space-6);
+      animation: stagger-up var(--duration-slow) var(--ease-out) both;
+    }
+
+    .rule-card:nth-child(1) { animation-delay: 0ms; }
+    .rule-card:nth-child(2) { animation-delay: 60ms; }
+    .rule-card:nth-child(3) { animation-delay: 120ms; }
+    .rule-card:nth-child(4) { animation-delay: 180ms; }
+    .rule-card:nth-child(5) { animation-delay: 240ms; }
+    .rule-card:nth-child(6) { animation-delay: 300ms; }
+
+    .rule-card__num {
+      font-family: var(--font-heading);
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--color-primary-100);
+      line-height: 1;
+      margin-bottom: var(--space-2);
+    }
+
+    .rule-card__title {
+      font-family: var(--font-heading);
+      font-size: var(--type-body-size);
+      font-weight: 700;
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-4);
+      line-height: 1.35;
+    }
+
+    .do-dont {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .do-item,
+    .dont-item {
+      font-size: var(--type-body-sm-size);
+      line-height: 1.5;
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-sm);
+      position: relative;
+      padding-left: var(--space-6);
+    }
+
+    .do-item {
+      background: var(--color-success-100);
+      color: var(--color-success-600);
+    }
+
+    .do-item::before {
+      content: '✓';
+      position: absolute;
+      left: var(--space-2);
+      font-weight: 700;
+    }
+
+    .dont-item {
+      background: var(--color-error-100);
+      color: var(--color-error-600);
+    }
+
+    .dont-item::before {
+      content: '✕';
+      position: absolute;
+      left: var(--space-2);
+      font-weight: 700;
+    }
+
+    /* ── 4. Escalation Scale ────────────────────────────────────── */
+    .escalation-track {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+    }
+
+    @media (max-width: 600px) {
+      .escalation-track { grid-template-columns: 1fr; }
+    }
+
+    .escalation-level {
+      border-radius: var(--radius-md);
+      padding: var(--space-6);
+      text-align: center;
+    }
+
+    .escalation-level--calm   { background: var(--color-success-100); }
+    .escalation-level--nudge  { background: var(--color-warning-100); }
+    .escalation-level--direct { background: var(--color-error-100); }
+
+    .escalation-level__badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-1) var(--space-3);
+      border-radius: var(--radius-full);
+      font-size: var(--type-caption-size);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-4);
+    }
+
+    .badge--calm   { background: var(--color-success-600); color: #fff; }
+    .badge--nudge  { background: var(--color-warning-600); color: #fff; }
+    .badge--direct { background: var(--color-error-600);   color: #fff; }
+
+    .escalation-level__indicator {
+      font-size: var(--type-body-sm-size);
+      font-weight: 600;
+      margin-bottom: var(--space-3);
+    }
+
+    .calm-text   { color: var(--color-success-600); }
+    .nudge-text  { color: var(--color-warning-600); }
+    .direct-text { color: var(--color-error-600); }
+
+    .escalation-level__example {
+      font-size: var(--type-body-sm-size);
+      line-height: 1.55;
+      font-style: italic;
+    }
+
+    .calm-example   { color: var(--color-success-600); }
+    .nudge-example  { color: var(--color-warning-600); }
+    .direct-example { color: var(--color-error-600); }
+
+    /* ── 5. Voice Comparison ────────────────────────────────────── */
+    .voice-comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-6);
+    }
+
+    @media (max-width: 650px) {
+      .voice-comparison { grid-template-columns: 1fr; }
+    }
+
+    .voice-block {
+      border-radius: var(--radius-md);
+      padding: var(--space-6);
+      border: 1px solid var(--color-neutral-200);
+    }
+
+    .voice-block__label {
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      margin-bottom: var(--space-4);
+    }
+
+    .voice-block--member .voice-block__label { color: var(--color-secondary-600); }
+    .voice-block--mgmt   .voice-block__label { color: var(--color-primary-600); }
+
+    .voice-block__event {
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-400);
+      margin-bottom: var(--space-3);
+      padding-bottom: var(--space-3);
+      border-bottom: 1px solid var(--color-neutral-100);
+    }
+
+    .voice-block__text {
+      font-size: var(--type-body-sm-size);
+      line-height: 1.65;
+      color: var(--color-neutral-800);
+    }
+
+    .voice-block__text strong {
+      font-weight: 600;
+      color: var(--color-neutral-900);
+    }
+
+    .voice-block__text .amount {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      color: var(--color-primary-600);
+    }
+
+    .voice-block__text .date {
+      font-weight: 600;
+      color: var(--color-secondary-600);
+    }
+  </style>
+</head>
+<body>
+
+  <button class="theme-btn" onclick="toggleTheme()">Toggle Dark Mode</button>
+
+  <div class="page-header">
+    <h1>Conversational UI</h1>
+    <p>Voice, tone, and language guidelines that make Quorant feel like a helpful neighbor — not a billing system.</p>
+  </div>
+
+  <!-- ── 1. Hero Statement ─────────────────────────────────────── -->
+  <div class="section">
+    <div class="hero-statement">
+      <p class="hero-statement__quote">
+        "Status should feel like a <em>helpful neighbor</em>, not an accounting system."
+      </p>
+      <p class="hero-statement__sub">Two apps. Two voices. One consistent principle: people first, data second.</p>
+    </div>
+  </div>
+
+  <!-- ── 2. Before/After Table ─────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Before &amp; After</h2>
+    <p class="section-desc">The same information rendered three ways: traditional system output, Member App voice, and Management Portal narrative.</p>
+
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th>Context</th>
+          <th>Traditional</th>
+          <th>Member App</th>
+          <th>Management Portal</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="context-label">Balance Due</span></td>
+          <td>
+            <div class="traditional-text">Balance: $285.00.<br/>Due: 04/15/2026</div>
+          </td>
+          <td>
+            <div class="mini-convo-card mini-convo-card--member">
+              Your April assessment of <span class="amount">$285.00</span> is ready. Autopay handles it on the <span class="date">12th</span>.
+            </div>
+          </td>
+          <td>
+            <div class="mini-convo-card mini-convo-card--mgmt">
+              <span class="name">Oakridge Commons</span> is in good shape this month.
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><span class="context-label">Current</span></td>
+          <td>
+            <div class="traditional-text">Status: Current</div>
+          </td>
+          <td>
+            <div class="mini-convo-card mini-convo-card--member">
+              You're all set — no action needed.
+            </div>
+          </td>
+          <td>
+            <div class="mini-convo-card mini-convo-card--mgmt">
+              Collections at <span class="amount">94.2%</span> — up from last month.
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><span class="context-label">Past Due</span></td>
+          <td>
+            <div class="traditional-text">Status: Past Due.<br/>Late Fee: $25.00</div>
+          </td>
+          <td>
+            <div class="mini-convo-card mini-convo-card--member">
+              Your March assessment is past due. A <span class="warn">$25 late fee</span> applies after the <span class="date">20th</span>.
+            </div>
+          </td>
+          <td>
+            <div class="mini-convo-card mini-convo-card--mgmt">
+              <span class="warn">3 accounts</span> need attention before they go delinquent.
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><span class="context-label">Received</span></td>
+          <td>
+            <div class="traditional-text">Payment received:<br/>$285.00</div>
+          </td>
+          <td>
+            <div class="mini-convo-card mini-convo-card--member">
+              Thanks — your <span class="amount">$285.00</span> payment posted today.
+            </div>
+          </td>
+          <td>
+            <div class="mini-convo-card mini-convo-card--mgmt">
+              <span class="name">Sarah Chen</span> paid April assessment — <span class="amount">$285.00</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><span class="context-label">Work Order</span></td>
+          <td>
+            <div class="traditional-text">WO-247: In Progress</div>
+          </td>
+          <td>
+            <div class="mini-convo-card mini-convo-card--member">
+              Your parking lot light request is now in progress.
+            </div>
+          </td>
+          <td>
+            <div class="mini-convo-card mini-convo-card--mgmt">
+              <span class="name">Priya Patel</span> reported a streetlight outage — WO #247 created.
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── 3. The 6 Rules ────────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">The 6 Rules</h2>
+    <p class="section-desc">Each rule has a Do and a Don't example so the intent is concrete, not just aspirational.</p>
+
+    <div class="rules-grid">
+
+      <!-- Rule 1 -->
+      <div class="rule-card">
+        <div class="rule-card__num">01</div>
+        <div class="rule-card__title">Lead with what matters to the user, not the system state</div>
+        <div class="do-dont">
+          <div class="do-item">Your payment posted — you're all set for April.</div>
+          <div class="dont-item">Transaction ID #82934 processed. Status: CONFIRMED.</div>
+        </div>
+      </div>
+
+      <!-- Rule 2 -->
+      <div class="rule-card">
+        <div class="rule-card__num">02</div>
+        <div class="rule-card__title">Name dates naturally, not in ISO format</div>
+        <div class="do-dont">
+          <div class="do-item">Autopay runs on the 12th — next Tuesday.</div>
+          <div class="dont-item">Payment scheduled for 2026-04-12T00:00:00Z.</div>
+        </div>
+      </div>
+
+      <!-- Rule 3 -->
+      <div class="rule-card">
+        <div class="rule-card__num">03</div>
+        <div class="rule-card__title">Use names in Management; "you / your" in Member</div>
+        <div class="do-dont">
+          <div class="do-item">Member: "Your March assessment is due." Management: "Sarah Chen's balance is current."</div>
+          <div class="dont-item">Member: "Unit 101-A balance: $285." Management: "Your account is delinquent."</div>
+        </div>
+      </div>
+
+      <!-- Rule 4 -->
+      <div class="rule-card">
+        <div class="rule-card__num">04</div>
+        <div class="rule-card__title">Escalation scales with severity — calm → nudge → direct</div>
+        <div class="do-dont">
+          <div class="do-item">Overdue 5 days: "Just a heads up — your April assessment is a few days late." Overdue 60 days: "This account requires immediate attention."</div>
+          <div class="dont-item">Same urgent tone for everything: "PAYMENT REQUIRED IMMEDIATELY."</div>
+        </div>
+      </div>
+
+      <!-- Rule 5 -->
+      <div class="rule-card">
+        <div class="rule-card__num">05</div>
+        <div class="rule-card__title">Management stream uses third-person narrative</div>
+        <div class="do-dont">
+          <div class="do-item">James Wright submitted an architectural review request for a deck addition.</div>
+          <div class="dont-item">You submitted a request. Request ID: ARC-0087. Status: PENDING.</div>
+        </div>
+      </div>
+
+      <!-- Rule 6 -->
+      <div class="rule-card">
+        <div class="rule-card__num">06</div>
+        <div class="rule-card__title">Member Pulse uses announcement style</div>
+        <div class="do-dont">
+          <div class="do-item">The community pool opens May 1st — pick up new key fobs at the office.</div>
+          <div class="dont-item">Amenity Status Update: Pool facility reopening date: 2026-05-01. Key fob distribution required.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 4. Escalation Scale ───────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Escalation Scale</h2>
+    <p class="section-desc">Tone adjusts proportionally to severity. Never threatening — always proportionate and human.</p>
+
+    <div class="escalation-track">
+
+      <div class="escalation-level escalation-level--calm">
+        <span class="escalation-level__badge badge--calm">Calm</span>
+        <div class="escalation-level__indicator calm-text">Current / Minor</div>
+        <p class="escalation-level__example calm-example">
+          "Your April assessment of $285 is ready. Autopay handles it on the 12th — you're all set."
+        </p>
+      </div>
+
+      <div class="escalation-level escalation-level--nudge">
+        <span class="escalation-level__badge badge--nudge">Nudge</span>
+        <div class="escalation-level__indicator nudge-text">Overdue / Approaching</div>
+        <p class="escalation-level__example nudge-example">
+          "Just a reminder — your March assessment is still outstanding. A $25 late fee applies after the 20th."
+        </p>
+      </div>
+
+      <div class="escalation-level escalation-level--direct">
+        <span class="escalation-level__badge badge--direct">Direct</span>
+        <div class="escalation-level__indicator direct-text">Delinquent / Urgent</div>
+        <p class="escalation-level__example direct-example">
+          "Your account is 60 days past due. Please contact the management office to arrange a payment plan."
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 5. Voice Comparison ───────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Voice Comparison</h2>
+    <p class="section-desc">The same event — Sarah Chen paying her April assessment — shown in Member and Management voice side by side.</p>
+
+    <div class="voice-comparison">
+
+      <div class="voice-block voice-block--member">
+        <div class="voice-block__label">Member App Voice</div>
+        <div class="voice-block__event">Event: Assessment payment posted</div>
+        <p class="voice-block__text">
+          Thanks — your <span class="amount">$285.00</span> payment posted today.
+          You're all set for April. <strong>Next assessment:</strong> due <span class="date">May 1st</span>.
+        </p>
+      </div>
+
+      <div class="voice-block voice-block--mgmt">
+        <div class="voice-block__label">Management Portal Voice</div>
+        <div class="voice-block__event">Event: Assessment payment posted</div>
+        <p class="voice-block__text">
+          <strong>Sarah Chen</strong> paid April assessment — <span class="amount">$285.00</span>.
+          Unit 101-A is now current. Account balance: <span class="amount">$0.00</span>.
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    }
+  </script>
+</body>
+</html>
