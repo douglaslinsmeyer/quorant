@@ -138,7 +138,7 @@
    DARK MODE — via JS toggle (component browser / user preference)
    Duplicates the media query values above exactly.
    ============================================================ */
-[data-theme="dark"] {
+:root[data-theme="dark"] {
   /* --- Primary (Teal) overrides --- */
   --color-primary-600: #3DACC9;
   --color-primary-500: #5BBDD6;
@@ -192,7 +192,7 @@
 /* ============================================================
    LIGHT MODE — via JS toggle (forces light even when OS is dark)
    ============================================================ */
-[data-theme="light"] {
+:root[data-theme="light"] {
   --color-primary-900: #0A3D4F;
   --color-primary-800: #0E4F65;
   --color-primary-700: #13647E;
