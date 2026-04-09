@@ -137,7 +137,8 @@ func (c *AnthropicClient) Complete(ctx context.Context, req CompletionRequest) (
 	return &CompletionResponse{
 		Content:    content,
 		Model:      result.Model,
-		TokensUsed: result.Usage.InputTokens + result.Usage.OutputTokens,
+		InputTokens: result.Usage.InputTokens,
+		OutputTokens: result.Usage.OutputTokens,
 	}, nil
 }
 

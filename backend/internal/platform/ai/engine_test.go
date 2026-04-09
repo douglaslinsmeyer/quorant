@@ -13,19 +13,19 @@ import (
 )
 
 func TestNewClient_Anthropic(t *testing.T) {
-	client, err := ai.NewClient(ai.Config{Provider: ai.ProviderAnthropic, APIKey: "test"})
+	client, err := ai.NewClient(ai.Config{Provider: ai.ProviderAnthropic, APIKey: "test-key"})
 	require.NoError(t, err)
 	assert.Equal(t, ai.ProviderAnthropic, client.Provider())
 }
 
 func TestNewClient_OpenAI(t *testing.T) {
-	client, err := ai.NewClient(ai.Config{Provider: ai.ProviderOpenAI, APIKey: "test"})
+	client, err := ai.NewClient(ai.Config{Provider: ai.ProviderOpenAI, APIKey: "test-key"})
 	require.NoError(t, err)
 	assert.Equal(t, ai.ProviderOpenAI, client.Provider())
 }
 
 func TestNewClient_Unknown(t *testing.T) {
-	_, err := ai.NewClient(ai.Config{Provider: "unknown"})
+	_, err := ai.NewClient(ai.Config{Provider: "unknown", APIKey: "test"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown LLM provider")
 }
@@ -37,7 +37,7 @@ func TestMultiClient_RoutesCorrectly(t *testing.T) {
 				{"message": map[string]string{"content": "Hello from completions"}},
 			},
 			"model": "test-model",
-			"usage": map[string]int{"total_tokens": 10},
+			"usage": map[string]int{"prompt_tokens": 7, "completion_tokens": 3},
 		})
 	}))
 	defer completionServer.Close()
@@ -98,7 +98,7 @@ func TestOpenAIClient_Complete(t *testing.T) {
 				{"message": map[string]string{"content": "The answer is 42"}},
 			},
 			"model": "gpt-4o",
-			"usage": map[string]int{"total_tokens": 25},
+			"usage": map[string]int{"prompt_tokens": 15, "completion_tokens": 10},
 		})
 	}))
 	defer server.Close()
@@ -116,7 +116,7 @@ func TestOpenAIClient_Complete(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "The answer is 42", resp.Content)
 	assert.Equal(t, "gpt-4o", resp.Model)
-	assert.Equal(t, 25, resp.TokensUsed)
+	assert.Equal(t, 25, resp.InputTokens+resp.OutputTokens)
 }
 
 func TestOpenAIClient_Embed(t *testing.T) {
