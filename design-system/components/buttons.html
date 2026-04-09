@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Buttons — Quorant Design System</title>
+
+  <link rel="stylesheet" href="../tokens/colors.css" />
+  <link rel="stylesheet" href="../tokens/typography.css" />
+  <link rel="stylesheet" href="../tokens/spacing.css" />
+  <link rel="stylesheet" href="../tokens/elevation.css" />
+  <link rel="stylesheet" href="../tokens/motion.css" />
+
+  <style>
+    /* ── Reset & Base ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: var(--type-body-size);
+      line-height: var(--type-body-line-height);
+      color: var(--color-neutral-900);
+      background: var(--surface-page);
+      padding: var(--space-8);
+      animation: page-enter var(--duration-slow) var(--ease-out) both;
+    }
+
+    /* ── Dark Mode Toggle ──────────────────────────────────────── */
+    .theme-btn {
+      position: fixed;
+      top: var(--space-4);
+      right: var(--space-4);
+      background: var(--surface-card);
+      border: 1px solid var(--color-neutral-200);
+      color: var(--color-neutral-700);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition:
+        background var(--duration-normal) var(--ease-smooth),
+        color var(--duration-normal) var(--ease-smooth),
+        box-shadow var(--duration-normal) var(--ease-smooth);
+      z-index: 100;
+    }
+
+    .theme-btn:hover {
+      box-shadow: var(--shadow-md);
+      background: var(--surface-elevated);
+    }
+
+    /* ── Page Header ────────────────────────────────────────────── */
+    .page-header {
+      margin-bottom: var(--space-8);
+    }
+
+    .page-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--type-h1-size);
+      font-weight: var(--type-h1-weight);
+      line-height: var(--type-h1-line-height);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-2);
+    }
+
+    .page-header p {
+      font-size: var(--type-body-lg-size);
+      color: var(--color-neutral-600);
+    }
+
+    /* ── Section ────────────────────────────────────────────────── */
+    .section {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-8);
+      margin-bottom: var(--space-6);
+    }
+
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h3-size);
+      font-weight: var(--type-h3-weight);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-1);
+    }
+
+    .section-desc {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-6);
+    }
+
+    .overline {
+      font-family: var(--font-body);
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-3);
+    }
+
+    /* ── Button Row / Group ─────────────────────────────────────── */
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+
+    .btn-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .size-group {
+      margin-bottom: var(--space-6);
+    }
+
+    .size-group:last-child {
+      margin-bottom: 0;
+    }
+
+    /* ── BASE BUTTON ─────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      font-family: var(--font-body);
+      font-weight: 600;
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      white-space: nowrap;
+      text-decoration: none;
+      transition:
+        background var(--duration-fast) var(--ease-default),
+        color var(--duration-fast) var(--ease-default),
+        border-color var(--duration-fast) var(--ease-default),
+        box-shadow var(--duration-fast) var(--ease-default),
+        transform var(--duration-fast) var(--ease-default),
+        opacity var(--duration-fast) var(--ease-default);
+    }
+
+    .btn:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px var(--color-primary-300);
+    }
+
+    .btn:disabled,
+    .btn--disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    /* ── SIZES ──────────────────────────────────────────────────── */
+    .btn--sm {
+      padding: 6px 12px;
+      font-size: 13px;
+      min-height: 32px;
+    }
+
+    .btn--md {
+      padding: 10px 20px;
+      font-size: 14px;
+      min-height: 40px;
+    }
+
+    .btn--lg {
+      padding: 14px 28px;
+      font-size: 16px;
+      min-height: 48px;
+    }
+
+    /* ── PRIMARY ─────────────────────────────────────────────────── */
+    .btn--primary {
+      background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
+      color: #ffffff;
+      box-shadow: var(--shadow-xs);
+    }
+
+    .btn--primary:hover:not(:disabled):not(.btn--disabled) {
+      background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-800));
+      box-shadow: var(--shadow-sm);
+      transform: scale(1.02);
+    }
+
+    .btn--primary:active:not(:disabled):not(.btn--disabled),
+    .btn--primary.btn--active {
+      transform: scale(0.98);
+      box-shadow: var(--shadow-inner);
+      background: linear-gradient(135deg, var(--color-primary-800), var(--color-primary-900));
+    }
+
+    /* Simulated hover state for showcase */
+    .btn--primary.btn--hover {
+      background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-800));
+      box-shadow: var(--shadow-sm);
+      transform: scale(1.02);
+    }
+
+    /* Simulated focus state for showcase */
+    .btn--primary.btn--focus {
+      outline: none;
+      box-shadow: 0 0 0 3px var(--color-primary-300);
+    }
+
+    /* ── SECONDARY ───────────────────────────────────────────────── */
+    .btn--secondary {
+      background: transparent;
+      color: var(--color-primary-600);
+      border: 1.5px solid var(--color-primary-600);
+    }
+
+    .btn--secondary:hover:not(:disabled):not(.btn--disabled) {
+      background: var(--color-primary-50);
+      box-shadow: var(--shadow-xs);
+      transform: scale(1.02);
+    }
+
+    .btn--secondary:active:not(:disabled):not(.btn--disabled),
+    .btn--secondary.btn--active {
+      transform: scale(0.98);
+      background: var(--color-primary-100);
+      box-shadow: var(--shadow-inner);
+    }
+
+    .btn--secondary:focus-visible {
+      box-shadow: 0 0 0 3px var(--color-primary-300);
+    }
+
+    /* ── GHOST ───────────────────────────────────────────────────── */
+    .btn--ghost {
+      background: transparent;
+      color: var(--color-primary-600);
+      border: none;
+    }
+
+    .btn--ghost:hover:not(:disabled):not(.btn--disabled) {
+      background: var(--color-neutral-100);
+      transform: scale(1.02);
+    }
+
+    .btn--ghost:active:not(:disabled):not(.btn--disabled),
+    .btn--ghost.btn--active {
+      transform: scale(0.98);
+      background: var(--color-neutral-200);
+      box-shadow: var(--shadow-inner);
+    }
+
+    .btn--ghost:focus-visible {
+      box-shadow: 0 0 0 3px var(--color-primary-300);
+    }
+
+    /* ── DESTRUCTIVE ─────────────────────────────────────────────── */
+    .btn--destructive {
+      background: var(--color-error-600);
+      color: #ffffff;
+      box-shadow: var(--shadow-xs);
+    }
+
+    .btn--destructive:hover:not(:disabled):not(.btn--disabled) {
+      background: #a93226;
+      box-shadow: var(--shadow-sm);
+      transform: scale(1.02);
+    }
+
+    .btn--destructive:active:not(:disabled):not(.btn--disabled),
+    .btn--destructive.btn--active {
+      transform: scale(0.98);
+      box-shadow: var(--shadow-inner);
+      background: #922b21;
+    }
+
+    .btn--destructive:focus-visible {
+      box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.35);
+    }
+
+    /* ── App Divergence: Member Pay Now ─────────────────────────── */
+    .btn--member-pay {
+      background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(26, 122, 154, 0.25);
+      border-radius: var(--radius-full);
+      padding: 12px 32px;
+      font-size: 15px;
+      min-height: 48px;
+      letter-spacing: 0.01em;
+    }
+
+    .btn--member-pay:hover:not(:disabled) {
+      box-shadow: 0 4px 16px rgba(26, 122, 154, 0.35);
+      transform: scale(1.03);
+      background: linear-gradient(135deg, var(--color-primary-400), var(--color-primary-500));
+    }
+
+    .btn--member-pay:active:not(:disabled) {
+      transform: scale(0.97);
+      box-shadow: 0 1px 4px rgba(26, 122, 154, 0.2);
+    }
+
+    .btn--management-flat {
+      background: var(--color-primary-600);
+      color: #ffffff;
+      border-radius: var(--radius-md);
+      padding: 10px 20px;
+      font-size: 14px;
+      min-height: 40px;
+    }
+
+    .btn--management-flat:hover:not(:disabled) {
+      background: var(--color-primary-700);
+      transform: none;
+    }
+
+    .btn--management-flat:active:not(:disabled) {
+      background: var(--color-primary-800);
+    }
+
+    /* ── Divider ────────────────────────────────────────────────── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--color-neutral-200);
+      margin: var(--space-6) 0;
+    }
+
+    /* ── States Grid ────────────────────────────────────────────── */
+    .states-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-6);
+      align-items: flex-start;
+    }
+
+    .state-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .state-label {
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      color: var(--color-neutral-500);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── App Comparison ─────────────────────────────────────────── */
+    .app-compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-6);
+    }
+
+    @media (max-width: 600px) {
+      .app-compare {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .app-card {
+      background: var(--surface-page);
+      border-radius: var(--radius-md);
+      padding: var(--space-6);
+      border: 1px solid var(--color-neutral-200);
+    }
+
+    .app-card__label {
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-4);
+    }
+
+    .app-card__desc {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-600);
+      margin-top: var(--space-3);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <button class="theme-btn" onclick="toggleTheme()">Toggle Dark Mode</button>
+
+  <div class="page-header">
+    <h1>Buttons</h1>
+    <p>All button variants, sizes, states, and app-specific divergences for the Quorant HOA platform.</p>
+  </div>
+
+  <!-- ── Variants ──────────────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Variants</h2>
+    <p class="section-desc">Four variants covering the full range of action hierarchy.</p>
+
+    <div class="overline">Primary</div>
+    <div class="btn-row">
+      <button class="btn btn--primary btn--sm">Small Action</button>
+      <button class="btn btn--primary btn--md">Medium Action</button>
+      <button class="btn btn--primary btn--lg">Large Action</button>
+    </div>
+
+    <div class="overline">Secondary</div>
+    <div class="btn-row">
+      <button class="btn btn--secondary btn--sm">View Details</button>
+      <button class="btn btn--secondary btn--md">View Details</button>
+      <button class="btn btn--secondary btn--lg">View Details</button>
+    </div>
+
+    <div class="overline">Ghost</div>
+    <div class="btn-row">
+      <button class="btn btn--ghost btn--sm">Cancel</button>
+      <button class="btn btn--ghost btn--md">Cancel</button>
+      <button class="btn btn--ghost btn--lg">Cancel</button>
+    </div>
+
+    <div class="overline">Destructive</div>
+    <div class="btn-row">
+      <button class="btn btn--destructive btn--sm">Remove</button>
+      <button class="btn btn--destructive btn--md">Remove Member</button>
+      <button class="btn btn--destructive btn--lg">Delete Assessment</button>
+    </div>
+  </div>
+
+  <!-- ── States ────────────────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Interactive States</h2>
+    <p class="section-desc">All interactive states shown for the Primary variant. Hover and active states are interactive — try them. Hover and Focus states below are class-simulated for reference.</p>
+
+    <div class="states-grid">
+      <div class="state-item">
+        <button class="btn btn--primary btn--md">Pay Assessment</button>
+        <span class="state-label">Default</span>
+      </div>
+      <div class="state-item">
+        <button class="btn btn--primary btn--md btn--hover">Pay Assessment</button>
+        <span class="state-label">Hover</span>
+      </div>
+      <div class="state-item">
+        <button class="btn btn--primary btn--md btn--active">Pay Assessment</button>
+        <span class="state-label">Active</span>
+      </div>
+      <div class="state-item">
+        <button class="btn btn--primary btn--md btn--focus">Pay Assessment</button>
+        <span class="state-label">Focus-visible</span>
+      </div>
+      <div class="state-item">
+        <button class="btn btn--primary btn--md btn--disabled" disabled>Pay Assessment</button>
+        <span class="state-label">Disabled</span>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <p class="section-desc" style="margin-bottom: var(--space-4);">Secondary, Ghost, and Destructive states are fully interactive below:</p>
+    <div class="states-grid">
+      <div class="state-item">
+        <button class="btn btn--secondary btn--md">View Report</button>
+        <span class="state-label">Secondary</span>
+      </div>
+      <div class="state-item">
+        <button class="btn btn--ghost btn--md">Dismiss</button>
+        <span class="state-label">Ghost</span>
+      </div>
+      <div class="state-item">
+        <button class="btn btn--destructive btn--md">Delete Record</button>
+        <span class="state-label">Destructive</span>
+      </div>
+      <div class="state-item">
+        <button class="btn btn--secondary btn--md" disabled>View Report</button>
+        <span class="state-label">Secondary Disabled</span>
+      </div>
+      <div class="state-item">
+        <button class="btn btn--destructive btn--md" disabled>Delete Record</button>
+        <span class="state-label">Destructive Disabled</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Sizes Grid ─────────────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Size Scale</h2>
+    <p class="section-desc">Three sizes across all four variants, vertically aligned for comparison.</p>
+
+    <div class="size-group">
+      <div class="overline">Small — 32px min-height, 13px</div>
+      <div class="btn-row">
+        <button class="btn btn--primary btn--sm">Submit Dues</button>
+        <button class="btn btn--secondary btn--sm">View Statement</button>
+        <button class="btn btn--ghost btn--sm">Cancel</button>
+        <button class="btn btn--destructive btn--sm">Remove</button>
+      </div>
+    </div>
+
+    <div class="size-group">
+      <div class="overline">Medium — 40px min-height, 14px (default)</div>
+      <div class="btn-row">
+        <button class="btn btn--primary btn--md">Submit Dues</button>
+        <button class="btn btn--secondary btn--md">View Statement</button>
+        <button class="btn btn--ghost btn--md">Cancel</button>
+        <button class="btn btn--destructive btn--md">Remove</button>
+      </div>
+    </div>
+
+    <div class="size-group">
+      <div class="overline">Large — 48px min-height, 16px</div>
+      <div class="btn-row">
+        <button class="btn btn--primary btn--lg">Submit Dues</button>
+        <button class="btn btn--secondary btn--lg">View Statement</button>
+        <button class="btn btn--ghost btn--lg">Cancel</button>
+        <button class="btn btn--destructive btn--lg">Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── With Icons ─────────────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">With Icons</h2>
+    <p class="section-desc">Buttons composed with inline SVG icons.</p>
+
+    <div class="btn-row">
+      <button class="btn btn--primary btn--md">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Add Unit
+      </button>
+      <button class="btn btn--secondary btn--md">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M13.5 8a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0Z" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M12 12.5L14.5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Search Members
+      </button>
+      <button class="btn btn--ghost btn--md">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Filter
+      </button>
+      <button class="btn btn--destructive btn--md">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M3 4h10M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1m2 0-1 9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1L3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Delete Violation
+      </button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn--primary btn--sm">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Add
+      </button>
+      <button class="btn btn--secondary btn--sm">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Dismiss
+      </button>
+      <button class="btn btn--ghost btn--sm">Export
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M8 2v8M4 7l4 4 4-4M3 13h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── App Divergence ─────────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">App Divergence</h2>
+    <p class="section-desc">The Member App uses pill-shaped, softly elevated CTAs. The Management Portal uses flat, squared primaries for density and professionalism.</p>
+
+    <div class="app-compare">
+      <div class="app-card">
+        <div class="app-card__label">Member App</div>
+        <button class="btn btn--member-pay btn--lg">
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect x="1.5" y="3.5" width="13" height="9" rx="1.5" stroke="white" stroke-width="1.5"/>
+            <path d="M1.5 7h13" stroke="white" stroke-width="1.5"/>
+          </svg>
+          Pay Now — $285.00
+        </button>
+        <p class="app-card__desc">Pill-shaped, gradient background, elevated shadow. Conversational, approachable tone.</p>
+      </div>
+
+      <div class="app-card">
+        <div class="app-card__label">Management Portal</div>
+        <button class="btn btn--management-flat btn--md">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 2v12M2 8h12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          Post Assessment
+        </button>
+        <p class="app-card__desc">Flat primary color, rectangular, no shadow elevation. Dense, professional, data-tool feel.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── HOA-Context Scenarios ──────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">In-Context HOA Scenarios</h2>
+    <p class="section-desc">Real usage patterns across common HOA management workflows.</p>
+
+    <div class="overline">Assessment Actions</div>
+    <div class="btn-row" style="margin-bottom: var(--space-6);">
+      <button class="btn btn--primary btn--md">Post Monthly Assessment</button>
+      <button class="btn btn--secondary btn--md">View Payment History</button>
+      <button class="btn btn--ghost btn--md">Export to PDF</button>
+    </div>
+
+    <div class="overline">Violation Management</div>
+    <div class="btn-row" style="margin-bottom: var(--space-6);">
+      <button class="btn btn--primary btn--md">Issue Violation Notice</button>
+      <button class="btn btn--secondary btn--md">Schedule Inspection</button>
+      <button class="btn btn--ghost btn--md">Archive</button>
+      <button class="btn btn--destructive btn--md">Void Violation</button>
+    </div>
+
+    <div class="overline">Work Order Actions</div>
+    <div class="btn-row">
+      <button class="btn btn--primary btn--md">Assign Contractor</button>
+      <button class="btn btn--secondary btn--md">Request Quote</button>
+      <button class="btn btn--ghost btn--md">Add Note</button>
+      <button class="btn btn--destructive btn--sm">Close Order</button>
+    </div>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    }
+  </script>
+</body>
+</html>
