@@ -20,6 +20,7 @@ import (
 	"github.com/quorant/quorant/internal/billing"
 	"github.com/quorant/quorant/internal/com"
 	"github.com/quorant/quorant/internal/doc"
+	"github.com/quorant/quorant/internal/estoppel"
 	"github.com/quorant/quorant/internal/fin"
 	"github.com/quorant/quorant/internal/gov"
 	"github.com/quorant/quorant/internal/iam"
@@ -293,6 +294,27 @@ func run() error {
 	docService := doc.NewDocService(docRepo, storageClient, cfg.S3.Bucket, auditor, outboxPublisher, logger)
 	docHandler := doc.NewDocHandler(docService, logger)
 	doc.RegisterRoutes(mux, docHandler, tokenValidator, permChecker, resolveUserID)
+
+	// --- Estoppel module ---
+	estoppelRepo := estoppel.NewPostgresRepository(pool)
+	financialProvider := fin.NewEstoppelFinancialAdapter(finService)
+	complianceProvider := gov.NewEstoppelComplianceAdapter(govService)
+	propertyProvider := org.NewEstoppelPropertyAdapter(orgService)
+	narrativeGen := estoppel.NewNoopNarrativeGenerator()
+	pdfGen := estoppel.NewMarotoGenerator()
+	estoppelService := estoppel.NewEstoppelService(
+		estoppelRepo,
+		financialProvider,
+		complianceProvider,
+		propertyProvider,
+		narrativeGen,
+		pdfGen,
+		auditor,
+		outboxPublisher,
+		logger,
+	)
+	estoppelHandler := estoppel.NewHandler(estoppelService, logger)
+	estoppel.RegisterRoutes(mux, estoppelHandler, tokenValidator, permChecker, entitlementChecker, resolveUserID)
 
 	// 10. Middleware chain (innermost to outermost)
 	rateLimiter := middleware.NewRateLimiter(100, 100, time.Minute) // 100 req/min default
