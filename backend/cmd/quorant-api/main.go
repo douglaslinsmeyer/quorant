@@ -14,6 +14,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/quorant/quorant/internal/iam"
+	"github.com/quorant/quorant/internal/org"
 	"github.com/quorant/quorant/internal/platform/auth"
 	"github.com/quorant/quorant/internal/platform/config"
 	"github.com/quorant/quorant/internal/platform/db"
@@ -96,6 +97,16 @@ func run() error {
 	userService := iam.NewUserService(userRepo)
 	iamHandler := iam.NewHandler(userService, logger)
 	iam.RegisterRoutes(mux, iamHandler, tokenValidator)
+
+	// Org module
+	orgRepo := org.NewPostgresOrgRepository(pool)
+	membershipRepo := org.NewPostgresMembershipRepository(pool)
+	unitRepo := org.NewPostgresUnitRepository(pool)
+	orgService := org.NewOrgService(orgRepo, membershipRepo, unitRepo, userRepo, logger)
+	orgHandler := org.NewOrgHandler(orgService, logger)
+	membershipHandler := org.NewMembershipHandler(orgService, logger)
+	unitHandler := org.NewUnitHandler(orgService, logger)
+	org.RegisterRoutes(mux, orgHandler, membershipHandler, unitHandler, tokenValidator)
 
 	// 9. Middleware chain (innermost to outermost)
 	var handler http.Handler = mux
