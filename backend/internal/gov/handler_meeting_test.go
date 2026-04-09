@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/gov"
+	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,6 +25,7 @@ import (
 type meetingTestServer struct {
 	server      *httptest.Server
 	mockMeeting *mockMeetingRepo
+	userID      uuid.UUID
 }
 
 func setupMeetingTestServer(t *testing.T) *meetingTestServer {
@@ -47,12 +49,18 @@ func setupMeetingTestServer(t *testing.T) *meetingTestServer {
 	mux.HandleFunc("POST /organizations/{org_id}/meetings/{meeting_id}/motions", handler.RecordMotion)
 	mux.HandleFunc("PATCH /organizations/{org_id}/meetings/{meeting_id}/motions/{motion_id}", handler.UpdateMotion)
 
-	server := httptest.NewServer(mux)
+	testUserID := uuid.New()
+	handlerWithUserID := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := middleware.WithUserID(r.Context(), testUserID)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
+	server := httptest.NewServer(handlerWithUserID)
 	t.Cleanup(server.Close)
 
 	return &meetingTestServer{
 		server:      server,
 		mockMeeting: mockMeeting,
+		userID:      testUserID,
 	}
 }
 

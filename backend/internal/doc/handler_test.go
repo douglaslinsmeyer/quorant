@@ -14,6 +14,7 @@ import (
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/doc"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,6 +25,7 @@ import (
 type docTestServer struct {
 	server *httptest.Server
 	repo   *mockDocRepo
+	userID uuid.UUID
 }
 
 func setupDocTestServer(t *testing.T) *docTestServer {
@@ -53,10 +55,15 @@ func setupDocTestServer(t *testing.T) *docTestServer {
 	mux.HandleFunc("PATCH /organizations/{org_id}/document-categories/{category_id}", handler.UpdateCategory)
 	mux.HandleFunc("DELETE /organizations/{org_id}/document-categories/{category_id}", handler.DeleteCategory)
 
-	srv := httptest.NewServer(mux)
+	testUserID := uuid.New()
+	handlerWithUserID := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := middleware.WithUserID(r.Context(), testUserID)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
+	srv := httptest.NewServer(handlerWithUserID)
 	t.Cleanup(srv.Close)
 
-	return &docTestServer{server: srv, repo: repo}
+	return &docTestServer{server: srv, repo: repo, userID: testUserID}
 }
 
 // ─── Helper functions ─────────────────────────────────────────────────────────

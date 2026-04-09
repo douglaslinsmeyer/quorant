@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/gov"
+	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,6 +26,7 @@ type violationTestServer struct {
 	server        *httptest.Server
 	mockViolation *mockViolationRepo
 	mockMeeting   *mockMeetingRepo
+	userID        uuid.UUID
 }
 
 func setupViolationTestServer(t *testing.T) *violationTestServer {
@@ -50,13 +52,19 @@ func setupViolationTestServer(t *testing.T) *violationTestServer {
 	mux.HandleFunc("GET /organizations/{org_id}/violations/{violation_id}/hearing", handler.GetHearing)
 	mux.HandleFunc("PATCH /organizations/{org_id}/violations/{violation_id}/hearing/{hearing_id}", handler.UpdateHearing)
 
-	server := httptest.NewServer(mux)
+	testUserID := uuid.New()
+	handlerWithUserID := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := middleware.WithUserID(r.Context(), testUserID)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
+	server := httptest.NewServer(handlerWithUserID)
 	t.Cleanup(server.Close)
 
 	return &violationTestServer{
 		server:        server,
 		mockViolation: mockViolation,
 		mockMeeting:   mockMeeting,
+		userID:        testUserID,
 	}
 }
 

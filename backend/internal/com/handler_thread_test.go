@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/com"
+	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,8 +20,9 @@ import (
 // ─── Test server setup ─────────────────────────────────────────────────────────
 
 type threadTestServer struct {
-	server          *httptest.Server
-	mockThreadRepo  *mockThreadRepo
+	server         *httptest.Server
+	mockThreadRepo *mockThreadRepo
+	userID         uuid.UUID
 }
 
 func setupThreadTestServer(t *testing.T) *threadTestServer {
@@ -48,12 +50,18 @@ func setupThreadTestServer(t *testing.T) *threadTestServer {
 	mux.HandleFunc("PATCH /api/v1/organizations/{org_id}/threads/{thread_id}/messages/{message_id}", handler.EditMessage)
 	mux.HandleFunc("DELETE /api/v1/organizations/{org_id}/threads/{thread_id}/messages/{message_id}", handler.DeleteMessage)
 
-	server := httptest.NewServer(mux)
+	testUserID := uuid.New()
+	handlerWithUserID := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := middleware.WithUserID(r.Context(), testUserID)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
+	server := httptest.NewServer(handlerWithUserID)
 	t.Cleanup(server.Close)
 
 	return &threadTestServer{
 		server:         server,
 		mockThreadRepo: mockTRepo,
+		userID:         testUserID,
 	}
 }
 

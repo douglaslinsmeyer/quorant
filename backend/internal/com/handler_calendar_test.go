@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/com"
+	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,6 +24,7 @@ type calendarTestServer struct {
 	mockCalendarRepo *mockCalendarRepo
 	mockTemplateRepo *mockTemplateRepo
 	mockDirRepo      *mockDirectoryRepo
+	userID           uuid.UUID
 }
 
 func setupCalendarTestServer(t *testing.T) *calendarTestServer {
@@ -58,7 +60,12 @@ func setupCalendarTestServer(t *testing.T) *calendarTestServer {
 	mux.HandleFunc("GET /api/v1/organizations/{org_id}/directory/preferences", handler.GetDirectoryPrefs)
 	mux.HandleFunc("PUT /api/v1/organizations/{org_id}/directory/preferences", handler.UpdateDirectoryPrefs)
 
-	server := httptest.NewServer(mux)
+	testUserID := uuid.New()
+	handlerWithUserID := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := middleware.WithUserID(r.Context(), testUserID)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
+	server := httptest.NewServer(handlerWithUserID)
 	t.Cleanup(server.Close)
 
 	return &calendarTestServer{
@@ -66,6 +73,7 @@ func setupCalendarTestServer(t *testing.T) *calendarTestServer {
 		mockCalendarRepo: mockCalRepo,
 		mockTemplateRepo: mockTplRepo,
 		mockDirRepo:      mockDirRepo,
+		userID:           testUserID,
 	}
 }
 

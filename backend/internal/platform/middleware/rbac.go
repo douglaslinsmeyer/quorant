@@ -54,6 +54,10 @@ func ResolveUserID(resolveUserID func(ctx context.Context) (uuid.UUID, error)) f
 				api.WriteError(w, api.NewUnauthenticatedError("could not resolve user"))
 				return
 			}
+			if userID == uuid.Nil {
+				api.WriteError(w, api.NewUnauthenticatedError("could not resolve user identity"))
+				return
+			}
 			ctx := WithUserID(r.Context(), userID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -167,6 +171,10 @@ func RequirePermission(
 			userID, err := resolveUserID(r.Context())
 			if err != nil {
 				api.WriteError(w, api.NewUnauthenticatedError("could not resolve user"))
+				return
+			}
+			if userID == uuid.Nil {
+				api.WriteError(w, api.NewUnauthenticatedError("could not resolve user identity"))
 				return
 			}
 

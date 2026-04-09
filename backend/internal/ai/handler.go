@@ -284,7 +284,6 @@ func (h *AIHandler) QueryPolicy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resolver := NewPostgresPolicyResolver(h.policyService)
-	// TODO: wire IAM context once available.
 	result, err := resolver.QueryPolicy(r.Context(), orgID, body.Query, body.Context)
 	if err != nil {
 		api.WriteError(w, err)

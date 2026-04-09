@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/com"
+	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,6 +22,7 @@ import (
 type commLogTestServer struct {
 	server          *httptest.Server
 	mockCommLogRepo *mockCommLogRepo
+	userID          uuid.UUID
 }
 
 func setupCommLogTestServer(t *testing.T) *commLogTestServer {
@@ -47,12 +49,18 @@ func setupCommLogTestServer(t *testing.T) *commLogTestServer {
 	mux.HandleFunc("PATCH /api/v1/organizations/{org_id}/communications/{comm_id}", handler.Update)
 	mux.HandleFunc("GET /api/v1/organizations/{org_id}/units/{unit_id}/communications", handler.ListByUnit)
 
-	server := httptest.NewServer(mux)
+	testUserID := uuid.New()
+	handlerWithUserID := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := middleware.WithUserID(r.Context(), testUserID)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
+	server := httptest.NewServer(handlerWithUserID)
 	t.Cleanup(server.Close)
 
 	return &commLogTestServer{
 		server:          server,
 		mockCommLogRepo: mockCLRepo,
+		userID:          testUserID,
 	}
 }
 

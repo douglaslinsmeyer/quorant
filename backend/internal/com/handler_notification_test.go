@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/com"
+	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,6 +21,7 @@ import (
 type notificationTestServer struct {
 	server               *httptest.Server
 	mockNotificationRepo *mockNotificationRepo
+	userID               uuid.UUID
 }
 
 func setupNotificationTestServer(t *testing.T) *notificationTestServer {
@@ -45,12 +47,18 @@ func setupNotificationTestServer(t *testing.T) *notificationTestServer {
 	mux.HandleFunc("POST /api/v1/push-tokens", handler.RegisterToken)
 	mux.HandleFunc("DELETE /api/v1/push-tokens/{token_id}", handler.UnregisterToken)
 
-	server := httptest.NewServer(mux)
+	testUserID := uuid.New()
+	handlerWithUserID := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := middleware.WithUserID(r.Context(), testUserID)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
+	server := httptest.NewServer(handlerWithUserID)
 	t.Cleanup(server.Close)
 
 	return &notificationTestServer{
 		server:               server,
 		mockNotificationRepo: mockNotifRepo,
+		userID:               testUserID,
 	}
 }
 

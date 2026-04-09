@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/fin"
+	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,6 +24,7 @@ type paymentTestServer struct {
 	server          *httptest.Server
 	mockAssessRepo  *mockAssessmentRepo
 	mockPaymentRepo *mockPaymentRepo
+	userID          uuid.UUID
 }
 
 func setupPaymentTestServer(t *testing.T) *paymentTestServer {
@@ -55,13 +57,19 @@ func setupPaymentTestServer(t *testing.T) *paymentTestServer {
 	mux.HandleFunc("GET /organizations/{org_id}/payment-methods", payHandler.ListPaymentMethods)
 	mux.HandleFunc("DELETE /organizations/{org_id}/payment-methods/{method_id}", payHandler.RemovePaymentMethod)
 
-	server := httptest.NewServer(mux)
+	testUserID := uuid.New()
+	handlerWithUserID := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := middleware.WithUserID(r.Context(), testUserID)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
+	server := httptest.NewServer(handlerWithUserID)
 	t.Cleanup(server.Close)
 
 	return &paymentTestServer{
 		server:          server,
 		mockAssessRepo:  mockAssessRepo,
 		mockPaymentRepo: mockPaymentRepo,
+		userID:          testUserID,
 	}
 }
 
@@ -274,10 +282,8 @@ func TestAddPaymentMethod_InvalidBody(t *testing.T) {
 func TestListPaymentMethods_Success(t *testing.T) {
 	ts := setupPaymentTestServer(t)
 	orgID := uuid.New()
-	// uuid.Nil is the placeholder user ID (matches what the handler passes)
-	userID := uuid.Nil
-	seedPaymentMethod(t, ts.mockPaymentRepo, orgID, userID)
-	seedPaymentMethod(t, ts.mockPaymentRepo, orgID, userID)
+	seedPaymentMethod(t, ts.mockPaymentRepo, orgID, ts.userID)
+	seedPaymentMethod(t, ts.mockPaymentRepo, orgID, ts.userID)
 
 	resp := doFinRequest(t, ts.server.URL, http.MethodGet,
 		fmt.Sprintf("/organizations/%s/payment-methods", orgID), nil)

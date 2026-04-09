@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/com"
+	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,8 +20,9 @@ import (
 // ─── Test server setup ─────────────────────────────────────────────────────────
 
 type announcementTestServer struct {
-	server           *httptest.Server
-	mockAnnRepo      *mockAnnouncementRepo
+	server      *httptest.Server
+	mockAnnRepo *mockAnnouncementRepo
+	userID      uuid.UUID
 }
 
 func setupAnnouncementTestServer(t *testing.T) *announcementTestServer {
@@ -47,12 +49,18 @@ func setupAnnouncementTestServer(t *testing.T) *announcementTestServer {
 	mux.HandleFunc("PATCH /api/v1/organizations/{org_id}/announcements/{announcement_id}", handler.Update)
 	mux.HandleFunc("DELETE /api/v1/organizations/{org_id}/announcements/{announcement_id}", handler.Delete)
 
-	server := httptest.NewServer(mux)
+	testUserID := uuid.New()
+	handlerWithUserID := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := middleware.WithUserID(r.Context(), testUserID)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
+	server := httptest.NewServer(handlerWithUserID)
 	t.Cleanup(server.Close)
 
 	return &announcementTestServer{
 		server:      server,
 		mockAnnRepo: mockAnnRepo,
+		userID:      testUserID,
 	}
 }
 

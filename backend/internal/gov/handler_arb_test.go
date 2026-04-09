@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/gov"
+	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,6 +25,7 @@ import (
 type arbTestServer struct {
 	server  *httptest.Server
 	mockARB *mockARBRepo
+	userID  uuid.UUID
 }
 
 func setupARBTestServer(t *testing.T) *arbTestServer {
@@ -46,12 +48,18 @@ func setupARBTestServer(t *testing.T) *arbTestServer {
 	mux.HandleFunc("POST /organizations/{org_id}/arb-requests/{request_id}/votes", handler.CastARBVote)
 	mux.HandleFunc("POST /organizations/{org_id}/arb-requests/{request_id}/request-revision", handler.RequestRevision)
 
-	server := httptest.NewServer(mux)
+	testUserID := uuid.New()
+	handlerWithUserID := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := middleware.WithUserID(r.Context(), testUserID)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
+	server := httptest.NewServer(handlerWithUserID)
 	t.Cleanup(server.Close)
 
 	return &arbTestServer{
 		server:  server,
 		mockARB: mockARB,
+		userID:  testUserID,
 	}
 }
 

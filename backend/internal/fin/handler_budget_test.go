@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/fin"
+	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,6 +23,7 @@ import (
 type budgetTestServer struct {
 	server         *httptest.Server
 	mockBudgetRepo *mockBudgetRepo
+	userID         uuid.UUID
 }
 
 func setupBudgetTestServer(t *testing.T) *budgetTestServer {
@@ -64,12 +66,18 @@ func setupBudgetTestServer(t *testing.T) *budgetTestServer {
 	mux.HandleFunc("POST /organizations/{org_id}/expenses/{expense_id}/approve", budgetHandler.ApproveExpense)
 	mux.HandleFunc("POST /organizations/{org_id}/expenses/{expense_id}/pay", budgetHandler.PayExpense)
 
-	server := httptest.NewServer(mux)
+	testUserID := uuid.New()
+	handlerWithUserID := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := middleware.WithUserID(r.Context(), testUserID)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
+	server := httptest.NewServer(handlerWithUserID)
 	t.Cleanup(server.Close)
 
 	return &budgetTestServer{
 		server:         server,
 		mockBudgetRepo: mockBudgetRepo,
+		userID:         testUserID,
 	}
 }
 

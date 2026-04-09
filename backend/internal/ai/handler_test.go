@@ -16,6 +16,7 @@ import (
 	"github.com/quorant/quorant/internal/ai"
 	"github.com/quorant/quorant/internal/org"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -90,6 +91,7 @@ type aiTestServer struct {
 	server     *httptest.Server
 	policyRepo *mockPolicyRepo
 	orgRepo    *handlerMockOrgRepo
+	userID     uuid.UUID
 }
 
 func setupAITestServer(t *testing.T) *aiTestServer {
@@ -138,13 +140,19 @@ func setupAITestServer(t *testing.T) *aiTestServer {
 	mux.HandleFunc("GET /api/v1/organizations/{org_id}/ai/config", handler.GetAIConfig)
 	mux.HandleFunc("PUT /api/v1/organizations/{org_id}/ai/config", handler.UpdateAIConfig)
 
-	server := httptest.NewServer(mux)
+	testUserID := uuid.New()
+	handlerWithUserID := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := middleware.WithUserID(r.Context(), testUserID)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
+	server := httptest.NewServer(handlerWithUserID)
 	t.Cleanup(server.Close)
 
 	return &aiTestServer{
 		server:     server,
 		policyRepo: policyRepo,
 		orgRepo:    orgRepo,
+		userID:     testUserID,
 	}
 }
 

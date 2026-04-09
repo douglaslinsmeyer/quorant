@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/audit"
+	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/quorant/quorant/internal/task"
 	"github.com/stretchr/testify/assert"
@@ -26,6 +27,7 @@ import (
 type taskTestServer struct {
 	server *httptest.Server
 	repo   *mockTaskRepo
+	userID uuid.UUID
 }
 
 func setupTaskTestServer(t *testing.T) *taskTestServer {
@@ -55,10 +57,15 @@ func setupTaskTestServer(t *testing.T) *taskTestServer {
 	mux.HandleFunc("POST /organizations/{org_id}/task-types", handler.CreateType)
 	mux.HandleFunc("PATCH /organizations/{org_id}/task-types/{type_id}", handler.UpdateType)
 
-	server := httptest.NewServer(mux)
+	testUserID := uuid.New()
+	handlerWithUserID := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := middleware.WithUserID(r.Context(), testUserID)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
+	server := httptest.NewServer(handlerWithUserID)
 	t.Cleanup(server.Close)
 
-	return &taskTestServer{server: server, repo: repo}
+	return &taskTestServer{server: server, repo: repo, userID: testUserID}
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +137,6 @@ func TestListMyTasks_Handler(t *testing.T) {
 	resp := doTaskRequest(t, ts.server.URL, http.MethodGet, "/tasks", nil)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	// Decode raw envelope — data may be null/empty array (no auth in test, callerID = uuid.Nil).
 	var envelope map[string]json.RawMessage
 	decodeTaskBody(t, resp, &envelope)
 	// Verify we got a valid JSON response envelope.
