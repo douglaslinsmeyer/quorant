@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alerts — Quorant Design System</title>
+
+  <link rel="stylesheet" href="../tokens/colors.css" />
+  <link rel="stylesheet" href="../tokens/typography.css" />
+  <link rel="stylesheet" href="../tokens/spacing.css" />
+  <link rel="stylesheet" href="../tokens/elevation.css" />
+  <link rel="stylesheet" href="../tokens/motion.css" />
+
+  <style>
+    /* ── Reset & Base ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: var(--type-body-size);
+      line-height: var(--type-body-line-height);
+      color: var(--color-neutral-900);
+      background: var(--surface-page);
+      padding: var(--space-8);
+      animation: page-enter var(--duration-slow) var(--ease-out) both;
+    }
+
+    /* ── Dark Mode Toggle ──────────────────────────────────────── */
+    .theme-btn {
+      position: fixed;
+      top: var(--space-4);
+      right: var(--space-4);
+      background: var(--surface-card);
+      border: 1px solid var(--color-neutral-200);
+      color: var(--color-neutral-700);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition:
+        background var(--duration-normal) var(--ease-smooth),
+        color var(--duration-normal) var(--ease-smooth),
+        box-shadow var(--duration-normal) var(--ease-smooth);
+      z-index: 100;
+    }
+
+    .theme-btn:hover {
+      box-shadow: var(--shadow-md);
+      background: var(--surface-elevated);
+    }
+
+    /* ── Page Header ────────────────────────────────────────────── */
+    .page-header {
+      margin-bottom: var(--space-8);
+      padding-right: 120px;
+    }
+
+    .page-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--type-h1-size);
+      font-weight: var(--type-h1-weight);
+      line-height: var(--type-h1-line-height);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-2);
+    }
+
+    .page-header p {
+      font-size: var(--type-body-lg-size);
+      color: var(--color-neutral-600);
+    }
+
+    /* ── Section ────────────────────────────────────────────────── */
+    .section {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-8);
+      margin-bottom: var(--space-6);
+    }
+
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h3-size);
+      font-weight: var(--type-h3-weight);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-1);
+    }
+
+    .section-desc {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-6);
+    }
+
+    .overline {
+      font-family: var(--font-body);
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-3);
+    }
+
+    /* ── Alert Stack ────────────────────────────────────────────── */
+    .alert-stack {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+    }
+
+    /* ── Base Alert ─────────────────────────────────────────────── */
+    .alert {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      padding: var(--space-4);
+      border-radius: var(--radius-md);
+      border-left: 4px solid transparent;
+      position: relative;
+      animation: stagger-up var(--duration-normal) var(--ease-out) both;
+    }
+
+    .alert__icon {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      margin-top: 1px;
+    }
+
+    .alert__icon svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .alert__body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .alert__title {
+      font-family: var(--font-body);
+      font-size: var(--type-body-sm-size);
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: var(--space-1);
+    }
+
+    .alert__message {
+      font-family: var(--font-body);
+      font-size: var(--type-body-sm-size);
+      line-height: 1.5;
+    }
+
+    .alert__action {
+      display: inline-block;
+      margin-top: var(--space-2);
+      font-family: var(--font-body);
+      font-size: var(--type-body-sm-size);
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      transition: opacity var(--duration-fast) var(--ease-default);
+    }
+
+    .alert__action:hover {
+      opacity: 0.75;
+      text-decoration: underline;
+    }
+
+    .alert__dismiss {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border: none;
+      background: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      padding: 2px;
+      color: inherit;
+      opacity: 0.5;
+      transition:
+        opacity var(--duration-fast) var(--ease-default),
+        background var(--duration-fast) var(--ease-default);
+    }
+
+    .alert__dismiss:hover {
+      opacity: 1;
+      background: rgba(0, 0, 0, 0.08);
+    }
+
+    [data-theme="dark"] .alert__dismiss:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .alert__dismiss svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* ── Alert Variants ─────────────────────────────────────────── */
+    .alert--success {
+      background: var(--color-success-100);
+      border-left-color: var(--color-success-600);
+      color: var(--color-success-600);
+    }
+
+    .alert--success .alert__message,
+    .alert--success .alert__title {
+      color: var(--color-success-600);
+    }
+
+    .alert--success .alert__action {
+      color: var(--color-success-600);
+    }
+
+    .alert--error {
+      background: var(--color-error-100);
+      border-left-color: var(--color-error-600);
+      color: var(--color-error-600);
+    }
+
+    .alert--error .alert__message,
+    .alert--error .alert__title {
+      color: var(--color-error-600);
+    }
+
+    .alert--error .alert__action {
+      color: var(--color-error-600);
+    }
+
+    .alert--warning {
+      background: var(--color-warning-100);
+      border-left-color: var(--color-warning-600);
+      color: var(--color-warning-600);
+    }
+
+    .alert--warning .alert__message,
+    .alert--warning .alert__title {
+      color: var(--color-warning-600);
+    }
+
+    .alert--warning .alert__action {
+      color: var(--color-warning-600);
+    }
+
+    .alert--info {
+      background: var(--color-info-100);
+      border-left-color: var(--color-info-600);
+      color: var(--color-info-600);
+    }
+
+    .alert--info .alert__message,
+    .alert--info .alert__title {
+      color: var(--color-info-600);
+    }
+
+    .alert--info .alert__action {
+      color: var(--color-info-600);
+    }
+
+    /* ── Dismissed State ────────────────────────────────────────── */
+    .alert[aria-hidden="true"] {
+      display: none;
+    }
+
+    /* ── Spec Table ─────────────────────────────────────────────── */
+    .spec-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+      margin-top: var(--space-6);
+    }
+
+    .spec-item {
+      background: var(--surface-page);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+    }
+
+    .spec-item__label {
+      font-size: var(--type-overline-size);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-2);
+    }
+
+    .spec-item__value {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--color-primary-600);
+      line-height: 1.6;
+    }
+
+    /* ── Dark mode note ─────────────────────────────────────────── */
+    .dark-note {
+      background: var(--color-info-100);
+      border: 1px solid var(--color-info-600);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      font-size: var(--type-body-sm-size);
+      color: var(--color-info-600);
+      margin-top: var(--space-6);
+      display: flex;
+      gap: var(--space-3);
+      align-items: flex-start;
+    }
+
+    .dark-note strong {
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <button class="theme-btn" id="themeToggle" aria-label="Toggle dark mode">
+    ☀ Light
+  </button>
+
+  <!-- ── Page Header ──────────────────────────────────────────────── -->
+  <header class="page-header">
+    <h1>Alerts</h1>
+    <p>Contextual feedback messages for HOA operations — payments, violations, announcements, and system notices.</p>
+  </header>
+
+  <!-- ── Section 1: Semantic Variants ─────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Semantic Alert Types</h2>
+    <p class="section-desc">Four semantic variants tied to HOA workflow states. Each uses a 4px left border and a tinted background from the semantic color scale.</p>
+
+    <div class="overline">Core Variants</div>
+    <div class="alert-stack">
+
+      <!-- Success -->
+      <div class="alert alert--success" role="alert">
+        <span class="alert__icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M6.5 10L8.75 12.5L13.5 7.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <div class="alert__body">
+          <p class="alert__message">Payment of <strong>$285.00</strong> received successfully. Your April assessment is now paid in full.</p>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div class="alert alert--error" role="alert">
+        <span class="alert__icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M7 7L13 13M13 7L7 13" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <div class="alert__body">
+          <p class="alert__message">Payment failed. Please check your payment method and try again.</p>
+          <button class="alert__action">Try Again</button>
+        </div>
+      </div>
+
+      <!-- Warning -->
+      <div class="alert alert--warning" role="alert">
+        <span class="alert__icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 2L18.5 17H1.5L10 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M10 8V11.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            <circle cx="10" cy="14.5" r="0.75" fill="currentColor"/>
+          </svg>
+        </span>
+        <div class="alert__body">
+          <p class="alert__message">Your March assessment is past due. A late fee will apply after <strong>March 20th</strong>.</p>
+          <button class="alert__action">Pay Now</button>
+        </div>
+      </div>
+
+      <!-- Info -->
+      <div class="alert alert--info" role="alert">
+        <span class="alert__icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M10 9V14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            <circle cx="10" cy="6.5" r="0.75" fill="currentColor"/>
+          </svg>
+        </span>
+        <div class="alert__body">
+          <p class="alert__message">Board meeting scheduled for <strong>April 15th at 7:00 PM</strong> — Community Center, Room B.</p>
+          <button class="alert__action">Add to Calendar</button>
+        </div>
+      </div>
+
+    </div><!-- /.alert-stack -->
+
+    <!-- Spec grid -->
+    <div class="spec-grid">
+      <div class="spec-item">
+        <div class="spec-item__label">Border</div>
+        <div class="spec-item__value">border-left: 4px solid {semantic-600}</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Background</div>
+        <div class="spec-item__value">background: var(--color-{type}-100)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Border Radius</div>
+        <div class="spec-item__value">var(--radius-md) — 8px</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Padding</div>
+        <div class="spec-item__value">var(--space-4) — 16px all sides</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 2: Dismissable Variants ──────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Dismissable Alerts</h2>
+    <p class="section-desc">A close button (×) appears in the top-right corner. Clicking it hides the alert with no animation jank by setting <code>aria-hidden="true"</code> and <code>display: none</code>.</p>
+
+    <div class="overline">With Dismiss Button</div>
+    <div class="alert-stack">
+
+      <div class="alert alert--success" id="dismiss-success" role="alert">
+        <span class="alert__icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M6.5 10L8.75 12.5L13.5 7.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <div class="alert__body">
+          <p class="alert__message">Your profile has been updated successfully.</p>
+        </div>
+        <button class="alert__dismiss" onclick="dismissAlert('dismiss-success')" aria-label="Dismiss alert">
+          <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 2L12 12M12 2L2 12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="alert alert--warning" id="dismiss-warning" role="alert">
+        <span class="alert__icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 2L18.5 17H1.5L10 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M10 8V11.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            <circle cx="10" cy="14.5" r="0.75" fill="currentColor"/>
+          </svg>
+        </span>
+        <div class="alert__body">
+          <p class="alert__message">Scheduled maintenance window: Sunday, April 20 from 2:00–4:00 AM. The portal will be temporarily unavailable.</p>
+        </div>
+        <button class="alert__dismiss" onclick="dismissAlert('dismiss-warning')" aria-label="Dismiss alert">
+          <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 2L12 12M12 2L2 12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="alert alert--info" id="dismiss-info" role="alert">
+        <span class="alert__icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M10 9V14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            <circle cx="10" cy="6.5" r="0.75" fill="currentColor"/>
+          </svg>
+        </span>
+        <div class="alert__body">
+          <p class="alert__message">New community guidelines have been published. Please review them before your next Violations Committee meeting.</p>
+          <button class="alert__action">View Guidelines</button>
+        </div>
+        <button class="alert__dismiss" onclick="dismissAlert('dismiss-info')" aria-label="Dismiss alert">
+          <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 2L12 12M12 2L2 12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Section 3: Alert with Title + Description ─────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Alert with Title + Description</h2>
+    <p class="section-desc">Use a bold title when the alert communicates a distinct event and the body provides supporting context. Common in escalated or multi-step workflows.</p>
+
+    <div class="overline">Titled Variants</div>
+    <div class="alert-stack">
+
+      <div class="alert alert--error" role="alert">
+        <span class="alert__icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M7 7L13 13M13 7L7 13" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <div class="alert__body">
+          <p class="alert__title">ACH Payment Returned</p>
+          <p class="alert__message">The payment of $570.00 from Unit 102-B was returned by the bank with code R01 (Insufficient Funds). Please contact the homeowner to arrange an alternative payment.</p>
+          <button class="alert__action">Contact Owner</button>
+        </div>
+      </div>
+
+      <div class="alert alert--warning" role="alert">
+        <span class="alert__icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 2L18.5 17H1.5L10 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M10 8V11.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            <circle cx="10" cy="14.5" r="0.75" fill="currentColor"/>
+          </svg>
+        </span>
+        <div class="alert__body">
+          <p class="alert__title">Delinquency Threshold Reached</p>
+          <p class="alert__message">3 units in Oakridge Commons are 60+ days past due, totaling <strong>$1,710.00</strong> in outstanding assessments. The board may wish to authorize collection proceedings at the next meeting.</p>
+          <button class="alert__action">View Delinquent Units</button>
+        </div>
+      </div>
+
+      <div class="alert alert--success" role="alert">
+        <span class="alert__icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M6.5 10L8.75 12.5L13.5 7.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <div class="alert__body">
+          <p class="alert__title">Annual Budget Approved</p>
+          <p class="alert__message">The 2025 operating budget of <strong>$184,500</strong> was approved by the board on April 3rd. Assessment rates will remain unchanged for the upcoming fiscal year.</p>
+          <button class="alert__action">View Budget</button>
+        </div>
+      </div>
+
+      <div class="alert alert--info" role="alert">
+        <span class="alert__icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M10 9V14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            <circle cx="10" cy="6.5" r="0.75" fill="currentColor"/>
+          </svg>
+        </span>
+        <div class="alert__body">
+          <p class="alert__title">Reserve Study Updated</p>
+          <p class="alert__message">The 2025 reserve study has been completed by Westfield Financial Consulting. The reserve fund is currently funded at 68%, above the recommended minimum of 50%.</p>
+          <button class="alert__action">Download Report</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Section 4: Dark Mode Note ────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Dark Mode Behavior</h2>
+    <p class="section-desc">Toggle dark mode using the button in the top-right corner to observe how alert backgrounds adapt. The semantic-100 tokens invert to deep tinted surfaces in dark mode.</p>
+
+    <div class="dark-note" role="note">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex-shrink:0;margin-top:1px">
+        <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M10 9V14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        <circle cx="10" cy="6.5" r="0.75" fill="currentColor"/>
+      </svg>
+      <div>
+        <strong>Dark mode token mapping:</strong> In dark mode, <code>--color-success-100</code> resolves to <code>#1A3D2A</code>, <code>--color-error-100</code> to <code>#3D1A1A</code>, <code>--color-warning-100</code> to <code>#3D2E0A</code>, and <code>--color-info-100</code> to <code>#0E4F65</code>. These deep, tinted surfaces maintain legibility while matching the dark UI palette. No additional overrides are needed in component code — the semantic tokens handle the adaptation automatically.
+      </div>
+    </div>
+
+    <div style="margin-top: var(--space-6)">
+      <div class="overline">Live Dark Mode Preview</div>
+      <div class="alert-stack">
+        <div class="alert alert--success" role="alert">
+          <span class="alert__icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 10L8.75 12.5L13.5 7.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <div class="alert__body">
+            <p class="alert__message">All 48 units are current on assessments for Q1 2025. Total collected: <strong>$13,680.00</strong>.</p>
+          </div>
+        </div>
+        <div class="alert alert--error" role="alert">
+          <span class="alert__icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M7 7L13 13M13 7L7 13" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          </span>
+          <div class="alert__body">
+            <p class="alert__message">Violation #VIO-312 requires board action within 14 days before escalation to collections.</p>
+            <button class="alert__action">Review Violation</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const btn = document.getElementById('themeToggle');
+    const html = document.documentElement;
+
+    function dismissAlert(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.setAttribute('aria-hidden', 'true');
+      }
+    }
+
+    btn.addEventListener('click', () => {
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        html.removeAttribute('data-theme');
+        btn.textContent = '☀ Light';
+      } else {
+        html.setAttribute('data-theme', 'dark');
+        btn.textContent = '☾ Dark';
+      }
+    });
+  </script>
+</body>
+</html>
