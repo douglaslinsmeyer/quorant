@@ -980,6 +980,16 @@
       const isDark = html.getAttribute('data-theme') === 'dark';
       html.setAttribute('data-theme', isDark ? 'light' : 'dark');
     }
+    // Listen for dark mode toggle from component browser (postMessage for file:// compatibility)
+    window.addEventListener("message", function(e) {
+      if (e.data && e.data.type === "quorant-theme") {
+        if (e.data.dark) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        } else {
+          document.documentElement.removeAttribute("data-theme");
+        }
+      }
+    });
   </script>
 </body>
 </html>

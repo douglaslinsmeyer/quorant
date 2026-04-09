@@ -966,6 +966,16 @@
       btn.textContent = isReduced ? 'Disable Reduced Motion' : 'Enable Reduced Motion';
       status.textContent = isReduced ? 'Animations: collapsed to 100ms' : 'Animations: normal';
     }
+    // Listen for dark mode toggle from component browser (postMessage for file:// compatibility)
+    window.addEventListener("message", function(e) {
+      if (e.data && e.data.type === "quorant-theme") {
+        if (e.data.dark) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        } else {
+          document.documentElement.removeAttribute("data-theme");
+        }
+      }
+    });
   </script>
 </body>
 </html>

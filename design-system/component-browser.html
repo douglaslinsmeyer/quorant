@@ -349,6 +349,7 @@
      * @param {boolean} dark
      */
     function applyDarkModeToFrame(frame, dark) {
+      // Method 1: direct DOM access (works on http://, fails on file://)
       try {
         const doc = frame.contentDocument || frame.contentWindow.document;
         if (doc && doc.documentElement) {
@@ -357,9 +358,16 @@
           } else {
             doc.documentElement.removeAttribute('data-theme');
           }
+          return; // Success — skip postMessage
         }
       } catch (e) {
-        // Cross-origin — silently ignore
+        // Cross-origin — fall through to postMessage
+      }
+      // Method 2: postMessage (works on file:// and cross-origin)
+      try {
+        frame.contentWindow.postMessage({ type: 'quorant-theme', dark: dark }, '*');
+      } catch (e) {
+        // Iframe not ready — will be applied on next load via onFrameLoad
       }
     }
 
