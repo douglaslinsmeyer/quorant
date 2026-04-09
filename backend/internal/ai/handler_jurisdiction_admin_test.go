@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/quorant/quorant/internal/ai"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +18,7 @@ import (
 func setupAdminTestServer(t *testing.T) (*httptest.Server, *mockJurisdictionRuleRepo) {
 	t.Helper()
 	repo := &mockJurisdictionRuleRepo{}
-	handler := ai.NewJurisdictionAdminHandler(repo, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	handler := ai.NewJurisdictionAdminHandler(repo, queue.NewInMemoryPublisher(), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/admin/jurisdiction-rules", handler.CreateRule)
 	mux.HandleFunc("GET /api/v1/admin/jurisdiction-rules/{id}", handler.GetRule)

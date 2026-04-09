@@ -210,7 +210,7 @@ func run() error {
 	complianceService.RegisterEvaluator("estoppel", ai.EvaluateEstoppel)
 	complianceHandler := ai.NewComplianceHandler(complianceService, complianceCheckRepo, logger)
 	ai.RegisterComplianceRoutes(mux, complianceHandler, tokenValidator, permChecker, resolveUserID, entitlementChecker)
-	jurisdictionAdminHandler := ai.NewJurisdictionAdminHandler(jurisdictionRuleRepo, logger)
+	jurisdictionAdminHandler := ai.NewJurisdictionAdminHandler(jurisdictionRuleRepo, outboxPublisher, logger)
 	ai.RegisterJurisdictionAdminRoutes(mux, jurisdictionAdminHandler, tokenValidator, permChecker, resolveUserID)
 
 	// Fin module

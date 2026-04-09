@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
 	"github.com/quorant/quorant/internal/platform/middleware"
+	"github.com/quorant/quorant/internal/platform/queue"
 )
 
 // parseComplianceCursorID decodes an opaque cursor token and extracts the "id" field as a UUID.
@@ -29,13 +31,14 @@ func parseComplianceCursorID(cursor string) (*uuid.UUID, error) {
 
 // JurisdictionAdminHandler handles platform-admin CRUD for jurisdiction rules.
 type JurisdictionAdminHandler struct {
-	rules  JurisdictionRuleRepository
-	logger *slog.Logger
+	rules     JurisdictionRuleRepository
+	publisher queue.Publisher
+	logger    *slog.Logger
 }
 
 // NewJurisdictionAdminHandler constructs a JurisdictionAdminHandler.
-func NewJurisdictionAdminHandler(rules JurisdictionRuleRepository, logger *slog.Logger) *JurisdictionAdminHandler {
-	return &JurisdictionAdminHandler{rules: rules, logger: logger}
+func NewJurisdictionAdminHandler(rules JurisdictionRuleRepository, publisher queue.Publisher, logger *slog.Logger) *JurisdictionAdminHandler {
+	return &JurisdictionAdminHandler{rules: rules, publisher: publisher, logger: logger}
 }
 
 // CreateRule handles POST /api/v1/admin/jurisdiction-rules.
@@ -89,6 +92,7 @@ func (h *JurisdictionAdminHandler) CreateRule(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	h.publishRuleEvent(r, "quorant.ai.JurisdictionRuleCreated", created)
 	api.WriteJSON(w, http.StatusCreated, created)
 }
 
@@ -220,6 +224,7 @@ func (h *JurisdictionAdminHandler) UpdateRule(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	h.publishRuleEvent(r, "quorant.ai.JurisdictionRuleUpdated", created)
 	api.WriteJSON(w, http.StatusOK, created)
 }
 
@@ -254,4 +259,21 @@ func (h *JurisdictionAdminHandler) ExpireRule(w http.ResponseWriter, r *http.Req
 	}
 
 	api.WriteJSON(w, http.StatusOK, updated)
+}
+
+// publishRuleEvent publishes a NATS event for jurisdiction rule changes.
+func (h *JurisdictionAdminHandler) publishRuleEvent(r *http.Request, eventType string, rule *JurisdictionRule) {
+	userID := middleware.UserIDFromContext(r.Context())
+	payload, _ := json.Marshal(map[string]any{
+		"rule_id":       rule.ID,
+		"jurisdiction":  rule.Jurisdiction,
+		"rule_category": rule.RuleCategory,
+		"rule_key":      rule.RuleKey,
+		"effective_date": rule.EffectiveDate.Format("2006-01-02"),
+		"changed_by":    userID,
+	})
+	event := queue.NewBaseEvent(eventType, "jurisdiction_rule", rule.ID, uuid.Nil, payload)
+	if err := h.publisher.Publish(r.Context(), event); err != nil {
+		h.logger.Error("failed to publish "+eventType, "rule_id", rule.ID, "error", err)
+	}
 }
