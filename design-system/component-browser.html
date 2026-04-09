@@ -300,7 +300,17 @@
   </div>
 
   <script>
-    let isDark = false;
+    // Initialize from OS preference
+    let isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    // Apply initial theme immediately
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    document.addEventListener('DOMContentLoaded', function() {
+      var btn = document.getElementById('dark-toggle-btn');
+      if (btn && isDark) btn.classList.add('active');
+      var label = document.getElementById('theme-label');
+      if (label) label.textContent = isDark ? 'Dark Mode' : 'Light Mode';
+    });
 
     /**
      * Load a page into the preview iframe and update nav + toolbar state.
@@ -340,21 +350,17 @@
       try {
         const doc = frame.contentDocument || frame.contentWindow.document;
         if (doc && doc.documentElement) {
-          if (dark) {
-            doc.documentElement.setAttribute('data-theme', 'dark');
-          } else {
-            doc.documentElement.removeAttribute('data-theme');
-          }
-          return; // Success — skip postMessage
+          doc.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+          return;
         }
       } catch (e) {
         // Cross-origin — fall through to postMessage
       }
       // Method 2: postMessage (works on file:// and cross-origin)
       try {
-        frame.contentWindow.postMessage({ type: 'quorant-theme', dark: dark }, '*');
+        frame.contentWindow.postMessage({ type: 'quorant-theme', theme: dark ? 'dark' : 'light' }, '*');
       } catch (e) {
-        // Iframe not ready — will be applied on next load via onFrameLoad
+        // Iframe not ready
       }
     }
 
@@ -364,12 +370,8 @@
     function toggleDarkMode() {
       isDark = !isDark;
 
-      // Apply to shell
-      if (isDark) {
-        document.documentElement.setAttribute('data-theme', 'dark');
-      } else {
-        document.documentElement.removeAttribute('data-theme');
-      }
+      // Apply to shell — always set explicitly (never remove, so it overrides OS preference)
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
 
       // Update button state
       var btn = document.getElementById('dark-toggle-btn');
