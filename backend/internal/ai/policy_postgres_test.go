@@ -24,20 +24,6 @@ func setupPolicyTestDB(t *testing.T) *pgxpool.Pool {
 	pool, err := pgxpool.New(ctx, "postgres://quorant:quorant@localhost:5432/quorant_dev?sslmode=disable")
 	require.NoError(t, err, "connecting to test database")
 
-	t.Cleanup(func() {
-		cleanCtx := context.Background()
-		pool.Exec(cleanCtx, "DELETE FROM policy_resolutions")
-		pool.Exec(cleanCtx, "DELETE FROM policy_extractions")
-		pool.Exec(cleanCtx, "DELETE FROM governing_documents")
-		pool.Exec(cleanCtx, "DELETE FROM documents")
-		pool.Exec(cleanCtx, "DELETE FROM memberships")
-		pool.Exec(cleanCtx, "DELETE FROM units")
-		pool.Exec(cleanCtx, "DELETE FROM organizations WHERE parent_id IS NOT NULL")
-		pool.Exec(cleanCtx, "DELETE FROM organizations")
-		pool.Exec(cleanCtx, "DELETE FROM users")
-		pool.Close()
-	})
-
 	return pool
 }
 
@@ -50,6 +36,7 @@ type policyTestFixture struct {
 }
 
 // setupPolicyFixture creates the base org, user, and document needed for policy tests.
+// Cleanup deletes only the rows created by this fixture, scoped by orgID and userID.
 func setupPolicyFixture(t *testing.T) policyTestFixture {
 	t.Helper()
 	pool := setupPolicyTestDB(t)
@@ -89,6 +76,17 @@ func setupPolicyFixture(t *testing.T) policyTestFixture {
 		orgID.String()+"/ccrs.pdf",
 	).Scan(&docID)
 	require.NoError(t, err, "create test document")
+
+	t.Cleanup(func() {
+		cleanCtx := context.Background()
+		pool.Exec(cleanCtx, "DELETE FROM policy_resolutions WHERE org_id = $1", orgID)
+		pool.Exec(cleanCtx, "DELETE FROM policy_extractions WHERE org_id = $1", orgID)
+		pool.Exec(cleanCtx, "DELETE FROM governing_documents WHERE org_id = $1", orgID)
+		pool.Exec(cleanCtx, "DELETE FROM documents WHERE org_id = $1", orgID)
+		pool.Exec(cleanCtx, "DELETE FROM organizations WHERE id = $1", orgID)
+		pool.Exec(cleanCtx, "DELETE FROM users WHERE id = $1", userID)
+		pool.Close()
+	})
 
 	return policyTestFixture{
 		pool:   pool,

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -42,7 +43,7 @@ func (r *PostgresPolicyRepository) CreateGoverningDoc(ctx context.Context, doc *
 		doc.DocumentID,
 		doc.DocType,
 		doc.Title,
-		doc.EffectiveDate,
+		utcMidnight(doc.EffectiveDate),
 		doc.SupersedesID,
 		doc.IndexingStatus,
 	)
@@ -112,7 +113,7 @@ func (r *PostgresPolicyRepository) UpdateGoverningDoc(ctx context.Context, doc *
 	row := r.pool.QueryRow(ctx, q,
 		doc.DocType,
 		doc.Title,
-		doc.EffectiveDate,
+		utcMidnight(doc.EffectiveDate),
 		doc.SupersedesID,
 		doc.IndexingStatus,
 		doc.IndexedAt,
@@ -158,7 +159,7 @@ func (r *PostgresPolicyRepository) CreateExtraction(ctx context.Context, e *Poli
 		e.OrgID,
 		e.Domain,
 		e.PolicyKey,
-		marshalRawOrNull(e.Config),
+		marshalRawOrEmpty(e.Config),
 		e.Confidence,
 		e.SourceDocID,
 		e.SourceText,
@@ -278,7 +279,7 @@ func (r *PostgresPolicyRepository) UpdateExtraction(ctx context.Context, e *Poli
 	row := r.pool.QueryRow(ctx, q,
 		e.Domain,
 		e.PolicyKey,
-		marshalRawOrNull(e.Config),
+		marshalRawOrEmpty(e.Config),
 		e.Confidence,
 		e.SourceText,
 		e.SourceSection,
@@ -326,13 +327,17 @@ func (r *PostgresPolicyRepository) CreateResolution(ctx context.Context, res *Po
 		          requesting_module, requesting_context,
 		          human_decision, decided_by, decided_at, fed_back, created_at`
 
+	policyKeys := res.PolicyKeys
+	if policyKeys == nil {
+		policyKeys = []string{}
+	}
 	row := r.pool.QueryRow(ctx, q,
 		res.OrgID,
 		res.Query,
-		res.PolicyKeys,
+		policyKeys,
 		marshalRawOrEmpty(res.Resolution),
 		res.Reasoning,
-		marshalRawOrEmpty(res.SourcePassages),
+		marshalRawOrEmptyArray(res.SourcePassages),
 		res.Confidence,
 		res.ResolutionType,
 		res.ModelVersion,
@@ -443,12 +448,16 @@ func (r *PostgresPolicyRepository) UpdateResolution(ctx context.Context, res *Po
 		          requesting_module, requesting_context,
 		          human_decision, decided_by, decided_at, fed_back, created_at`
 
+	policyKeysUpd := res.PolicyKeys
+	if policyKeysUpd == nil {
+		policyKeysUpd = []string{}
+	}
 	row := r.pool.QueryRow(ctx, q,
 		res.Query,
-		res.PolicyKeys,
+		policyKeysUpd,
 		marshalRawOrEmpty(res.Resolution),
 		res.Reasoning,
-		marshalRawOrEmpty(res.SourcePassages),
+		marshalRawOrEmptyArray(res.SourcePassages),
 		res.Confidence,
 		res.ResolutionType,
 		res.ModelVersion,
@@ -709,5 +718,21 @@ func marshalRawOrEmpty(raw json.RawMessage) []byte {
 		return []byte("{}")
 	}
 	return []byte(raw)
+}
+
+// marshalRawOrEmptyArray converts a json.RawMessage to bytes, returning '[]' if empty.
+// Use this for array-typed JSONB columns (e.g. source_passages).
+func marshalRawOrEmptyArray(raw json.RawMessage) []byte {
+	if len(raw) == 0 {
+		return []byte("[]")
+	}
+	return []byte(raw)
+}
+
+// utcMidnight truncates t to midnight UTC, preventing timezone drift when
+// storing a Go time.Time into a PostgreSQL DATE column.
+func utcMidnight(t time.Time) time.Time {
+	u := t.UTC()
+	return time.Date(u.Year(), u.Month(), u.Day(), 0, 0, 0, 0, time.UTC)
 }
 
