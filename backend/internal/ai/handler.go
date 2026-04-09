@@ -15,6 +15,7 @@ import (
 type AIHandler struct {
 	policyService  *PolicyService
 	contextService *ContextLakeService
+	policyResolver *PostgresPolicyResolver
 	orgRepo        org.OrgRepository
 	logger         *slog.Logger
 }
@@ -24,6 +25,7 @@ func NewAIHandler(policyService *PolicyService, contextService *ContextLakeServi
 	return &AIHandler{
 		policyService:  policyService,
 		contextService: contextService,
+		policyResolver: NewPostgresPolicyResolver(policyService),
 		orgRepo:        orgRepo,
 		logger:         logger,
 	}
@@ -283,8 +285,7 @@ func (h *AIHandler) QueryPolicy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resolver := NewPostgresPolicyResolver(h.policyService)
-	result, err := resolver.QueryPolicy(r.Context(), orgID, body.Query, body.Context)
+	result, err := h.policyResolver.QueryPolicy(r.Context(), orgID, body.Query, body.Context)
 	if err != nil {
 		api.WriteError(w, err)
 		return
