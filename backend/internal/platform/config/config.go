@@ -11,13 +11,14 @@ import (
 
 // Config is the root configuration struct for the Quorant backend service.
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	Redis    RedisConfig
-	NATS     NATSConfig
-	S3       S3Config
-	Zitadel  ZitadelConfig
-	Log      LogConfig
+	Server    ServerConfig
+	Database  DatabaseConfig
+	Redis     RedisConfig
+	NATS      NATSConfig
+	S3        S3Config
+	Zitadel   ZitadelConfig
+	Log       LogConfig
+	Telemetry TelemetryConfig
 }
 
 // ServerConfig holds HTTP server settings.
@@ -75,6 +76,13 @@ type ZitadelConfig struct {
 // LogConfig holds structured logging settings.
 type LogConfig struct {
 	Level string // env: LOG_LEVEL, default: "info"
+}
+
+// TelemetryConfig holds OpenTelemetry settings.
+type TelemetryConfig struct {
+	Enabled     bool   // env: OTEL_ENABLED, default: false
+	Endpoint    string // env: OTEL_ENDPOINT, default: "localhost:4318"
+	ServiceName string // env: OTEL_SERVICE_NAME, default: "quorant-api"
 }
 
 // getEnv returns the value of the named environment variable, or fallback when
@@ -158,6 +166,11 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	otelEnabled, err := getEnvBool("OTEL_ENABLED", false)
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := &Config{
 		Server: ServerConfig{
 			Host: getEnv("SERVER_HOST", "0.0.0.0"),
@@ -193,6 +206,11 @@ func Load() (*Config, error) {
 		},
 		Log: LogConfig{
 			Level: getEnv("LOG_LEVEL", "info"),
+		},
+		Telemetry: TelemetryConfig{
+			Enabled:     otelEnabled,
+			Endpoint:    getEnv("OTEL_ENDPOINT", "localhost:4318"),
+			ServiceName: getEnv("OTEL_SERVICE_NAME", "quorant-api"),
 		},
 	}
 

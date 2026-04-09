@@ -34,6 +34,7 @@ import (
 	"github.com/quorant/quorant/internal/platform/logging"
 	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/quorant/quorant/internal/platform/storage"
+	"github.com/quorant/quorant/internal/platform/telemetry"
 )
 
 func main() {
@@ -56,14 +57,26 @@ func run() error {
 	logger := logging.NewLogger(cfg.Log.Level)
 	slog.SetDefault(logger)
 
-	// 3. Database
+	// 3. Telemetry
+	shutdownTracer, err := telemetry.InitTracer(ctx, telemetry.Config{
+		ServiceName: cfg.Telemetry.ServiceName,
+		Endpoint:    cfg.Telemetry.Endpoint,
+		Enabled:     cfg.Telemetry.Enabled,
+	})
+	if err != nil {
+		logger.Warn("failed to initialize tracer", "error", err)
+	} else {
+		defer shutdownTracer(ctx)
+	}
+
+	// 4. Database
 	pool, err := db.NewPool(ctx, cfg.Database)
 	if err != nil {
 		return fmt.Errorf("connecting to database: %w", err)
 	}
 	defer pool.Close()
 
-	// 4. Audit and event infrastructure
+	// 5. Audit and event infrastructure
 	auditor := audit.NewPostgresAuditor(pool)
 	_ = auditor
 	outboxPublisher := queue.NewOutboxPublisher(pool)
@@ -239,6 +252,7 @@ func run() error {
 	handler = middleware.Logging(logger, handler)
 	handler = middleware.Recovery(logger, handler)
 	handler = middleware.RequestID(handler)
+	handler = middleware.Tracing(handler) // outermost: creates root span before RequestID
 	handler = middleware.CORS([]string{"*"}, handler) // permissive for dev; configured per-env in production
 
 	// 11. HTTP server
