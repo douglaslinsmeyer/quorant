@@ -18,7 +18,7 @@ type OrgService struct {
 	orgRepo        OrgRepository
 	membershipRepo MembershipRepository
 	unitRepo       UnitRepository
-	userRepo       iam.UserRepository
+	userRepo UserFinder
 	auditor        audit.Auditor
 	publisher      queue.Publisher
 	logger         *slog.Logger
@@ -29,7 +29,7 @@ func NewOrgService(
 	orgRepo OrgRepository,
 	membershipRepo MembershipRepository,
 	unitRepo UnitRepository,
-	userRepo iam.UserRepository,
+	userRepo UserFinder,
 	auditor audit.Auditor,
 	publisher queue.Publisher,
 	logger *slog.Logger,
