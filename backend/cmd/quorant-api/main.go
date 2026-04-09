@@ -250,6 +250,10 @@ func run() error {
 	adminHandler := admin.NewAdminHandler(adminService, logger)
 	admin.RegisterRoutes(mux, adminHandler, tokenValidator, permChecker, resolveUserID)
 
+	// Audit module
+	auditHandler := audit.NewHandler(auditor, logger)
+	audit.RegisterRoutes(mux, auditHandler, tokenValidator, permChecker, resolveUserID)
+
 	// Webhook module
 	webhookRepo := webhook.NewPostgresWebhookRepository(pool)
 	webhookService := webhook.NewWebhookService(webhookRepo, auditor, outboxPublisher, logger)
