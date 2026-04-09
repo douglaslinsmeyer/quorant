@@ -1,9 +1,8 @@
 package org
 
 import (
-	"errors"
-
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/platform/api"
 )
 
 // CreateOrgRequest is the request body for POST /api/v1/organizations.
@@ -25,13 +24,13 @@ type CreateOrgRequest struct {
 // Validate checks that Name and Type are present and Type is a valid value.
 func (r CreateOrgRequest) Validate() error {
 	if r.Name == "" {
-		return errors.New("name is required")
+		return api.NewValidationError("name is required", "name")
 	}
 	if r.Type == "" {
-		return errors.New("type is required")
+		return api.NewValidationError("type is required", "type")
 	}
 	if r.Type != "firm" && r.Type != "hoa" {
-		return errors.New("type must be \"firm\" or \"hoa\"")
+		return api.NewValidationError(`type must be "firm" or "hoa"`, "type")
 	}
 	return nil
 }
@@ -64,7 +63,7 @@ func (r UpdateOrgRequest) Validate() error {
 		r.Website == nil &&
 		r.LogoURL == nil &&
 		r.Settings == nil {
-		return errors.New("at least one field must be provided")
+		return api.NewValidationError("at least one field must be provided", "")
 	}
 	return nil
 }
@@ -79,10 +78,10 @@ type CreateMembershipRequest struct {
 // Validate checks that UserID and RoleID are non-zero.
 func (r CreateMembershipRequest) Validate() error {
 	if r.UserID == (uuid.UUID{}) {
-		return errors.New("user_id is required")
+		return api.NewValidationError("user_id is required", "user_id")
 	}
 	if r.RoleID == (uuid.UUID{}) {
-		return errors.New("role_id is required")
+		return api.NewValidationError("role_id is required", "role_id")
 	}
 	return nil
 }
@@ -105,7 +104,7 @@ type CreateUnitRequest struct {
 // Validate checks that Label is present.
 func (r CreateUnitRequest) Validate() error {
 	if r.Label == "" {
-		return errors.New("label is required")
+		return api.NewValidationError("label is required", "label")
 	}
 	return nil
 }
@@ -119,7 +118,7 @@ type ConnectManagementRequest struct {
 // Validate checks that FirmOrgID is non-zero.
 func (r ConnectManagementRequest) Validate() error {
 	if r.FirmOrgID == (uuid.UUID{}) {
-		return errors.New("firm_org_id is required")
+		return api.NewValidationError("firm_org_id is required", "firm_org_id")
 	}
 	return nil
 }
