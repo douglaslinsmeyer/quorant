@@ -1,0 +1,298 @@
+package fin
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// PostgresPaymentRepository implements PaymentRepository using a pgxpool.
+type PostgresPaymentRepository struct {
+	pool *pgxpool.Pool
+}
+
+// NewPostgresPaymentRepository creates a new PostgresPaymentRepository backed
+// by pool.
+func NewPostgresPaymentRepository(pool *pgxpool.Pool) *PostgresPaymentRepository {
+	return &PostgresPaymentRepository{pool: pool}
+}
+
+// ─── Payments ─────────────────────────────────────────────────────────────────
+
+// CreatePayment inserts a new payment record and returns the fully-populated
+// row.
+func (r *PostgresPaymentRepository) CreatePayment(ctx context.Context, p *Payment) (*Payment, error) {
+	const q = `
+		INSERT INTO payments (
+			org_id, unit_id, user_id, payment_method_id, amount_cents,
+			status, provider_ref, description, paid_at
+		) VALUES (
+			$1, $2, $3, $4, $5,
+			$6, $7, $8, $9
+		)
+		RETURNING id, org_id, unit_id, user_id, payment_method_id, amount_cents,
+		          status, provider_ref, description, paid_at, created_at, updated_at`
+
+	row := r.pool.QueryRow(ctx, q,
+		p.OrgID,
+		p.UnitID,
+		p.UserID,
+		p.PaymentMethodID,
+		p.AmountCents,
+		p.Status,
+		p.ProviderRef,
+		p.Description,
+		p.PaidAt,
+	)
+
+	result, err := scanPayment(row)
+	if err != nil {
+		return nil, fmt.Errorf("fin: CreatePayment: %w", err)
+	}
+	return result, nil
+}
+
+// FindPaymentByID returns the payment with the given id, or nil, nil if not
+// found.
+func (r *PostgresPaymentRepository) FindPaymentByID(ctx context.Context, id uuid.UUID) (*Payment, error) {
+	const q = `
+		SELECT id, org_id, unit_id, user_id, payment_method_id, amount_cents,
+		       status, provider_ref, description, paid_at, created_at, updated_at
+		FROM payments
+		WHERE id = $1`
+
+	row := r.pool.QueryRow(ctx, q, id)
+	result, err := scanPayment(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("fin: FindPaymentByID: %w", err)
+	}
+	return result, nil
+}
+
+// ListPaymentsByOrg returns all payments for the given org ordered by
+// created_at DESC. Returns an empty (non-nil) slice when none exist.
+func (r *PostgresPaymentRepository) ListPaymentsByOrg(ctx context.Context, orgID uuid.UUID) ([]Payment, error) {
+	const q = `
+		SELECT id, org_id, unit_id, user_id, payment_method_id, amount_cents,
+		       status, provider_ref, description, paid_at, created_at, updated_at
+		FROM payments
+		WHERE org_id = $1
+		ORDER BY created_at DESC`
+
+	rows, err := r.pool.Query(ctx, q, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("fin: ListPaymentsByOrg: %w", err)
+	}
+	defer rows.Close()
+
+	return collectPayments(rows, "ListPaymentsByOrg")
+}
+
+// ListPaymentsByUnit returns all payments for the given unit ordered by
+// created_at DESC. Returns an empty (non-nil) slice when none exist.
+func (r *PostgresPaymentRepository) ListPaymentsByUnit(ctx context.Context, unitID uuid.UUID) ([]Payment, error) {
+	const q = `
+		SELECT id, org_id, unit_id, user_id, payment_method_id, amount_cents,
+		       status, provider_ref, description, paid_at, created_at, updated_at
+		FROM payments
+		WHERE unit_id = $1
+		ORDER BY created_at DESC`
+
+	rows, err := r.pool.Query(ctx, q, unitID)
+	if err != nil {
+		return nil, fmt.Errorf("fin: ListPaymentsByUnit: %w", err)
+	}
+	defer rows.Close()
+
+	return collectPayments(rows, "ListPaymentsByUnit")
+}
+
+// UpdatePaymentStatus updates the status and optionally paid_at for the given
+// payment, and bumps updated_at to now().
+func (r *PostgresPaymentRepository) UpdatePaymentStatus(ctx context.Context, id uuid.UUID, status string, paidAt *time.Time) error {
+	const q = `
+		UPDATE payments
+		SET status     = $1,
+		    paid_at    = $2,
+		    updated_at = now()
+		WHERE id = $3`
+
+	_, err := r.pool.Exec(ctx, q, status, paidAt, id)
+	if err != nil {
+		return fmt.Errorf("fin: UpdatePaymentStatus: %w", err)
+	}
+	return nil
+}
+
+// ─── Payment Methods ──────────────────────────────────────────────────────────
+
+// CreatePaymentMethod inserts a new payment method and returns the
+// fully-populated row.
+func (r *PostgresPaymentRepository) CreatePaymentMethod(ctx context.Context, m *PaymentMethod) (*PaymentMethod, error) {
+	const q = `
+		INSERT INTO payment_methods (
+			org_id, user_id, method_type, provider_ref, last_four, is_default
+		) VALUES (
+			$1, $2, $3, $4, $5, $6
+		)
+		RETURNING id, org_id, user_id, method_type, provider_ref, last_four,
+		          is_default, created_at, deleted_at`
+
+	row := r.pool.QueryRow(ctx, q,
+		m.OrgID,
+		m.UserID,
+		m.MethodType,
+		m.ProviderRef,
+		m.LastFour,
+		m.IsDefault,
+	)
+
+	result, err := scanPaymentMethod(row)
+	if err != nil {
+		return nil, fmt.Errorf("fin: CreatePaymentMethod: %w", err)
+	}
+	return result, nil
+}
+
+// ListPaymentMethodsByUser returns all non-deleted payment methods for the
+// given user ordered by created_at. Returns an empty (non-nil) slice when none
+// exist.
+func (r *PostgresPaymentRepository) ListPaymentMethodsByUser(ctx context.Context, userID uuid.UUID) ([]PaymentMethod, error) {
+	const q = `
+		SELECT id, org_id, user_id, method_type, provider_ref, last_four,
+		       is_default, created_at, deleted_at
+		FROM payment_methods
+		WHERE user_id = $1 AND deleted_at IS NULL
+		ORDER BY created_at`
+
+	rows, err := r.pool.Query(ctx, q, userID)
+	if err != nil {
+		return nil, fmt.Errorf("fin: ListPaymentMethodsByUser: %w", err)
+	}
+	defer rows.Close()
+
+	return collectPaymentMethods(rows, "ListPaymentMethodsByUser")
+}
+
+// SoftDeletePaymentMethod marks the payment method as deleted without removing
+// the row.
+func (r *PostgresPaymentRepository) SoftDeletePaymentMethod(ctx context.Context, id uuid.UUID) error {
+	const q = `
+		UPDATE payment_methods
+		SET deleted_at = now()
+		WHERE id = $1 AND deleted_at IS NULL`
+
+	_, err := r.pool.Exec(ctx, q, id)
+	if err != nil {
+		return fmt.Errorf("fin: SoftDeletePaymentMethod: %w", err)
+	}
+	return nil
+}
+
+// ─── Scan helpers ─────────────────────────────────────────────────────────────
+
+// scanPayment reads a single payments row.
+func scanPayment(row pgx.Row) (*Payment, error) {
+	var p Payment
+	err := row.Scan(
+		&p.ID,
+		&p.OrgID,
+		&p.UnitID,
+		&p.UserID,
+		&p.PaymentMethodID,
+		&p.AmountCents,
+		&p.Status,
+		&p.ProviderRef,
+		&p.Description,
+		&p.PaidAt,
+		&p.CreatedAt,
+		&p.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+// collectPayments drains pgx.Rows into a slice of Payment values.
+func collectPayments(rows pgx.Rows, op string) ([]Payment, error) {
+	payments := []Payment{}
+	for rows.Next() {
+		var p Payment
+		if err := rows.Scan(
+			&p.ID,
+			&p.OrgID,
+			&p.UnitID,
+			&p.UserID,
+			&p.PaymentMethodID,
+			&p.AmountCents,
+			&p.Status,
+			&p.ProviderRef,
+			&p.Description,
+			&p.PaidAt,
+			&p.CreatedAt,
+			&p.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("fin: %s scan: %w", op, err)
+		}
+		payments = append(payments, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("fin: %s rows: %w", op, err)
+	}
+	return payments, nil
+}
+
+// scanPaymentMethod reads a single payment_methods row.
+func scanPaymentMethod(row pgx.Row) (*PaymentMethod, error) {
+	var m PaymentMethod
+	err := row.Scan(
+		&m.ID,
+		&m.OrgID,
+		&m.UserID,
+		&m.MethodType,
+		&m.ProviderRef,
+		&m.LastFour,
+		&m.IsDefault,
+		&m.CreatedAt,
+		&m.DeletedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// collectPaymentMethods drains pgx.Rows into a slice of PaymentMethod values.
+func collectPaymentMethods(rows pgx.Rows, op string) ([]PaymentMethod, error) {
+	methods := []PaymentMethod{}
+	for rows.Next() {
+		var m PaymentMethod
+		if err := rows.Scan(
+			&m.ID,
+			&m.OrgID,
+			&m.UserID,
+			&m.MethodType,
+			&m.ProviderRef,
+			&m.LastFour,
+			&m.IsDefault,
+			&m.CreatedAt,
+			&m.DeletedAt,
+		); err != nil {
+			return nil, fmt.Errorf("fin: %s scan: %w", op, err)
+		}
+		methods = append(methods, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("fin: %s rows: %w", op, err)
+	}
+	return methods, nil
+}
