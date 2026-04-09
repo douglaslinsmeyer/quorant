@@ -224,6 +224,59 @@ func (h *AssessmentHandler) GetAssessment(w http.ResponseWriter, r *http.Request
 	api.WriteJSON(w, http.StatusOK, assessment)
 }
 
+// UpdateAssessment handles PATCH /organizations/{org_id}/assessments/{assessment_id}.
+func (h *AssessmentHandler) UpdateAssessment(w http.ResponseWriter, r *http.Request) {
+	_, err := parseFinOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	assessmentID, err := parsePathUUID(r, "assessment_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	var a Assessment
+	if err := api.ReadJSON(r, &a); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	updated, err := h.service.UpdateAssessment(r.Context(), assessmentID, &a)
+	if err != nil {
+		h.logger.Error("UpdateAssessment failed", "assessment_id", assessmentID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, updated)
+}
+
+// DeleteAssessment handles DELETE /organizations/{org_id}/assessments/{assessment_id}.
+func (h *AssessmentHandler) DeleteAssessment(w http.ResponseWriter, r *http.Request) {
+	_, err := parseFinOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	assessmentID, err := parsePathUUID(r, "assessment_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	if err := h.service.DeleteAssessment(r.Context(), assessmentID); err != nil {
+		h.logger.Error("DeleteAssessment failed", "assessment_id", assessmentID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ── Ledger ────────────────────────────────────────────────────────────────────
 
 // GetUnitLedger handles GET /organizations/{org_id}/units/{unit_id}/ledger.

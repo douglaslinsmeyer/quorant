@@ -247,6 +247,26 @@ func (s *FinService) GetAssessment(ctx context.Context, id uuid.UUID) (*Assessme
 	return a, nil
 }
 
+// UpdateAssessment persists changes to an existing assessment and returns the updated row.
+func (s *FinService) UpdateAssessment(ctx context.Context, id uuid.UUID, a *Assessment) (*Assessment, error) {
+	existing, err := s.GetAssessment(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	a.ID = existing.ID
+	a.OrgID = existing.OrgID
+	a.UnitID = existing.UnitID
+	return s.assessments.UpdateAssessment(ctx, a)
+}
+
+// DeleteAssessment soft-deletes an assessment.
+func (s *FinService) DeleteAssessment(ctx context.Context, id uuid.UUID) error {
+	if _, err := s.GetAssessment(ctx, id); err != nil {
+		return err
+	}
+	return s.assessments.SoftDeleteAssessment(ctx, id)
+}
+
 // ── Ledger ────────────────────────────────────────────────────────────────────
 
 // GetUnitLedger returns ledger entries for the given unit, supporting pagination.
@@ -441,6 +461,36 @@ func (s *FinService) ApproveBudget(ctx context.Context, id uuid.UUID, approvedBy
 	return s.budgets.UpdateBudget(ctx, b)
 }
 
+// GetBudgetReport returns a budget with its line items.
+func (s *FinService) GetBudgetReport(ctx context.Context, budgetID uuid.UUID) (*BudgetReport, error) {
+	b, err := s.GetBudget(ctx, budgetID)
+	if err != nil {
+		return nil, err
+	}
+	items, err := s.budgets.ListLineItemsByBudget(ctx, budgetID)
+	if err != nil {
+		return nil, err
+	}
+	return &BudgetReport{Budget: b, LineItems: items}, nil
+}
+
+// UpdateCategory persists changes to an existing budget category.
+func (s *FinService) UpdateCategory(ctx context.Context, id uuid.UUID, c *BudgetCategory) (*BudgetCategory, error) {
+	c.ID = id
+	return s.budgets.UpdateCategory(ctx, c)
+}
+
+// UpdateExpense applies partial updates to an expense and returns the updated row.
+func (s *FinService) UpdateExpense(ctx context.Context, id uuid.UUID, e *Expense) (*Expense, error) {
+	existing, err := s.GetExpense(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	e.ID = existing.ID
+	e.OrgID = existing.OrgID
+	return s.budgets.UpdateExpense(ctx, e)
+}
+
 // CreateLineItem creates a budget line item.
 func (s *FinService) CreateLineItem(ctx context.Context, budgetID uuid.UUID, item *BudgetLineItem) (*BudgetLineItem, error) {
 	item.BudgetID = budgetID
@@ -577,6 +627,17 @@ func (s *FinService) ListFunds(ctx context.Context, orgID uuid.UUID) ([]Fund, er
 	return s.funds.ListFundsByOrg(ctx, orgID)
 }
 
+// UpdateFund persists changes to an existing fund and returns the updated row.
+func (s *FinService) UpdateFund(ctx context.Context, id uuid.UUID, f *Fund) (*Fund, error) {
+	existing, err := s.GetFund(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	f.ID = existing.ID
+	f.OrgID = existing.OrgID
+	return s.funds.UpdateFund(ctx, f)
+}
+
 // GetFundTransactions returns all transactions for the given fund.
 func (s *FinService) GetFundTransactions(ctx context.Context, fundID uuid.UUID) ([]FundTransaction, error) {
 	return s.funds.ListTransactionsByFund(ctx, fundID)
@@ -698,6 +759,12 @@ func (s *FinService) CreatePaymentPlan(ctx context.Context, caseID uuid.UUID, or
 		Status:            "active",
 	}
 	return s.collections.CreatePaymentPlan(ctx, p)
+}
+
+// UpdatePaymentPlan persists changes to an existing payment plan.
+func (s *FinService) UpdatePaymentPlan(ctx context.Context, id uuid.UUID, p *PaymentPlan) (*PaymentPlan, error) {
+	p.ID = id
+	return s.collections.UpdatePaymentPlan(ctx, p)
 }
 
 // ListPaymentPlans returns all payment plans for the given collection case.

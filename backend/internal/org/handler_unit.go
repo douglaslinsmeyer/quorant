@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // UnitHandler handles unit, property, and unit membership HTTP requests.
@@ -277,6 +278,64 @@ func (h *UnitHandler) EndUnitMembership(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ─── Ownership History ────────────────────────────────────────────────────────
+
+// TransferOwnership handles POST /api/v1/organizations/{org_id}/units/{unit_id}/transfer.
+func (h *UnitHandler) TransferOwnership(w http.ResponseWriter, r *http.Request) {
+	orgID, err := parseOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	unitID, err := parseUnitID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	var req TransferOwnershipRequest
+	if err := api.ReadJSON(r, &req); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	recordedBy := middleware.UserIDFromContext(r.Context())
+
+	record, err := h.service.TransferOwnership(r.Context(), orgID, unitID, recordedBy, req)
+	if err != nil {
+		h.logger.Error("TransferOwnership failed", "unit_id", unitID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusCreated, record)
+}
+
+// GetOwnershipHistory handles GET /api/v1/organizations/{org_id}/units/{unit_id}/ownership-history.
+func (h *UnitHandler) GetOwnershipHistory(w http.ResponseWriter, r *http.Request) {
+	_, err := parseOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	unitID, err := parseUnitID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	history, err := h.service.GetOwnershipHistory(r.Context(), unitID)
+	if err != nil {
+		h.logger.Error("GetOwnershipHistory failed", "unit_id", unitID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, history)
 }
 
 // ─── Path value helpers ───────────────────────────────────────────────────────

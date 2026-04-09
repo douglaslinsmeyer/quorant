@@ -87,6 +87,24 @@ type UnitMembership struct {
 	UpdatedAt    time.Time  `json:"updated_at"`
 }
 
+// UnitOwnershipHistory records a property transfer event for a unit.
+type UnitOwnershipHistory struct {
+	ID                     uuid.UUID  `json:"id"`
+	UnitID                 uuid.UUID  `json:"unit_id"`
+	OrgID                  uuid.UUID  `json:"org_id"`
+	FromUserID             *uuid.UUID `json:"from_user_id,omitempty"`
+	ToUserID               uuid.UUID  `json:"to_user_id"`
+	TransferType           string     `json:"transfer_type"`
+	TransferDate           time.Time  `json:"transfer_date"`
+	SalePriceCents         *int64     `json:"sale_price_cents,omitempty"`
+	OutstandingBalanceCents *int64    `json:"outstanding_balance_cents,omitempty"`
+	BalanceSettled         bool       `json:"balance_settled"`
+	RecordingRef           *string    `json:"recording_ref,omitempty"`
+	Notes                  *string    `json:"notes,omitempty"`
+	RecordedBy             uuid.UUID  `json:"recorded_by"`
+	CreatedAt              time.Time  `json:"created_at"`
+}
+
 // Vendor represents an external service provider.
 type Vendor struct {
 	ID              uuid.UUID      `json:"id"`

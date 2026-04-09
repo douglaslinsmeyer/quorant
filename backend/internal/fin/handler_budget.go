@@ -166,6 +166,30 @@ func (h *BudgetHandler) ApproveBudget(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, http.StatusOK, updated)
 }
 
+// GetBudgetReport handles GET /organizations/{org_id}/budgets/{budget_id}/report.
+func (h *BudgetHandler) GetBudgetReport(w http.ResponseWriter, r *http.Request) {
+	_, err := parseFinOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	budgetID, err := parsePathUUID(r, "budget_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	report, err := h.service.GetBudgetReport(r.Context(), budgetID)
+	if err != nil {
+		h.logger.Error("GetBudgetReport failed", "budget_id", budgetID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, report)
+}
+
 // ── Line Items ────────────────────────────────────────────────────────────────
 
 // CreateLineItem handles POST /organizations/{org_id}/budgets/{budget_id}/line-items.
@@ -307,6 +331,36 @@ func (h *BudgetHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, http.StatusOK, categories)
 }
 
+// UpdateCategory handles PATCH /organizations/{org_id}/budget-categories/{category_id}.
+func (h *BudgetHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
+	_, err := parseFinOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	categoryID, err := parsePathUUID(r, "category_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	var c BudgetCategory
+	if err := api.ReadJSON(r, &c); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	updated, err := h.service.UpdateCategory(r.Context(), categoryID, &c)
+	if err != nil {
+		h.logger.Error("UpdateCategory failed", "category_id", categoryID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, updated)
+}
+
 // ── Expenses ──────────────────────────────────────────────────────────────────
 
 // CreateExpense handles POST /organizations/{org_id}/expenses.
@@ -416,6 +470,36 @@ func (h *BudgetHandler) PayExpense(w http.ResponseWriter, r *http.Request) {
 	updated, err := h.service.PayExpense(r.Context(), expenseID)
 	if err != nil {
 		h.logger.Error("PayExpense failed", "expense_id", expenseID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, updated)
+}
+
+// UpdateExpense handles PATCH /organizations/{org_id}/expenses/{expense_id}.
+func (h *BudgetHandler) UpdateExpense(w http.ResponseWriter, r *http.Request) {
+	_, err := parseFinOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	expenseID, err := parsePathUUID(r, "expense_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	var e Expense
+	if err := api.ReadJSON(r, &e); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	updated, err := h.service.UpdateExpense(r.Context(), expenseID, &e)
+	if err != nil {
+		h.logger.Error("UpdateExpense failed", "expense_id", expenseID, "error", err)
 		api.WriteError(w, err)
 		return
 	}

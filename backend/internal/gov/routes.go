@@ -44,6 +44,7 @@ func RegisterRoutes(
 	mux.Handle("PATCH /api/v1/organizations/{org_id}/arb-requests/{request_id}", permMw("gov.arb.review", arbHandler.UpdateARBRequest))
 	mux.Handle("POST /api/v1/organizations/{org_id}/arb-requests/{request_id}/votes", permMw("gov.arb.review", arbHandler.CastARBVote))
 	mux.Handle("POST /api/v1/organizations/{org_id}/arb-requests/{request_id}/request-revision", permMw("gov.arb.review", arbHandler.RequestRevision))
+	mux.Handle("POST /api/v1/organizations/{org_id}/arb-requests/{request_id}/conditions/{condition_id}/verify", permMw("gov.arb.review", arbHandler.VerifyCondition))
 
 	// Ballots (7 routes)
 	mux.Handle("POST /api/v1/organizations/{org_id}/ballots", permMw("gov.ballot.create", ballotHandler.CreateBallot))
