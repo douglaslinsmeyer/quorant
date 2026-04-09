@@ -1,0 +1,335 @@
+package task
+
+import (
+	"log/slog"
+	"net/http"
+
+	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/auth"
+	"github.com/quorant/quorant/internal/platform/middleware"
+)
+
+// TaskHandler handles HTTP requests for the task module.
+type TaskHandler struct {
+	service *TaskService
+	logger  *slog.Logger
+}
+
+// NewTaskHandler constructs a TaskHandler backed by the given service.
+func NewTaskHandler(service *TaskService, logger *slog.Logger) *TaskHandler {
+	return &TaskHandler{service: service, logger: logger}
+}
+
+// ---------------------------------------------------------------------------
+// Cross-org / user-scoped endpoints
+// ---------------------------------------------------------------------------
+
+// ListMyTasks handles GET /api/v1/tasks — returns tasks assigned to the caller.
+func (h *TaskHandler) ListMyTasks(w http.ResponseWriter, r *http.Request) {
+	userID := callerID(r)
+
+	tasks, err := h.service.ListMyTasks(r.Context(), userID)
+	if err != nil {
+		h.logger.Error("ListMyTasks failed", "user_id", userID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, tasks)
+}
+
+// Dashboard handles GET /api/v1/tasks/dashboard — placeholder response.
+func (h *TaskHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
+	api.WriteJSON(w, http.StatusOK, map[string]string{"message": "dashboard coming soon"})
+}
+
+// ---------------------------------------------------------------------------
+// Org-scoped task endpoints
+// ---------------------------------------------------------------------------
+
+// Create handles POST /api/v1/organizations/{org_id}/tasks.
+func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
+	orgID, err := parseTaskPathUUID(r, "org_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	var req CreateTaskRequest
+	if err := api.ReadJSON(r, &req); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	created, err := h.service.CreateTask(r.Context(), orgID, req, callerID(r))
+	if err != nil {
+		h.logger.Error("CreateTask failed", "org_id", orgID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusCreated, created)
+}
+
+// List handles GET /api/v1/organizations/{org_id}/tasks.
+func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
+	orgID, err := parseTaskPathUUID(r, "org_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	tasks, err := h.service.ListTasks(r.Context(), orgID)
+	if err != nil {
+		h.logger.Error("ListTasks failed", "org_id", orgID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, tasks)
+}
+
+// Get handles GET /api/v1/organizations/{org_id}/tasks/{task_id}.
+func (h *TaskHandler) Get(w http.ResponseWriter, r *http.Request) {
+	taskID, err := parseTaskPathUUID(r, "task_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	t, err := h.service.GetTask(r.Context(), taskID)
+	if err != nil {
+		h.logger.Error("GetTask failed", "task_id", taskID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, t)
+}
+
+// Update handles PATCH /api/v1/organizations/{org_id}/tasks/{task_id}.
+func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
+	taskID, err := parseTaskPathUUID(r, "task_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	var t Task
+	if err := api.ReadJSON(r, &t); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	updated, err := h.service.UpdateTask(r.Context(), taskID, &t)
+	if err != nil {
+		h.logger.Error("UpdateTask failed", "task_id", taskID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, updated)
+}
+
+// Assign handles POST /api/v1/organizations/{org_id}/tasks/{task_id}/assign.
+func (h *TaskHandler) Assign(w http.ResponseWriter, r *http.Request) {
+	taskID, err := parseTaskPathUUID(r, "task_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	var req AssignTaskRequest
+	if err := api.ReadJSON(r, &req); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	updated, err := h.service.AssignTask(r.Context(), taskID, req, callerID(r))
+	if err != nil {
+		h.logger.Error("AssignTask failed", "task_id", taskID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, updated)
+}
+
+// Transition handles POST /api/v1/organizations/{org_id}/tasks/{task_id}/transition.
+func (h *TaskHandler) Transition(w http.ResponseWriter, r *http.Request) {
+	taskID, err := parseTaskPathUUID(r, "task_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	var req TransitionTaskRequest
+	if err := api.ReadJSON(r, &req); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	updated, err := h.service.TransitionTask(r.Context(), taskID, req, callerID(r))
+	if err != nil {
+		h.logger.Error("TransitionTask failed", "task_id", taskID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, updated)
+}
+
+// AddComment handles POST /api/v1/organizations/{org_id}/tasks/{task_id}/comments.
+func (h *TaskHandler) AddComment(w http.ResponseWriter, r *http.Request) {
+	taskID, err := parseTaskPathUUID(r, "task_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	var req AddCommentRequest
+	if err := api.ReadJSON(r, &req); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	comment, err := h.service.AddComment(r.Context(), taskID, req, callerID(r))
+	if err != nil {
+		h.logger.Error("AddComment failed", "task_id", taskID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusCreated, comment)
+}
+
+// ToggleChecklist handles PATCH /api/v1/organizations/{org_id}/tasks/{task_id}/checklist/{item_id}.
+func (h *TaskHandler) ToggleChecklist(w http.ResponseWriter, r *http.Request) {
+	taskID, err := parseTaskPathUUID(r, "task_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	itemID := r.PathValue("item_id")
+	if itemID == "" {
+		api.WriteError(w, api.NewValidationError("item_id is required", "item_id"))
+		return
+	}
+
+	updated, err := h.service.ToggleChecklistItem(r.Context(), taskID, itemID)
+	if err != nil {
+		h.logger.Error("ToggleChecklistItem failed", "task_id", taskID, "item_id", itemID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, updated)
+}
+
+// ---------------------------------------------------------------------------
+// Task Type endpoints
+// ---------------------------------------------------------------------------
+
+// ListTypes handles GET /api/v1/organizations/{org_id}/task-types.
+func (h *TaskHandler) ListTypes(w http.ResponseWriter, r *http.Request) {
+	orgID, err := parseTaskPathUUID(r, "org_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	types, err := h.service.ListTaskTypes(r.Context(), orgID)
+	if err != nil {
+		h.logger.Error("ListTaskTypes failed", "org_id", orgID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, types)
+}
+
+// CreateType handles POST /api/v1/organizations/{org_id}/task-types.
+func (h *TaskHandler) CreateType(w http.ResponseWriter, r *http.Request) {
+	orgID, err := parseTaskPathUUID(r, "org_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	var req CreateTaskTypeRequest
+	if err := api.ReadJSON(r, &req); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	tt, err := h.service.CreateTaskType(r.Context(), orgID, req)
+	if err != nil {
+		h.logger.Error("CreateTaskType failed", "org_id", orgID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusCreated, tt)
+}
+
+// UpdateType handles PATCH /api/v1/organizations/{org_id}/task-types/{type_id}.
+func (h *TaskHandler) UpdateType(w http.ResponseWriter, r *http.Request) {
+	typeID, err := parseTaskPathUUID(r, "type_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	var tt TaskType
+	if err := api.ReadJSON(r, &tt); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	updated, err := h.service.UpdateTaskType(r.Context(), typeID, &tt)
+	if err != nil {
+		h.logger.Error("UpdateTaskType failed", "type_id", typeID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, updated)
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// parseTaskPathUUID extracts and parses a UUID path value by the given key.
+func parseTaskPathUUID(r *http.Request, key string) (uuid.UUID, error) {
+	raw := r.PathValue(key)
+	if raw == "" {
+		return uuid.Nil, api.NewValidationError(key+" is required", key)
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return uuid.Nil, api.NewValidationError(key+" must be a valid UUID", key)
+	}
+	return id, nil
+}
+
+// callerID extracts the user UUID from JWT claims in context, returning uuid.Nil if absent.
+// TODO: once IAM user lookup is wired, resolve idp_user_id -> users.id here.
+func callerID(r *http.Request) uuid.UUID {
+	claims, ok := auth.ClaimsFromContext(r.Context())
+	if !ok || claims == nil {
+		return uuid.Nil
+	}
+	id, err := uuid.Parse(claims.Subject)
+	if err != nil {
+		return uuid.Nil
+	}
+	return id
+}
+
+// orgIDFromContext reads the org UUID stored by TenantContext middleware.
+func orgIDFromContext(r *http.Request) uuid.UUID {
+	return middleware.OrgIDFromContext(r.Context())
+}

@@ -20,6 +20,7 @@ import (
 	"github.com/quorant/quorant/internal/gov"
 	"github.com/quorant/quorant/internal/iam"
 	"github.com/quorant/quorant/internal/org"
+	"github.com/quorant/quorant/internal/task"
 	"github.com/quorant/quorant/internal/platform/auth"
 	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/quorant/quorant/internal/platform/config"
@@ -163,6 +164,12 @@ func run() error {
 	notificationHandler := com.NewNotificationHandler(comService, logger)
 	commLogHandler := com.NewCommLogHandler(comService, logger)
 	com.RegisterRoutes(mux, announcementHandler, threadHandler, calendarHandler, notificationHandler, commLogHandler, tokenValidator)
+
+	// Task module
+	taskRepo := task.NewPostgresTaskRepository(pool)
+	taskService := task.NewTaskService(taskRepo, logger)
+	taskHandler := task.NewTaskHandler(taskService, logger)
+	task.RegisterRoutes(mux, taskHandler, tokenValidator)
 
 	// Doc module
 	s3Client, err := storage.NewS3Client(cfg.S3)
