@@ -11,12 +11,12 @@ import (
 
 // WebhookHandler handles HTTP requests for the webhook module.
 type WebhookHandler struct {
-	service *WebhookService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewWebhookHandler constructs a WebhookHandler backed by the given service and logger.
-func NewWebhookHandler(service *WebhookService, logger *slog.Logger) *WebhookHandler {
+func NewWebhookHandler(service Service, logger *slog.Logger) *WebhookHandler {
 	return &WebhookHandler{service: service, logger: logger}
 }
 

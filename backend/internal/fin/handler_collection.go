@@ -11,12 +11,12 @@ import (
 // CollectionHandler handles HTTP requests for collection cases, actions,
 // and payment plans.
 type CollectionHandler struct {
-	service *FinService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewCollectionHandler constructs a CollectionHandler backed by the given service.
-func NewCollectionHandler(service *FinService, logger *slog.Logger) *CollectionHandler {
+func NewCollectionHandler(service Service, logger *slog.Logger) *CollectionHandler {
 	return &CollectionHandler{service: service, logger: logger}
 }
 

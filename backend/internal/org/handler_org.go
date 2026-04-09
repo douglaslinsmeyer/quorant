@@ -10,12 +10,12 @@ import (
 
 // OrgHandler handles organization HTTP requests.
 type OrgHandler struct {
-	service *OrgService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewOrgHandler constructs an OrgHandler backed by the given service.
-func NewOrgHandler(service *OrgService, logger *slog.Logger) *OrgHandler {
+func NewOrgHandler(service Service, logger *slog.Logger) *OrgHandler {
 	return &OrgHandler{service: service, logger: logger}
 }
 

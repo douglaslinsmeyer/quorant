@@ -10,12 +10,12 @@ import (
 
 // PaymentHandler handles HTTP requests for payments and payment methods.
 type PaymentHandler struct {
-	service *FinService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewPaymentHandler constructs a PaymentHandler backed by the given service.
-func NewPaymentHandler(service *FinService, logger *slog.Logger) *PaymentHandler {
+func NewPaymentHandler(service Service, logger *slog.Logger) *PaymentHandler {
 	return &PaymentHandler{service: service, logger: logger}
 }
 

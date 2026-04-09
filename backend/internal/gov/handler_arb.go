@@ -11,12 +11,12 @@ import (
 
 // ARBHandler handles HTTP requests for the ARB (Architectural Review Board) sub-domain.
 type ARBHandler struct {
-	service *GovService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewARBHandler constructs an ARBHandler backed by the given service.
-func NewARBHandler(service *GovService, logger *slog.Logger) *ARBHandler {
+func NewARBHandler(service Service, logger *slog.Logger) *ARBHandler {
 	return &ARBHandler{service: service, logger: logger}
 }
 

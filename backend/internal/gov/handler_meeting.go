@@ -10,12 +10,12 @@ import (
 
 // MeetingHandler handles HTTP requests for the meetings sub-domain.
 type MeetingHandler struct {
-	service *GovService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewMeetingHandler constructs a MeetingHandler backed by the given service.
-func NewMeetingHandler(service *GovService, logger *slog.Logger) *MeetingHandler {
+func NewMeetingHandler(service Service, logger *slog.Logger) *MeetingHandler {
 	return &MeetingHandler{service: service, logger: logger}
 }
 

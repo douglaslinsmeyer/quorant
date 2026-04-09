@@ -11,12 +11,12 @@ import (
 
 // AmenityHandler handles amenity and reservation HTTP requests.
 type AmenityHandler struct {
-	service *OrgService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewAmenityHandler constructs an AmenityHandler backed by the given service.
-func NewAmenityHandler(service *OrgService, logger *slog.Logger) *AmenityHandler {
+func NewAmenityHandler(service Service, logger *slog.Logger) *AmenityHandler {
 	return &AmenityHandler{service: service, logger: logger}
 }
 

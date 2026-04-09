@@ -11,12 +11,12 @@ import (
 
 // RegistrationHandler handles unit registration type and registration HTTP requests.
 type RegistrationHandler struct {
-	service *OrgService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewRegistrationHandler constructs a RegistrationHandler backed by the given service.
-func NewRegistrationHandler(service *OrgService, logger *slog.Logger) *RegistrationHandler {
+func NewRegistrationHandler(service Service, logger *slog.Logger) *RegistrationHandler {
 	return &RegistrationHandler{service: service, logger: logger}
 }
 

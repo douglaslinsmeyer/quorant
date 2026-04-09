@@ -11,12 +11,12 @@ import (
 // BudgetHandler handles HTTP requests for budgets, line items, categories,
 // and expenses.
 type BudgetHandler struct {
-	service *FinService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewBudgetHandler constructs a BudgetHandler backed by the given service.
-func NewBudgetHandler(service *FinService, logger *slog.Logger) *BudgetHandler {
+func NewBudgetHandler(service Service, logger *slog.Logger) *BudgetHandler {
 	return &BudgetHandler{service: service, logger: logger}
 }
 

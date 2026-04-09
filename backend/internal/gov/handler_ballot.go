@@ -10,12 +10,12 @@ import (
 
 // BallotHandler handles HTTP requests for the ballots sub-domain.
 type BallotHandler struct {
-	service *GovService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewBallotHandler constructs a BallotHandler backed by the given service.
-func NewBallotHandler(service *GovService, logger *slog.Logger) *BallotHandler {
+func NewBallotHandler(service Service, logger *slog.Logger) *BallotHandler {
 	return &BallotHandler{service: service, logger: logger}
 }
 

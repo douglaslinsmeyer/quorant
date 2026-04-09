@@ -10,12 +10,12 @@ import (
 
 // CalendarHandler handles calendar event HTTP requests.
 type CalendarHandler struct {
-	service *ComService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewCalendarHandler constructs a CalendarHandler backed by the given service.
-func NewCalendarHandler(service *ComService, logger *slog.Logger) *CalendarHandler {
+func NewCalendarHandler(service Service, logger *slog.Logger) *CalendarHandler {
 	return &CalendarHandler{service: service, logger: logger}
 }
 
