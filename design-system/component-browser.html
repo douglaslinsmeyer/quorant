@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quorant Design System</title>
+
+  <link rel="stylesheet" href="tokens/colors.css" />
+  <link rel="stylesheet" href="tokens/typography.css" />
+  <link rel="stylesheet" href="tokens/spacing.css" />
+  <link rel="stylesheet" href="tokens/elevation.css" />
+  <link rel="stylesheet" href="tokens/motion.css" />
+
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--surface-page);
+      color: var(--color-neutral-900);
+      font-family: var(--font-body);
+    }
+
+    /* ── Layout Shell ───────────────────────────────────────────── */
+    .shell {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* ── Sidebar ────────────────────────────────────────────────── */
+    .sidebar {
+      width: 240px;
+      flex-shrink: 0;
+      background: var(--surface-sidebar);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* Brand header */
+    .sidebar__brand {
+      padding: var(--space-6) var(--space-5) var(--space-5);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .sidebar__brand-name {
+      font-family: var(--font-heading);
+      font-size: var(--type-h3-size);
+      font-weight: var(--type-h3-weight);
+      line-height: var(--type-h3-line-height);
+      color: #ffffff;
+      letter-spacing: -0.01em;
+    }
+
+    .sidebar__brand-caption {
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: var(--type-caption-weight);
+      color: rgba(255, 255, 255, 0.55);
+      margin-top: var(--space-1);
+    }
+
+    /* Dark mode toggle */
+    .sidebar__toggle {
+      padding: var(--space-4) var(--space-5);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .toggle-label {
+      font-size: var(--type-caption-size);
+      font-weight: 500;
+      color: rgba(255,255,255,0.6);
+      user-select: none;
+      min-width: 36px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .toggle-switch input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-track {
+      width: 40px;
+      height: 22px;
+      background: rgba(255,255,255,0.15);
+      border-radius: var(--radius-full);
+      transition: background var(--duration-normal) var(--ease-smooth);
+      position: relative;
+    }
+
+    .toggle-switch input:checked ~ .toggle-track {
+      background: var(--color-primary-400);
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      left: 3px;
+      top: 3px;
+      width: 16px;
+      height: 16px;
+      background: #ffffff;
+      border-radius: var(--radius-full);
+      transition: transform var(--duration-normal) var(--ease-spring);
+    }
+
+    .toggle-switch input:checked ~ .toggle-track::after {
+      transform: translateX(18px);
+    }
+
+    .toggle-icon {
+      font-size: 14px;
+      color: rgba(255,255,255,0.55);
+    }
+
+    /* Navigation */
+    .sidebar__nav {
+      flex: 1;
+      padding: var(--space-4) 0;
+    }
+
+    .nav-section {
+      margin-bottom: var(--space-2);
+    }
+
+    .nav-section__label {
+      font-family: var(--font-body);
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: rgba(255,255,255,0.35);
+      padding: var(--space-3) var(--space-5) var(--space-2);
+    }
+
+    .nav-link {
+      display: block;
+      padding: var(--space-2) var(--space-5);
+      font-size: var(--type-body-sm-size);
+      font-weight: 500;
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      cursor: pointer;
+      border-radius: 0;
+      transition:
+        background var(--duration-fast) var(--ease-smooth),
+        color var(--duration-fast) var(--ease-smooth);
+      border-left: 2px solid transparent;
+    }
+
+    .nav-link:hover {
+      background: rgba(255,255,255,0.07);
+      color: rgba(255,255,255,0.95);
+    }
+
+    .nav-link.active {
+      background: rgba(255,255,255,0.1);
+      color: #ffffff;
+      border-left-color: var(--color-primary-300);
+      font-weight: 600;
+    }
+
+    /* ── Main area ──────────────────────────────────────────────── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--surface-page);
+    }
+
+    /* Toolbar */
+    .toolbar {
+      height: 44px;
+      background: var(--surface-card);
+      border-bottom: 1px solid var(--color-neutral-200);
+      display: flex;
+      align-items: center;
+      padding: 0 var(--space-6);
+      gap: var(--space-3);
+      flex-shrink: 0;
+      box-shadow: var(--shadow-xs);
+    }
+
+    .toolbar__label {
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: var(--color-neutral-500);
+    }
+
+    .toolbar__page {
+      font-size: var(--type-body-sm-size);
+      font-weight: 600;
+      color: var(--color-neutral-800);
+    }
+
+    /* iframe */
+    .frame-container {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #preview-frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+      background: var(--surface-page);
+    }
+
+    /* Dark mode adjustments for main area */
+    [data-theme="dark"] .main {
+      background: var(--surface-page);
+    }
+
+    [data-theme="dark"] .toolbar {
+      background: var(--surface-card);
+      border-bottom-color: var(--color-neutral-200);
+    }
+
+    [data-theme="dark"] .toolbar__page {
+      color: var(--color-neutral-800);
+    }
+
+    [data-theme="dark"] #preview-frame {
+      background: var(--surface-page);
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <!-- ── Sidebar ─────────────────────────────────────────────── -->
+    <aside class="sidebar">
+      <div class="sidebar__brand">
+        <div class="sidebar__brand-name">Quorant</div>
+        <div class="sidebar__brand-caption">Design System v1.0</div>
+      </div>
+
+      <div class="sidebar__toggle">
+        <span class="toggle-icon" aria-hidden="true">☀</span>
+        <label class="toggle-switch" title="Toggle dark mode">
+          <input type="checkbox" id="dark-mode-checkbox" onchange="handleDarkModeToggle(this.checked)" />
+          <span class="toggle-track"></span>
+        </label>
+        <span class="toggle-icon" aria-hidden="true">🌙</span>
+        <span class="toggle-label" id="theme-label">Light</span>
+      </div>
+
+      <nav class="sidebar__nav" aria-label="Design system navigation">
+        <div class="nav-section">
+          <div class="nav-section__label">Overview</div>
+          <a class="nav-link active" onclick="loadPage('guide.html', 'Design Guide', this)" tabindex="0">Design Guide</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section__label">Components</div>
+          <a class="nav-link" onclick="loadPage('components/buttons.html', 'Buttons', this)" tabindex="0">Buttons</a>
+          <a class="nav-link" onclick="loadPage('components/cards.html', 'Cards', this)" tabindex="0">Cards</a>
+          <a class="nav-link" onclick="loadPage('components/forms.html', 'Forms', this)" tabindex="0">Forms</a>
+          <a class="nav-link" onclick="loadPage('components/badges.html', 'Badges', this)" tabindex="0">Badges</a>
+          <a class="nav-link" onclick="loadPage('components/alerts.html', 'Alerts', this)" tabindex="0">Alerts</a>
+          <a class="nav-link" onclick="loadPage('components/tables.html', 'Tables', this)" tabindex="0">Tables</a>
+          <a class="nav-link" onclick="loadPage('components/navigation.html', 'Navigation', this)" tabindex="0">Navigation</a>
+          <a class="nav-link" onclick="loadPage('components/modals.html', 'Modals', this)" tabindex="0">Modals</a>
+          <a class="nav-link" onclick="loadPage('components/feed-pulse.html', 'Feed / Pulse', this)" tabindex="0">Feed / Pulse</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section__label">Patterns</div>
+          <a class="nav-link" onclick="loadPage('patterns/conversational-ui.html', 'Conversational UI', this)" tabindex="0">Conversational UI</a>
+          <a class="nav-link" onclick="loadPage('patterns/motion-specs.html', 'Motion Specs', this)" tabindex="0">Motion Specs</a>
+          <a class="nav-link" onclick="loadPage('patterns/management-layouts.html', 'Management Layouts', this)" tabindex="0">Management Layouts</a>
+          <a class="nav-link" onclick="loadPage('patterns/member-layouts.html', 'Member Layouts', this)" tabindex="0">Member Layouts</a>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- ── Main Area ───────────────────────────────────────────── -->
+    <main class="main">
+      <div class="toolbar">
+        <span class="toolbar__label">Viewing:</span>
+        <span class="toolbar__page" id="toolbar-page">Design Guide</span>
+      </div>
+      <div class="frame-container">
+        <iframe
+          id="preview-frame"
+          src="guide.html"
+          title="Component preview"
+          onload="onFrameLoad(this)"
+        ></iframe>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let isDark = false;
+
+    /**
+     * Load a page into the preview iframe and update nav + toolbar state.
+     * @param {string} src - Relative URL of the page to load
+     * @param {string} label - Human-readable page name for the toolbar
+     * @param {HTMLElement} linkEl - The nav-link element that was clicked
+     */
+    function loadPage(src, label, linkEl) {
+      // Update toolbar
+      document.getElementById('toolbar-page').textContent = label;
+
+      // Update active nav state
+      document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+      if (linkEl) linkEl.classList.add('active');
+
+      // Load the page in the iframe
+      const frame = document.getElementById('preview-frame');
+      frame.src = src;
+    }
+
+    /**
+     * Called when the iframe finishes loading a new page.
+     * Applies current dark mode state to the newly loaded document.
+     * @param {HTMLIFrameElement} frame
+     */
+    function onFrameLoad(frame) {
+      applyDarkModeToFrame(frame, isDark);
+    }
+
+    /**
+     * Apply or remove dark mode on the iframe's <html> element.
+     * @param {HTMLIFrameElement} frame
+     * @param {boolean} dark
+     */
+    function applyDarkModeToFrame(frame, dark) {
+      try {
+        const doc = frame.contentDocument || frame.contentWindow.document;
+        if (doc && doc.documentElement) {
+          if (dark) {
+            doc.documentElement.setAttribute('data-theme', 'dark');
+          } else {
+            doc.documentElement.removeAttribute('data-theme');
+          }
+        }
+      } catch (e) {
+        // Cross-origin — silently ignore
+      }
+    }
+
+    /**
+     * Toggle dark mode on the shell <html> and the iframe content.
+     * @param {boolean} checked - Whether the toggle is in "dark" position
+     */
+    function handleDarkModeToggle(checked) {
+      isDark = checked;
+
+      // Apply to shell
+      if (isDark) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+
+      // Apply to label
+      document.getElementById('theme-label').textContent = isDark ? 'Dark' : 'Light';
+
+      // Apply to iframe
+      const frame = document.getElementById('preview-frame');
+      applyDarkModeToFrame(frame, isDark);
+    }
+
+    // Support keyboard activation for nav links (Enter/Space)
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          link.click();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
