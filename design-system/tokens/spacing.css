@@ -1,0 +1,70 @@
+/**
+ * Quorant Design System — Spacing Tokens
+ *
+ * Provides the spacing scale (8px base grid), border radii, responsive
+ * breakpoints, and layout-specific dimension tokens for the Quorant
+ * HOA management platform.
+ *
+ * Sections:
+ *   - Spacing scale     --space-{n}: 4px steps on an 8px grid
+ *   - Border radius     --radius-{sm|md|lg|full}
+ *   - Breakpoints       --bp-{sm|md|lg|xl|2xl}
+ *   - Layout dimensions --container-max-width, --sidebar-width, etc.
+ */
+
+:root {
+  /* ============================================================
+     Spacing Scale (8px base grid, with a 4px half-step at --space-1)
+     ============================================================ */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* ============================================================
+     Border Radius
+     ============================================================ */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-full: 9999px;
+
+  /* ============================================================
+     Breakpoints
+     (Use in @media queries as: @media (min-width: var(--bp-md)) — note:
+      CSS custom properties cannot be used directly in media query conditions;
+      these are provided as reference tokens and for JS/tooling consumption.)
+     ============================================================ */
+  --bp-sm:  640px;
+  --bp-md:  768px;
+  --bp-lg:  1024px;
+  --bp-xl:  1280px;
+  --bp-2xl: 1536px;
+
+  /* ============================================================
+     Layout Dimensions
+     ============================================================ */
+  --container-max-width: 1280px;
+  --sidebar-width:       230px;
+  --member-max-width:    428px;
+
+  /* Grid */
+  --grid-gap: var(--space-4);   /* 16px */
+
+  /* Navigation */
+  --bottombar-height: 56px;
+
+  /* Form controls */
+  --input-height: 44px;
+
+  /* Touch / accessibility */
+  --touch-target-min: 44px;
+  --tap-spacing-min:  8px;
+}
