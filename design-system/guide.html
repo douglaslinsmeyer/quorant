@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quorant Design System — Guide</title>
+
+  <link rel="stylesheet" href="tokens/colors.css" />
+  <link rel="stylesheet" href="tokens/typography.css" />
+  <link rel="stylesheet" href="tokens/spacing.css" />
+  <link rel="stylesheet" href="tokens/elevation.css" />
+  <link rel="stylesheet" href="tokens/motion.css" />
+
+  <style>
+    /* ── Reset & Base ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: var(--type-body-size);
+      font-weight: var(--type-body-weight);
+      line-height: var(--type-body-line-height);
+      color: var(--color-neutral-900);
+      background: var(--surface-page);
+      padding: var(--space-8);
+      max-width: 960px;
+      margin: 0 auto;
+      animation: page-enter var(--duration-slow) var(--ease-out) both;
+    }
+
+    /* ── Dark Mode Toggle (standalone) ────────────────────────── */
+    .guide-theme-btn {
+      position: fixed;
+      top: var(--space-4);
+      right: var(--space-4);
+      background: var(--surface-card);
+      border: 1px solid var(--color-neutral-200);
+      color: var(--color-neutral-700);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition:
+        background var(--duration-normal) var(--ease-smooth),
+        color var(--duration-normal) var(--ease-smooth),
+        box-shadow var(--duration-normal) var(--ease-smooth);
+      z-index: 100;
+    }
+
+    .guide-theme-btn:hover {
+      box-shadow: var(--shadow-md);
+      background: var(--surface-elevated);
+    }
+
+    /* ── Section Card ──────────────────────────────────────────── */
+    .guide-section {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-8);
+      margin-bottom: var(--space-8);
+    }
+
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h2-size);
+      font-weight: var(--type-h2-weight);
+      line-height: var(--type-h2-line-height);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-2);
+    }
+
+    .section-description {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-600);
+      margin-bottom: var(--space-6);
+    }
+
+    .subsection-title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h4-size);
+      font-weight: var(--type-h4-weight);
+      color: var(--color-neutral-800);
+      margin-bottom: var(--space-3);
+      margin-top: var(--space-6);
+    }
+
+    .subsection-title:first-of-type {
+      margin-top: 0;
+    }
+
+    /* ── Header / Hero ─────────────────────────────────────────── */
+    .guide-header {
+      background: var(--surface-header);
+      border-radius: var(--radius-lg);
+      padding: var(--space-12) var(--space-8);
+      margin-bottom: var(--space-8);
+      color: #ffffff;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .guide-header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 80% 50%, rgba(61,172,201,0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .guide-header__overline {
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: rgba(255,255,255,0.55);
+      margin-bottom: var(--space-3);
+    }
+
+    .guide-header__title {
+      font-family: var(--font-heading);
+      font-size: var(--type-display-size);
+      font-weight: var(--type-display-weight);
+      line-height: var(--type-display-line-height);
+      color: #ffffff;
+      margin-bottom: var(--space-4);
+    }
+
+    .guide-header__tagline {
+      font-size: var(--type-body-lg-size);
+      font-weight: 400;
+      line-height: var(--type-body-lg-line-height);
+      color: rgba(255,255,255,0.75);
+      margin-bottom: var(--space-6);
+      font-style: italic;
+    }
+
+    .guide-header__meta {
+      display: flex;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+    }
+
+    .guide-header__badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: var(--radius-full);
+      padding: var(--space-1) var(--space-3);
+      font-size: var(--type-caption-size);
+      font-weight: 500;
+      color: rgba(255,255,255,0.85);
+    }
+
+    /* ── Color Swatches ────────────────────────────────────────── */
+    .swatch-row {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+      margin-bottom: var(--space-4);
+    }
+
+    .swatch {
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      flex: 1;
+      min-width: 72px;
+      box-shadow: var(--shadow-xs);
+    }
+
+    .swatch__color {
+      height: 56px;
+    }
+
+    .swatch__info {
+      padding: var(--space-2) var(--space-2);
+      background: var(--surface-elevated);
+    }
+
+    .swatch__name {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--color-neutral-700);
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .swatch__hex {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--color-neutral-500);
+      display: block;
+    }
+
+    /* Semantic swatches (2-per-row pairs) */
+    .semantic-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .semantic-pair {
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: var(--shadow-xs);
+    }
+
+    .semantic-pair__strong {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      padding: 0 var(--space-3);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .semantic-pair__light {
+      height: 36px;
+      display: flex;
+      align-items: center;
+      padding: 0 var(--space-3);
+      font-size: var(--type-caption-size);
+      font-weight: 500;
+    }
+
+    /* Surface tokens */
+    .surface-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: var(--space-3);
+    }
+
+    .surface-swatch {
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-neutral-200);
+      overflow: hidden;
+      box-shadow: var(--shadow-xs);
+    }
+
+    .surface-swatch__preview {
+      height: 48px;
+    }
+
+    .surface-swatch__label {
+      padding: var(--space-2);
+      background: var(--surface-elevated);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--color-neutral-700);
+      font-family: var(--font-mono);
+    }
+
+    /* ── Typography Specimens ──────────────────────────────────── */
+    .type-specimen {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-6);
+      padding: var(--space-4) 0;
+      border-bottom: 1px solid var(--color-neutral-100);
+    }
+
+    .type-specimen:last-child {
+      border-bottom: none;
+    }
+
+    .type-specimen__meta {
+      min-width: 140px;
+      flex-shrink: 0;
+    }
+
+    .type-specimen__level {
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: var(--color-primary-500);
+      margin-bottom: var(--space-1);
+    }
+
+    .type-specimen__specs {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--color-neutral-500);
+      line-height: 1.6;
+    }
+
+    .type-specimen__text {
+      flex: 1;
+      color: var(--color-neutral-900);
+    }
+
+    /* ── Spacing Bars ──────────────────────────────────────────── */
+    .spacing-grid {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .spacing-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    .spacing-row__label {
+      font-family: var(--font-mono);
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-600);
+      min-width: 80px;
+      flex-shrink: 0;
+    }
+
+    .spacing-row__bar {
+      background: var(--color-primary-200);
+      height: 20px;
+      border-radius: var(--radius-sm);
+      transition: background var(--duration-normal) var(--ease-smooth);
+    }
+
+    .spacing-row__value {
+      font-family: var(--font-mono);
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-500);
+      margin-left: var(--space-2);
+    }
+
+    /* Border radius examples */
+    .radius-grid {
+      display: flex;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+      margin-top: var(--space-4);
+    }
+
+    .radius-box {
+      width: 72px;
+      height: 72px;
+      background: var(--color-primary-100);
+      border: 2px solid var(--color-primary-300);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .radius-box__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--color-primary-600);
+      font-weight: 600;
+      text-align: center;
+    }
+
+    /* ── Elevation Cards ───────────────────────────────────────── */
+    .elevation-grid {
+      display: flex;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .elevation-card {
+      background: var(--surface-card);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      min-width: 100px;
+      text-align: center;
+      border: 1px solid var(--color-neutral-100);
+    }
+
+    .elevation-card__token {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--color-primary-500);
+      font-weight: 600;
+      margin-bottom: var(--space-2);
+    }
+
+    .elevation-card__usage {
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-500);
+    }
+
+    /* ── Motion Section ────────────────────────────────────────── */
+    .easing-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      margin-bottom: var(--space-6);
+    }
+
+    .easing-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-3);
+      background: var(--surface-page);
+      border-radius: var(--radius-md);
+    }
+
+    .easing-row__name {
+      font-family: var(--font-mono);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      color: var(--color-primary-500);
+      min-width: 120px;
+    }
+
+    .easing-row__value {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--color-neutral-500);
+    }
+
+    .duration-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      margin-bottom: var(--space-6);
+    }
+
+    .duration-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    .duration-row__label {
+      font-family: var(--font-mono);
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-600);
+      min-width: 130px;
+      flex-shrink: 0;
+    }
+
+    .duration-row__bar {
+      background: var(--color-secondary-300);
+      height: 16px;
+      border-radius: var(--radius-sm);
+    }
+
+    .duration-row__value {
+      font-family: var(--font-mono);
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-500);
+      margin-left: var(--space-2);
+    }
+
+    /* Motion demo cards */
+    .motion-demo {
+      display: flex;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+      margin-top: var(--space-4);
+    }
+
+    .motion-card {
+      background: var(--color-primary-50);
+      border: 1px solid var(--color-primary-200);
+      border-radius: var(--radius-md);
+      padding: var(--space-4) var(--space-5);
+      font-size: var(--type-body-sm-size);
+      font-weight: 600;
+      color: var(--color-primary-700);
+      opacity: 0;
+    }
+
+    .motion-card.playing {
+      animation: stagger-up var(--duration-slow) var(--ease-out) forwards;
+    }
+
+    .play-btn {
+      background: var(--color-primary-500);
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-md);
+      padding: var(--space-3) var(--space-6);
+      font-family: var(--font-body);
+      font-size: var(--type-body-sm-size);
+      font-weight: 600;
+      cursor: pointer;
+      transition:
+        background var(--duration-normal) var(--ease-smooth),
+        box-shadow var(--duration-normal) var(--ease-smooth),
+        transform var(--duration-fast) var(--ease-spring);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .play-btn:hover {
+      background: var(--color-primary-600);
+      box-shadow: var(--shadow-md);
+    }
+
+    .play-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* ── Divider ───────────────────────────────────────────────── */
+    .guide-divider {
+      height: 1px;
+      background: var(--color-neutral-100);
+      margin: var(--space-6) 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Standalone dark mode toggle ──────────────────────────── -->
+  <button class="guide-theme-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">
+    ☀ Light
+  </button>
+
+  <!-- ════════════════════════════════════════════════════════════
+       HEADER
+       ════════════════════════════════════════════════════════════ -->
+  <header class="guide-header">
+    <div class="guide-header__overline">Quorant HOA Platform</div>
+    <h1 class="guide-header__title">Design System</h1>
+    <p class="guide-header__tagline">"Identity lives in behavior, not decoration."</p>
+    <div class="guide-header__meta">
+      <span class="guide-header__badge">v1.0</span>
+      <span class="guide-header__badge">Manrope + Inter</span>
+      <span class="guide-header__badge">5 Token Files</span>
+      <span class="guide-header__badge">Design Guide</span>
+    </div>
+  </header>
+
+  <!-- ════════════════════════════════════════════════════════════
+       COLORS
+       ════════════════════════════════════════════════════════════ -->
+  <section class="guide-section" id="colors">
+    <h2 class="section-title">Color Palette</h2>
+    <p class="section-description">
+      Quorant's palette is grounded in trust and clarity. Teal primary conveys
+      professionalism and community; amber secondary signals action and warmth.
+      Warm neutral grays unify the interface across light and dark contexts.
+    </p>
+
+    <!-- Primary: Teal -->
+    <h3 class="subsection-title">Primary — Teal</h3>
+    <div class="swatch-row">
+      <div class="swatch">
+        <div class="swatch__color" style="background:#072D3B;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">primary-900</span>
+          <span class="swatch__hex">#072D3B</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#0A3D4F;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">primary-800</span>
+          <span class="swatch__hex">#0A3D4F</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#0E4F65;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">primary-700</span>
+          <span class="swatch__hex">#0E4F65</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#13647E;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">primary-600</span>
+          <span class="swatch__hex">#13647E</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#1A7A9A;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">primary-500</span>
+          <span class="swatch__hex">#1A7A9A</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#2196B8;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">primary-400</span>
+          <span class="swatch__hex">#2196B8</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#3DACC9;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">primary-300</span>
+          <span class="swatch__hex">#3DACC9</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#5BBDD6;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">primary-200</span>
+          <span class="swatch__hex">#5BBDD6</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#A3DAE8;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">primary-100</span>
+          <span class="swatch__hex">#A3DAE8</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#EBF7FB;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">primary-50</span>
+          <span class="swatch__hex">#EBF7FB</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Secondary: Amber -->
+    <h3 class="subsection-title">Secondary — Amber</h3>
+    <div class="swatch-row">
+      <div class="swatch">
+        <div class="swatch__color" style="background:#B8860B;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">secondary-600</span>
+          <span class="swatch__hex">#B8860B</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#C99A1A;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">secondary-500</span>
+          <span class="swatch__hex">#C99A1A</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#D4A828;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">secondary-400</span>
+          <span class="swatch__hex">#D4A828</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#E0BC4A;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">secondary-300</span>
+          <span class="swatch__hex">#E0BC4A</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#EDD080;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">secondary-200</span>
+          <span class="swatch__hex">#EDD080</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#F5E4B3;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">secondary-100</span>
+          <span class="swatch__hex">#F5E4B3</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Neutral -->
+    <h3 class="subsection-title">Neutral — Warm Gray</h3>
+    <div class="swatch-row">
+      <div class="swatch">
+        <div class="swatch__color" style="background:#1A1A1A;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">neutral-950</span>
+          <span class="swatch__hex">#1A1A1A</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#2A2A2A;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">neutral-900</span>
+          <span class="swatch__hex">#2A2A2A</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#3D3D3D;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">neutral-800</span>
+          <span class="swatch__hex">#3D3D3D</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#525252;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">neutral-700</span>
+          <span class="swatch__hex">#525252</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#6B6B6B;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">neutral-600</span>
+          <span class="swatch__hex">#6B6B6B</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#858585;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">neutral-500</span>
+          <span class="swatch__hex">#858585</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#A3A3A3;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">neutral-400</span>
+          <span class="swatch__hex">#A3A3A3</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#C2C2C2;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">neutral-300</span>
+          <span class="swatch__hex">#C2C2C2</span>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch__color" style="background:#DEDEDE;"></div>
+        <div class="swatch__info">
+          <span class="swatch__name">neutral-200</span>
+          <span class="swatch__hex">#DEDEDE</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Semantic -->
+    <h3 class="subsection-title">Semantic</h3>
+    <div class="semantic-grid">
+      <div class="semantic-pair">
+        <div class="semantic-pair__strong" style="background:var(--color-success-600);">
+          success-600 — #1E8A4A
+        </div>
+        <div class="semantic-pair__light" style="background:var(--color-success-100);color:var(--color-success-600);">
+          success-100 — #D4F0E1
+        </div>
+      </div>
+      <div class="semantic-pair">
+        <div class="semantic-pair__strong" style="background:var(--color-error-600);">
+          error-600 — #C0392B
+        </div>
+        <div class="semantic-pair__light" style="background:var(--color-error-100);color:var(--color-error-600);">
+          error-100 — #FAD7D4
+        </div>
+      </div>
+      <div class="semantic-pair">
+        <div class="semantic-pair__strong" style="background:var(--color-warning-600);color:#1A1A1A;">
+          warning-600 — #C99A1A
+        </div>
+        <div class="semantic-pair__light" style="background:var(--color-warning-100);color:#7A5500;">
+          warning-100 — #FDF3CC
+        </div>
+      </div>
+      <div class="semantic-pair">
+        <div class="semantic-pair__strong" style="background:var(--color-info-600);">
+          info-600 — #13647E
+        </div>
+        <div class="semantic-pair__light" style="background:var(--color-info-100);color:var(--color-info-600);">
+          info-100 — #D4EEF5
+        </div>
+      </div>
+    </div>
+
+    <!-- Surfaces -->
+    <h3 class="subsection-title">Surface Tokens</h3>
+    <div class="surface-grid">
+      <div class="surface-swatch">
+        <div class="surface-swatch__preview" style="background:var(--surface-page);"></div>
+        <div class="surface-swatch__label">--surface-page</div>
+      </div>
+      <div class="surface-swatch">
+        <div class="surface-swatch__preview" style="background:var(--surface-card);"></div>
+        <div class="surface-swatch__label">--surface-card</div>
+      </div>
+      <div class="surface-swatch">
+        <div class="surface-swatch__preview" style="background:var(--surface-elevated);"></div>
+        <div class="surface-swatch__label">--surface-elevated</div>
+      </div>
+      <div class="surface-swatch">
+        <div class="surface-swatch__preview" style="background:var(--surface-sidebar);"></div>
+        <div class="surface-swatch__label">--surface-sidebar</div>
+      </div>
+      <div class="surface-swatch">
+        <div class="surface-swatch__preview" style="background:var(--surface-header);"></div>
+        <div class="surface-swatch__label">--surface-header</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════
+       TYPOGRAPHY
+       ════════════════════════════════════════════════════════════ -->
+  <section class="guide-section" id="typography">
+    <h2 class="section-title">Typography</h2>
+    <p class="section-description">
+      Manrope for headings (authoritative, geometric) and Inter for body text
+      (neutral, highly legible). JetBrains Mono for code and token references.
+    </p>
+
+    <!-- Display -->
+    <div class="type-specimen">
+      <div class="type-specimen__meta">
+        <div class="type-specimen__level">Display</div>
+        <div class="type-specimen__specs">
+          48px / 800<br/>
+          Manrope<br/>
+          lh 1.1
+        </div>
+      </div>
+      <div class="type-specimen__text" style="font-family:var(--font-heading);font-size:var(--type-display-size);font-weight:var(--type-display-weight);line-height:var(--type-display-line-height);">
+        Community Dashboard
+      </div>
+    </div>
+
+    <!-- H1 -->
+    <div class="type-specimen">
+      <div class="type-specimen__meta">
+        <div class="type-specimen__level">H1</div>
+        <div class="type-specimen__specs">
+          36px / 700<br/>
+          Manrope<br/>
+          lh 1.2
+        </div>
+      </div>
+      <div class="type-specimen__text" style="font-family:var(--font-heading);font-size:var(--type-h1-size);font-weight:var(--type-h1-weight);line-height:var(--type-h1-line-height);">
+        Assessment &amp; Payment Overview
+      </div>
+    </div>
+
+    <!-- H2 -->
+    <div class="type-specimen">
+      <div class="type-specimen__meta">
+        <div class="type-specimen__level">H2</div>
+        <div class="type-specimen__specs">
+          28px / 700<br/>
+          Manrope<br/>
+          lh 1.25
+        </div>
+      </div>
+      <div class="type-specimen__text" style="font-family:var(--font-heading);font-size:var(--type-h2-size);font-weight:var(--type-h2-weight);line-height:var(--type-h2-line-height);">
+        Quarterly Financial Report
+      </div>
+    </div>
+
+    <!-- H3 -->
+    <div class="type-specimen">
+      <div class="type-specimen__meta">
+        <div class="type-specimen__level">H3</div>
+        <div class="type-specimen__specs">
+          22px / 600<br/>
+          Manrope<br/>
+          lh 1.3
+        </div>
+      </div>
+      <div class="type-specimen__text" style="font-family:var(--font-heading);font-size:var(--type-h3-size);font-weight:var(--type-h3-weight);line-height:var(--type-h3-line-height);">
+        Maintenance Requests — April 2026
+      </div>
+    </div>
+
+    <!-- H4 -->
+    <div class="type-specimen">
+      <div class="type-specimen__meta">
+        <div class="type-specimen__level">H4</div>
+        <div class="type-specimen__specs">
+          18px / 600<br/>
+          Manrope<br/>
+          lh 1.35
+        </div>
+      </div>
+      <div class="type-specimen__text" style="font-family:var(--font-heading);font-size:var(--type-h4-size);font-weight:var(--type-h4-weight);line-height:var(--type-h4-line-height);">
+        Unit 4B — Pending Approval
+      </div>
+    </div>
+
+    <!-- Body Large -->
+    <div class="type-specimen">
+      <div class="type-specimen__meta">
+        <div class="type-specimen__level">Body Large</div>
+        <div class="type-specimen__specs">
+          18px / 400<br/>
+          Inter<br/>
+          lh 1.6
+        </div>
+      </div>
+      <div class="type-specimen__text" style="font-family:var(--font-body);font-size:var(--type-body-lg-size);font-weight:var(--type-body-lg-weight);line-height:var(--type-body-lg-line-height);">
+        Your HOA dues for Q2 2026 are due on May 1st. Homeowners in good standing
+        receive priority access to amenity reservations and pool key distribution.
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="type-specimen">
+      <div class="type-specimen__meta">
+        <div class="type-specimen__level">Body</div>
+        <div class="type-specimen__specs">
+          16px / 400<br/>
+          Inter<br/>
+          lh 1.6
+        </div>
+      </div>
+      <div class="type-specimen__text" style="font-family:var(--font-body);font-size:var(--type-body-size);font-weight:var(--type-body-weight);line-height:var(--type-body-line-height);">
+        The board has approved a $12,000 budget for common-area landscaping
+        improvements scheduled to begin in June. All residents will receive
+        a 48-hour notice before work commences in their quadrant.
+      </div>
+    </div>
+
+    <!-- Body Small -->
+    <div class="type-specimen">
+      <div class="type-specimen__meta">
+        <div class="type-specimen__level">Body Small</div>
+        <div class="type-specimen__specs">
+          14px / 400<br/>
+          Inter<br/>
+          lh 1.5
+        </div>
+      </div>
+      <div class="type-specimen__text" style="font-family:var(--font-body);font-size:var(--type-body-sm-size);font-weight:var(--type-body-sm-weight);line-height:var(--type-body-sm-line-height);color:var(--color-neutral-700);">
+        Contact the management office at ext. 204 for billing discrepancies.
+        Office hours are Monday–Friday, 9 am – 5 pm. Emergency maintenance requests
+        can be submitted 24/7 through this portal.
+      </div>
+    </div>
+
+    <!-- Caption -->
+    <div class="type-specimen">
+      <div class="type-specimen__meta">
+        <div class="type-specimen__level">Caption</div>
+        <div class="type-specimen__specs">
+          12px / 500<br/>
+          Inter<br/>
+          lh 1.4
+        </div>
+      </div>
+      <div class="type-specimen__text" style="font-family:var(--font-body);font-size:var(--type-caption-size);font-weight:var(--type-caption-weight);line-height:var(--type-caption-line-height);color:var(--color-neutral-500);">
+        Last updated April 8, 2026 at 10:32 AM by Property Manager R. Torres
+      </div>
+    </div>
+
+    <!-- Overline -->
+    <div class="type-specimen">
+      <div class="type-specimen__meta">
+        <div class="type-specimen__level">Overline</div>
+        <div class="type-specimen__specs">
+          11px / 600<br/>
+          Inter<br/>
+          Uppercase + 0.08em
+        </div>
+      </div>
+      <div class="type-specimen__text" style="font-family:var(--font-body);font-size:var(--type-overline-size);font-weight:var(--type-overline-weight);line-height:var(--type-overline-line-height);letter-spacing:var(--type-overline-letter-spacing);text-transform:var(--type-overline-text-transform);color:var(--color-neutral-500);">
+        Resident Communications
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════
+       SPACING
+       ════════════════════════════════════════════════════════════ -->
+  <section class="guide-section" id="spacing">
+    <h2 class="section-title">Spacing</h2>
+    <p class="section-description">
+      An 8px base grid with a 4px half-step. All layout spacing, padding, and
+      gaps should use these tokens for visual consistency.
+    </p>
+
+    <div class="spacing-grid">
+      <div class="spacing-row">
+        <span class="spacing-row__label">--space-1</span>
+        <div class="spacing-row__bar" style="width:4px;"></div>
+        <span class="spacing-row__value">4px</span>
+      </div>
+      <div class="spacing-row">
+        <span class="spacing-row__label">--space-2</span>
+        <div class="spacing-row__bar" style="width:8px;"></div>
+        <span class="spacing-row__value">8px</span>
+      </div>
+      <div class="spacing-row">
+        <span class="spacing-row__label">--space-3</span>
+        <div class="spacing-row__bar" style="width:12px;"></div>
+        <span class="spacing-row__value">12px</span>
+      </div>
+      <div class="spacing-row">
+        <span class="spacing-row__label">--space-4</span>
+        <div class="spacing-row__bar" style="width:16px;"></div>
+        <span class="spacing-row__value">16px</span>
+      </div>
+      <div class="spacing-row">
+        <span class="spacing-row__label">--space-5</span>
+        <div class="spacing-row__bar" style="width:20px;"></div>
+        <span class="spacing-row__value">20px</span>
+      </div>
+      <div class="spacing-row">
+        <span class="spacing-row__label">--space-6</span>
+        <div class="spacing-row__bar" style="width:24px;"></div>
+        <span class="spacing-row__value">24px</span>
+      </div>
+      <div class="spacing-row">
+        <span class="spacing-row__label">--space-8</span>
+        <div class="spacing-row__bar" style="width:32px;"></div>
+        <span class="spacing-row__value">32px</span>
+      </div>
+      <div class="spacing-row">
+        <span class="spacing-row__label">--space-10</span>
+        <div class="spacing-row__bar" style="width:40px;"></div>
+        <span class="spacing-row__value">40px</span>
+      </div>
+      <div class="spacing-row">
+        <span class="spacing-row__label">--space-12</span>
+        <div class="spacing-row__bar" style="width:48px;"></div>
+        <span class="spacing-row__value">48px</span>
+      </div>
+      <div class="spacing-row">
+        <span class="spacing-row__label">--space-16</span>
+        <div class="spacing-row__bar" style="width:64px;"></div>
+        <span class="spacing-row__value">64px</span>
+      </div>
+      <div class="spacing-row">
+        <span class="spacing-row__label">--space-20</span>
+        <div class="spacing-row__bar" style="width:80px;"></div>
+        <span class="spacing-row__value">80px</span>
+      </div>
+    </div>
+
+    <div class="guide-divider"></div>
+
+    <h3 class="subsection-title">Border Radius</h3>
+    <div class="radius-grid">
+      <div>
+        <div class="radius-box" style="border-radius:var(--radius-sm);">
+          <span class="radius-box__label">--radius-sm<br/>4px</span>
+        </div>
+      </div>
+      <div>
+        <div class="radius-box" style="border-radius:var(--radius-md);">
+          <span class="radius-box__label">--radius-md<br/>8px</span>
+        </div>
+      </div>
+      <div>
+        <div class="radius-box" style="border-radius:var(--radius-lg);">
+          <span class="radius-box__label">--radius-lg<br/>12px</span>
+        </div>
+      </div>
+      <div>
+        <div class="radius-box" style="border-radius:var(--radius-full);width:72px;height:72px;">
+          <span class="radius-box__label">--radius-full<br/>9999px</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════
+       ELEVATION
+       ════════════════════════════════════════════════════════════ -->
+  <section class="guide-section" id="elevation">
+    <h2 class="section-title">Elevation</h2>
+    <p class="section-description">
+      Seven shadow levels from near-flat to modal depth. Light mode uses
+      warm-tinted shadows; dark mode uses deeper black shadows for contrast.
+    </p>
+
+    <div class="elevation-grid">
+      <div class="elevation-card" style="box-shadow:var(--shadow-xs);">
+        <div class="elevation-card__token">--shadow-xs</div>
+        <div class="elevation-card__usage">Subtle borders, input fields</div>
+      </div>
+      <div class="elevation-card" style="box-shadow:var(--shadow-sm);">
+        <div class="elevation-card__token">--shadow-sm</div>
+        <div class="elevation-card__usage">Cards, panels</div>
+      </div>
+      <div class="elevation-card" style="box-shadow:var(--shadow-md);">
+        <div class="elevation-card__token">--shadow-md</div>
+        <div class="elevation-card__usage">Dropdowns, popovers</div>
+      </div>
+      <div class="elevation-card" style="box-shadow:var(--shadow-lg);">
+        <div class="elevation-card__token">--shadow-lg</div>
+        <div class="elevation-card__usage">Floating panels</div>
+      </div>
+      <div class="elevation-card" style="box-shadow:var(--shadow-xl);">
+        <div class="elevation-card__token">--shadow-xl</div>
+        <div class="elevation-card__usage">Drawers, sheets</div>
+      </div>
+      <div class="elevation-card" style="box-shadow:var(--shadow-2xl);">
+        <div class="elevation-card__token">--shadow-2xl</div>
+        <div class="elevation-card__usage">Modals, dialogs</div>
+      </div>
+      <div class="elevation-card" style="box-shadow:var(--shadow-inner);">
+        <div class="elevation-card__token">--shadow-inner</div>
+        <div class="elevation-card__usage">Inset inputs, wells</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════
+       MOTION
+       ════════════════════════════════════════════════════════════ -->
+  <section class="guide-section" id="motion">
+    <h2 class="section-title">Motion</h2>
+    <p class="section-description">
+      Purposeful animation reinforces spatial relationships and state changes.
+      All animations respect <code>prefers-reduced-motion</code>.
+    </p>
+
+    <!-- Easing curves -->
+    <h3 class="subsection-title">Easing Curves</h3>
+    <div class="easing-list">
+      <div class="easing-row">
+        <span class="easing-row__name">--ease-default</span>
+        <span class="easing-row__value">cubic-bezier(0.25, 0.1, 0.25, 1)</span>
+      </div>
+      <div class="easing-row">
+        <span class="easing-row__name">--ease-out</span>
+        <span class="easing-row__value">cubic-bezier(0.0, 0.0, 0.2, 1) — entrances</span>
+      </div>
+      <div class="easing-row">
+        <span class="easing-row__name">--ease-in</span>
+        <span class="easing-row__value">cubic-bezier(0.4, 0.0, 1, 1) — exits</span>
+      </div>
+      <div class="easing-row">
+        <span class="easing-row__name">--ease-spring</span>
+        <span class="easing-row__value">cubic-bezier(0.34, 1.56, 0.64, 1) — bouncy</span>
+      </div>
+      <div class="easing-row">
+        <span class="easing-row__name">--ease-smooth</span>
+        <span class="easing-row__value">cubic-bezier(0.4, 0.0, 0.2, 1) — interactive</span>
+      </div>
+    </div>
+
+    <!-- Duration scale -->
+    <h3 class="subsection-title">Duration Scale</h3>
+    <div class="duration-list">
+      <div class="duration-row">
+        <span class="duration-row__label">--duration-instant</span>
+        <div class="duration-row__bar" style="width:calc(100 / 400 * 100px);"></div>
+        <span class="duration-row__value">100ms — hover, micro-interactions</span>
+      </div>
+      <div class="duration-row">
+        <span class="duration-row__label">--duration-fast</span>
+        <div class="duration-row__bar" style="width:calc(150 / 400 * 100px);"></div>
+        <span class="duration-row__value">150ms — tooltips, reveals</span>
+      </div>
+      <div class="duration-row">
+        <span class="duration-row__label">--duration-normal</span>
+        <div class="duration-row__bar" style="width:calc(200 / 400 * 100px);"></div>
+        <span class="duration-row__value">200ms — default transitions</span>
+      </div>
+      <div class="duration-row">
+        <span class="duration-row__label">--duration-moderate</span>
+        <div class="duration-row__bar" style="width:calc(300 / 400 * 100px);"></div>
+        <span class="duration-row__value">300ms — panels, modals</span>
+      </div>
+      <div class="duration-row">
+        <span class="duration-row__label">--duration-slow</span>
+        <div class="duration-row__bar" style="width:100px;"></div>
+        <span class="duration-row__value">400ms — page transitions</span>
+      </div>
+      <div class="duration-row">
+        <span class="duration-row__label">--duration-stagger</span>
+        <div class="duration-row__bar" style="width:calc(60 / 400 * 100px);"></div>
+        <span class="duration-row__value">60ms — stagger offset per item</span>
+      </div>
+    </div>
+
+    <!-- Animation demo -->
+    <h3 class="subsection-title">Animation Demo</h3>
+    <p style="font-size:var(--type-body-sm-size);color:var(--color-neutral-600);margin-bottom:var(--space-4);">
+      Press "Play Animations" to trigger the stagger-up entrance on the cards below.
+    </p>
+
+    <button class="play-btn" onclick="playAnimations()">Play Animations</button>
+
+    <div class="motion-demo" id="motion-demo">
+      <div class="motion-card" id="mc-1">Annual Meeting Agenda</div>
+      <div class="motion-card" id="mc-2">Pool Maintenance Notice</div>
+      <div class="motion-card" id="mc-3">Dues Statement Ready</div>
+      <div class="motion-card" id="mc-4">Gate Code Updated</div>
+      <div class="motion-card" id="mc-5">Violation Cleared</div>
+    </div>
+  </section>
+
+  <script>
+    /* ── Standalone dark mode toggle ─────────────────────────── */
+    let guideDark = false;
+
+    function toggleTheme() {
+      guideDark = !guideDark;
+      const btn = document.getElementById('theme-toggle');
+
+      if (guideDark) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        btn.textContent = '🌙 Dark';
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        btn.textContent = '☀ Light';
+      }
+    }
+
+    /* ── Motion demo ─────────────────────────────────────────── */
+    function playAnimations() {
+      const cards = document.querySelectorAll('.motion-card');
+
+      // Reset
+      cards.forEach(card => {
+        card.classList.remove('playing');
+        card.style.animationDelay = '';
+        // Force reflow to allow re-triggering
+        void card.offsetWidth;
+      });
+
+      // Stagger each card
+      cards.forEach((card, i) => {
+        const delay = i * 60; // --duration-stagger
+        card.style.animationDelay = delay + 'ms';
+        card.classList.add('playing');
+      });
+    }
+  </script>
+</body>
+</html>
