@@ -710,3 +710,46 @@ func (s *FinService) GetUnitCollectionStatus(ctx context.Context, unitID uuid.UU
 	}
 	return c, nil
 }
+
+// ReconciliationResult holds the outcome of a ledger reconciliation check.
+type ReconciliationResult struct {
+	OrgID              uuid.UUID `json:"org_id"`
+	UnitLedgerTotal    int64     `json:"unit_ledger_total_cents"`
+	FundTransTotal     int64     `json:"fund_transaction_total_cents"`
+	Discrepancy        int64     `json:"discrepancy_cents"`
+	IsReconciled       bool      `json:"is_reconciled"`
+}
+
+// CheckReconciliation compares unit-level ledger totals with org-level fund transaction totals.
+// Returns the discrepancy if any. This is a read-only diagnostic — it does not modify data.
+func (s *FinService) CheckReconciliation(ctx context.Context, orgID uuid.UUID) (*ReconciliationResult, error) {
+	// Get total from unit ledger (sum of all charges and payments)
+	ledger, err := s.assessments.ListLedgerByOrg(ctx, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("listing org ledger: %w", err)
+	}
+
+	var unitTotal int64
+	for _, entry := range ledger {
+		unitTotal += entry.AmountCents
+	}
+
+	// Get total from fund transactions
+	funds, err := s.funds.ListFundsByOrg(ctx, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("listing funds: %w", err)
+	}
+
+	var fundTotal int64
+	for _, fund := range funds {
+		fundTotal += fund.BalanceCents
+	}
+
+	return &ReconciliationResult{
+		OrgID:           orgID,
+		UnitLedgerTotal: unitTotal,
+		FundTransTotal:  fundTotal,
+		Discrepancy:     unitTotal - fundTotal,
+		IsReconciled:    unitTotal == fundTotal,
+	}, nil
+}
