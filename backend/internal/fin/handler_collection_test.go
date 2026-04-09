@@ -44,6 +44,7 @@ func setupCollectionTestServer(t *testing.T) *collectionTestServer {
 		audit.NewNoopAuditor(),
 		queue.NewInMemoryPublisher(),
 		ai.NewNoopPolicyResolver(),
+		ai.NewNoopComplianceResolver(),
 		logger,
 	)
 	collectionHandler := fin.NewCollectionHandler(service, logger)

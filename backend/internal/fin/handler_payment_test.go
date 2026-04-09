@@ -47,6 +47,7 @@ func setupPaymentTestServer(t *testing.T) *paymentTestServer {
 		audit.NewNoopAuditor(),
 		queue.NewInMemoryPublisher(),
 		ai.NewNoopPolicyResolver(),
+		ai.NewNoopComplianceResolver(),
 		logger,
 	)
 	payHandler := fin.NewPaymentHandler(service, logger)

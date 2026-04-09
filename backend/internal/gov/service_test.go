@@ -362,7 +362,7 @@ func newTestService() (*gov.GovService, *mockViolationRepo, *mockARBRepo, *mockB
 	br := newMockBallotRepo()
 	mr := newMockMeetingRepo()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	svc := gov.NewGovService(vr, ar, br, mr, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), ai.NewNoopPolicyResolver(), logger)
+	svc := gov.NewGovService(vr, ar, br, mr, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
 	return svc, vr, ar, br, mr
 }
 

@@ -22,6 +22,7 @@ type GovService struct {
 	auditor    audit.Auditor
 	publisher  queue.Publisher
 	policy     ai.PolicyResolver
+	compliance ai.ComplianceResolver
 	logger     *slog.Logger
 }
 
@@ -34,6 +35,7 @@ func NewGovService(
 	auditor audit.Auditor,
 	publisher queue.Publisher,
 	policy ai.PolicyResolver,
+	compliance ai.ComplianceResolver,
 	logger *slog.Logger,
 ) *GovService {
 	return &GovService{
@@ -44,6 +46,7 @@ func NewGovService(
 		auditor:    auditor,
 		publisher:  publisher,
 		policy:     policy,
+		compliance: compliance,
 		logger:     logger,
 	}
 }

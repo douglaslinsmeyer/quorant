@@ -38,7 +38,7 @@ func setupMeetingTestServer(t *testing.T) *meetingTestServer {
 	mockMeeting := newMockMeetingRepo()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	service := gov.NewGovService(mockViolation, mockARB, mockBallot, mockMeeting, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), ai.NewNoopPolicyResolver(), logger)
+	service := gov.NewGovService(mockViolation, mockARB, mockBallot, mockMeeting, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
 	handler := gov.NewMeetingHandler(service, logger)
 
 	mux := http.NewServeMux()

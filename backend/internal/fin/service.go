@@ -39,6 +39,7 @@ type FinService struct {
 	auditor     audit.Auditor
 	publisher   queue.Publisher
 	policy      ai.PolicyResolver
+	compliance  ai.ComplianceResolver
 	logger      *slog.Logger
 }
 
@@ -52,6 +53,7 @@ func NewFinService(
 	auditor audit.Auditor,
 	publisher queue.Publisher,
 	policy ai.PolicyResolver,
+	compliance ai.ComplianceResolver,
 	logger *slog.Logger,
 ) *FinService {
 	return &FinService{
@@ -63,6 +65,7 @@ func NewFinService(
 		auditor:     auditor,
 		publisher:   publisher,
 		policy:      policy,
+		compliance:  compliance,
 		logger:      logger,
 	}
 }

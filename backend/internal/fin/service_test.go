@@ -717,7 +717,7 @@ func newTestService() (*fin.FinService, *mockAssessmentRepo, *mockPaymentRepo, *
 	funds := &mockFundRepo{}
 	collections := &mockCollectionRepo{}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), ai.NewNoopPolicyResolver(), logger)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
 	return svc, assessments, payments, budgets, funds, collections
 }
 
