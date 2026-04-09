@@ -11,18 +11,21 @@ import (
 
 // RegisterRoutes registers all AI module routes on the mux.
 // All routes require authentication and tenant context middleware.
+// All AI endpoints are gated by the ai.context_lake entitlement.
 func RegisterRoutes(
 	mux *http.ServeMux,
 	handler *AIHandler,
 	validator auth.TokenValidator,
 	checker middleware.PermissionChecker,
 	resolveUserID func(context.Context) (uuid.UUID, error),
+	entChecker middleware.EntitlementChecker,
 ) {
 	permMw := func(perm string, h http.HandlerFunc) http.Handler {
 		return middleware.Auth(validator,
 			middleware.TenantContext(
-				middleware.RequirePermission(checker, perm, resolveUserID)(
-					http.HandlerFunc(h))))
+				middleware.RequireEntitlement(entChecker, "ai.context_lake")(
+					middleware.RequirePermission(checker, perm, resolveUserID)(
+						http.HandlerFunc(h)))))
 	}
 
 	// Governing documents

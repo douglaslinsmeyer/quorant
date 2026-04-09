@@ -28,6 +28,13 @@ func (allowAllWebhookChecker) HasPermission(_ context.Context, _, _ uuid.UUID, _
 	return true, nil
 }
 
+// allowAllWebhookEntitlementChecker is an EntitlementChecker that always grants access (for use in tests).
+type allowAllWebhookEntitlementChecker struct{}
+
+func (allowAllWebhookEntitlementChecker) Check(_ context.Context, _ uuid.UUID, _ string) (bool, int, error) {
+	return true, -1, nil
+}
+
 // fixedWebhookUserIDResolver returns a resolveUserID func that always returns the given UUID.
 func fixedWebhookUserIDResolver(id uuid.UUID) func(context.Context) (uuid.UUID, error) {
 	return func(_ context.Context) (uuid.UUID, error) {
@@ -36,6 +43,7 @@ func fixedWebhookUserIDResolver(id uuid.UUID) func(context.Context) (uuid.UUID, 
 }
 
 var _ middleware.PermissionChecker = allowAllWebhookChecker{}
+var _ middleware.EntitlementChecker = allowAllWebhookEntitlementChecker{}
 
 // ─── Test server helpers ──────────────────────────────────────────────────────
 
@@ -47,7 +55,7 @@ func newWebhookTestServer(t *testing.T, repo *mockWebhookRepo, validator auth.To
 	svc := webhook.NewWebhookService(repo, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 	handler := webhook.NewWebhookHandler(svc, logger)
 	mux := http.NewServeMux()
-	webhook.RegisterRoutes(mux, handler, validator, allowAllWebhookChecker{}, fixedWebhookUserIDResolver(uuid.New()))
+	webhook.RegisterRoutes(mux, handler, validator, allowAllWebhookChecker{}, fixedWebhookUserIDResolver(uuid.New()), allowAllWebhookEntitlementChecker{})
 	return httptest.NewServer(mux)
 }
 

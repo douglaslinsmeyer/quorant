@@ -11,6 +11,7 @@ import (
 
 // RegisterRoutes registers all webhook routes on the mux.
 // All routes are auth-protected and include tenant context.
+// All webhook endpoints are gated by the webhooks.enabled entitlement.
 //
 // IMPORTANT: event-types must be registered before the {webhook_id} catch-all
 // routes, otherwise the literal string "event-types" would be matched as a
@@ -21,12 +22,14 @@ func RegisterRoutes(
 	validator auth.TokenValidator,
 	checker middleware.PermissionChecker,
 	resolveUserID func(context.Context) (uuid.UUID, error),
+	entChecker middleware.EntitlementChecker,
 ) {
 	permMw := func(perm string, h http.HandlerFunc) http.Handler {
 		return middleware.Auth(validator,
 			middleware.TenantContext(
-				middleware.RequirePermission(checker, perm, resolveUserID)(
-					http.HandlerFunc(h))))
+				middleware.RequireEntitlement(entChecker, "webhooks.enabled")(
+					middleware.RequirePermission(checker, perm, resolveUserID)(
+						http.HandlerFunc(h)))))
 	}
 
 	// Collection endpoints

@@ -240,7 +240,7 @@ func run() error {
 	policyRepo := ai.NewPostgresPolicyRepository(pool)
 	policyService := ai.NewPolicyService(policyRepo, logger)
 	aiHandler := ai.NewAIHandler(policyService, contextLakeService, orgRepo, logger)
-	ai.RegisterRoutes(mux, aiHandler, tokenValidator, permChecker, resolveUserID)
+	ai.RegisterRoutes(mux, aiHandler, tokenValidator, permChecker, resolveUserID, entitlementChecker)
 
 	// Real implementations of AI interfaces (for future module injection).
 	contextRetriever := ai.NewPostgresContextRetriever(contextLakeService)
@@ -252,7 +252,7 @@ func run() error {
 	webhookRepo := webhook.NewPostgresWebhookRepository(pool)
 	webhookService := webhook.NewWebhookService(webhookRepo, auditor, outboxPublisher, logger)
 	webhookHandler := webhook.NewWebhookHandler(webhookService, logger)
-	webhook.RegisterRoutes(mux, webhookHandler, tokenValidator, permChecker, resolveUserID)
+	webhook.RegisterRoutes(mux, webhookHandler, tokenValidator, permChecker, resolveUserID, entitlementChecker)
 
 	// Doc module
 	s3Client, err := storage.NewS3Client(cfg.S3)

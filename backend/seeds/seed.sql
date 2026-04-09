@@ -130,14 +130,18 @@ INSERT INTO plans (id, name, description, plan_type, price_cents, is_active) VAL
     ('50000000-0000-0000-0000-000000000003', 'Firm Bundle', 'Management firm with bundled HOA coverage', 'firm_bundle', 49900, TRUE);
 
 INSERT INTO entitlements (plan_id, feature_key, limit_type, limit_value) VALUES
+    -- HOA Starter: violations only, no AI, no webhooks
     ('50000000-0000-0000-0000-000000000001', 'units.max', 'numeric', 50),
     ('50000000-0000-0000-0000-000000000001', 'violations.tracking', 'boolean', NULL),
+    -- HOA Professional: violations + AI context lake, no webhooks
     ('50000000-0000-0000-0000-000000000002', 'units.max', 'numeric', 500),
     ('50000000-0000-0000-0000-000000000002', 'violations.tracking', 'boolean', NULL),
     ('50000000-0000-0000-0000-000000000002', 'ai.context_lake', 'boolean', NULL),
+    -- Firm Bundle: everything including webhooks
     ('50000000-0000-0000-0000-000000000003', 'units.max', 'numeric', 5000),
     ('50000000-0000-0000-0000-000000000003', 'violations.tracking', 'boolean', NULL),
-    ('50000000-0000-0000-0000-000000000003', 'ai.context_lake', 'boolean', NULL);
+    ('50000000-0000-0000-0000-000000000003', 'ai.context_lake', 'boolean', NULL),
+    ('50000000-0000-0000-0000-000000000003', 'webhooks.enabled', 'boolean', NULL);
 
 -- Subscriptions
 INSERT INTO org_subscriptions (org_id, plan_id, status) VALUES
