@@ -25,6 +25,7 @@ import (
 	"github.com/quorant/quorant/internal/license"
 	"github.com/quorant/quorant/internal/org"
 	"github.com/quorant/quorant/internal/task"
+	"github.com/quorant/quorant/internal/webhook"
 	"github.com/quorant/quorant/internal/platform/auth"
 	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/quorant/quorant/internal/platform/config"
@@ -206,6 +207,12 @@ func run() error {
 	// Replace stub resolvers with real implementations (for future module injection).
 	_ = ai.NewPostgresContextRetriever(contextLakeService)
 	_ = ai.NewPostgresPolicyResolver(policyService)
+
+	// Webhook module
+	webhookRepo := webhook.NewPostgresWebhookRepository(pool)
+	webhookService := webhook.NewWebhookService(webhookRepo, logger)
+	webhookHandler := webhook.NewWebhookHandler(webhookService, logger)
+	webhook.RegisterRoutes(mux, webhookHandler, tokenValidator)
 
 	// Doc module
 	s3Client, err := storage.NewS3Client(cfg.S3)

@@ -14,6 +14,7 @@ import (
 	"github.com/quorant/quorant/internal/platform/db"
 	"github.com/quorant/quorant/internal/platform/logging"
 	"github.com/quorant/quorant/internal/platform/queue"
+	"github.com/quorant/quorant/internal/webhook"
 )
 
 func main() {
@@ -83,6 +84,23 @@ func run() error {
 	go func() {
 		if err := poller.Start(ctx); err != nil && ctx.Err() == nil {
 			logger.Error("outbox poller error", "error", err)
+		}
+	}()
+
+	// Webhook relay
+	webhookRepo := webhook.NewPostgresWebhookRepository(pool)
+	webhookRelay := webhook.NewRelay(nc, webhookRepo, logger)
+	go func() {
+		if err := webhookRelay.Start(ctx); err != nil && ctx.Err() == nil {
+			logger.Error("webhook relay error", "error", err)
+		}
+	}()
+
+	// Webhook retry worker
+	webhookRetryWorker := webhook.NewRetryWorker(webhookRepo, logger)
+	go func() {
+		if err := webhookRetryWorker.Start(ctx); err != nil && ctx.Err() == nil {
+			logger.Error("webhook retry worker error", "error", err)
 		}
 	}()
 
