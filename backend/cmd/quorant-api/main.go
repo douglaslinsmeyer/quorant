@@ -161,11 +161,20 @@ func run() error {
 	orgRepo := org.NewPostgresOrgRepository(pool)
 	membershipRepo := org.NewPostgresMembershipRepository(pool)
 	unitRepo := org.NewPostgresUnitRepository(pool)
-	orgService := org.NewOrgService(orgRepo, membershipRepo, unitRepo, userRepo, auditor, outboxPublisher, logger)
+	amenityRepo := org.NewPostgresAmenityRepository(pool)
+	vendorRepo := org.NewPostgresVendorRepository(pool)
+	registrationRepo := org.NewPostgresRegistrationRepository(pool)
+	orgService := org.NewOrgService(orgRepo, membershipRepo, unitRepo, userRepo, auditor, outboxPublisher, logger).
+		WithAmenityRepo(amenityRepo).
+		WithVendorRepo(vendorRepo).
+		WithRegistrationRepo(registrationRepo)
 	orgHandler := org.NewOrgHandler(orgService, logger)
 	membershipHandler := org.NewMembershipHandler(orgService, logger)
 	unitHandler := org.NewUnitHandler(orgService, logger)
-	org.RegisterRoutes(mux, orgHandler, membershipHandler, unitHandler, tokenValidator, permChecker, resolveUserID)
+	amenityHandler := org.NewAmenityHandler(orgService, logger)
+	vendorHandler := org.NewVendorHandler(orgService, logger)
+	registrationHandler := org.NewRegistrationHandler(orgService, logger)
+	org.RegisterRoutes(mux, orgHandler, membershipHandler, unitHandler, amenityHandler, vendorHandler, registrationHandler, tokenValidator, permChecker, resolveUserID)
 
 	// License module (initialized early — entitlementChecker is needed by AI and Webhook routes)
 	licenseRepo := license.NewPostgresLicenseRepository(pool)
