@@ -6,7 +6,6 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
-	"github.com/quorant/quorant/internal/org"
 )
 
 const defaultSearchLimit = 10
@@ -23,13 +22,13 @@ func StubEmbeddingFunc(ctx context.Context, text string) ([]float32, error) {
 // ContextLakeService provides high-level access to context lake ingestion and retrieval.
 type ContextLakeService struct {
 	repo    ContextChunkRepository
-	orgRepo org.OrgRepository
+	orgRepo OrgLookup
 	embed   EmbeddingFunc
 	logger  *slog.Logger
 }
 
 // NewContextLakeService creates a new ContextLakeService.
-func NewContextLakeService(repo ContextChunkRepository, orgRepo org.OrgRepository, embed EmbeddingFunc, logger *slog.Logger) *ContextLakeService {
+func NewContextLakeService(repo ContextChunkRepository, orgRepo OrgLookup, embed EmbeddingFunc, logger *slog.Logger) *ContextLakeService {
 	return &ContextLakeService{
 		repo:    repo,
 		orgRepo: orgRepo,
