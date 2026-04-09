@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // ARBHandler handles HTTP requests for the ARB (Architectural Review Board) sub-domain.
@@ -33,8 +33,7 @@ func (h *ARBHandler) SubmitARBRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: wire IAM — extract real submitter ID from context
-	created, err := h.service.SubmitARBRequest(r.Context(), orgID, req, uuid.Nil)
+	created, err := h.service.SubmitARBRequest(r.Context(), orgID, req, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("SubmitARBRequest failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
@@ -136,8 +135,7 @@ func (h *ARBHandler) CastARBVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: wire IAM — extract real voter ID from context
-	vote, err := h.service.CastARBVote(r.Context(), requestID, req, uuid.Nil)
+	vote, err := h.service.CastARBVote(r.Context(), requestID, req, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("CastARBVote failed", "request_id", requestID, "error", err)
 		api.WriteError(w, err)

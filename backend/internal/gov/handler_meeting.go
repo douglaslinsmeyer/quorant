@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // MeetingHandler handles HTTP requests for the meetings sub-domain.
@@ -33,8 +33,7 @@ func (h *MeetingHandler) ScheduleMeeting(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// TODO: wire IAM — extract real creator ID from context
-	created, err := h.service.ScheduleMeeting(r.Context(), orgID, req, uuid.Nil)
+	created, err := h.service.ScheduleMeeting(r.Context(), orgID, req, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("ScheduleMeeting failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)

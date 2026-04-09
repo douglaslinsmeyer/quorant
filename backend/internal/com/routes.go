@@ -20,9 +20,9 @@ func RegisterRoutes(
 	checker middleware.PermissionChecker,
 	resolveUserID func(context.Context) (uuid.UUID, error),
 ) {
-	// auth only — no org context (user-scoped)
+	// auth only — no org context (user-scoped); resolves and stores user ID in context
 	authMw := func(h http.HandlerFunc) http.Handler {
-		return middleware.Auth(validator, http.HandlerFunc(h))
+		return middleware.Auth(validator, middleware.ResolveUserID(resolveUserID)(http.HandlerFunc(h)))
 	}
 
 	// auth + tenant context + permission check

@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
-	"github.com/quorant/quorant/internal/platform/auth"
 	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
@@ -315,18 +314,10 @@ func parseTaskPathUUID(r *http.Request, key string) (uuid.UUID, error) {
 	return id, nil
 }
 
-// callerID extracts the user UUID from JWT claims in context, returning uuid.Nil if absent.
-// TODO: once IAM user lookup is wired, resolve idp_user_id -> users.id here.
+// callerID extracts the authenticated user's internal UUID from context.
+// Requires either RBAC middleware or ResolveUserID middleware to have run first.
 func callerID(r *http.Request) uuid.UUID {
-	claims, ok := auth.ClaimsFromContext(r.Context())
-	if !ok || claims == nil {
-		return uuid.Nil
-	}
-	id, err := uuid.Parse(claims.Subject)
-	if err != nil {
-		return uuid.Nil
-	}
-	return id
+	return middleware.UserIDFromContext(r.Context())
 }
 
 // orgIDFromContext reads the org UUID stored by TenantContext middleware.

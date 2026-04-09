@@ -12,6 +12,7 @@ import (
 // ─── Context helpers ─────────────────────────────────────────────────────────
 
 type orgContextKey struct{}
+type userIDContextKey struct{}
 
 // WithOrgID stores the org ID in context.
 func WithOrgID(ctx context.Context, orgID uuid.UUID) context.Context {
@@ -25,6 +26,38 @@ func OrgIDFromContext(ctx context.Context) uuid.UUID {
 		return id
 	}
 	return uuid.Nil
+}
+
+// WithUserID stores the authenticated user's internal UUID in context.
+func WithUserID(ctx context.Context, id uuid.UUID) context.Context {
+	return context.WithValue(ctx, userIDContextKey{}, id)
+}
+
+// UserIDFromContext retrieves the authenticated user's internal UUID from context.
+// Returns uuid.Nil if the user ID has not been stored (e.g. RBAC or ResolveUserID
+// middleware has not run yet).
+func UserIDFromContext(ctx context.Context) uuid.UUID {
+	if id, ok := ctx.Value(userIDContextKey{}).(uuid.UUID); ok {
+		return id
+	}
+	return uuid.Nil
+}
+
+// ResolveUserID is middleware that resolves the authenticated user's internal UUID
+// from JWT claims and stores it in the request context via WithUserID.
+// Use this on auth-only routes (no RBAC) where handlers need the user ID.
+func ResolveUserID(resolveUserID func(ctx context.Context) (uuid.UUID, error)) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userID, err := resolveUserID(r.Context())
+			if err != nil {
+				api.WriteError(w, api.NewUnauthenticatedError("could not resolve user"))
+				return
+			}
+			ctx := WithUserID(r.Context(), userID)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }
 
 // ─── PermissionChecker interface ─────────────────────────────────────────────
@@ -148,7 +181,8 @@ func RequirePermission(
 				return
 			}
 
-			next.ServeHTTP(w, r)
+			ctx := WithUserID(r.Context(), userID)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }

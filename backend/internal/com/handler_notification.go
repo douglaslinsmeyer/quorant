@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // NotificationHandler handles notification preference and push token HTTP requests.
@@ -21,8 +21,8 @@ func NewNotificationHandler(service *ComService, logger *slog.Logger) *Notificat
 
 // GetPrefs handles GET /api/v1/notification-preferences.
 func (h *NotificationHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
-	// TODO: extract real user ID and org ID from auth context
-	prefs, err := h.service.GetNotificationPreferences(r.Context(), uuid.Nil, uuid.Nil)
+	userID := middleware.UserIDFromContext(r.Context())
+	prefs, err := h.service.GetNotificationPreferences(r.Context(), userID, middleware.OrgIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("GetNotificationPreferences failed", "error", err)
 		api.WriteError(w, err)
@@ -57,8 +57,7 @@ func (h *NotificationHandler) RegisterToken(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// TODO: extract real user ID from auth context
-	token.UserID = uuid.Nil
+	token.UserID = middleware.UserIDFromContext(r.Context())
 
 	created, err := h.service.RegisterPushToken(r.Context(), &token)
 	if err != nil {

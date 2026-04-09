@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // BudgetHandler handles HTTP requests for budgets, line items, categories,
@@ -36,11 +36,7 @@ func (h *BudgetHandler) CreateBudget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: resolve IDP user ID from auth context to a platform UUID via IAM module.
-	// For now, uuid.Nil is used as a placeholder until the routes wiring task.
-	createdBy := uuid.Nil
-
-	created, err := h.service.CreateBudget(r.Context(), orgID, createdBy, req)
+	created, err := h.service.CreateBudget(r.Context(), orgID, middleware.UserIDFromContext(r.Context()), req)
 	if err != nil {
 		h.logger.Error("CreateBudget failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
@@ -136,11 +132,7 @@ func (h *BudgetHandler) ProposeBudget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: resolve IDP user ID from auth context to a platform UUID via IAM module.
-	// For now, uuid.Nil is used as a placeholder until the routes wiring task.
-	proposedBy := uuid.Nil
-
-	updated, err := h.service.ProposeBudget(r.Context(), budgetID, proposedBy)
+	updated, err := h.service.ProposeBudget(r.Context(), budgetID, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("ProposeBudget failed", "budget_id", budgetID, "error", err)
 		api.WriteError(w, err)
@@ -164,11 +156,7 @@ func (h *BudgetHandler) ApproveBudget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: resolve IDP user ID from auth context to a platform UUID via IAM module.
-	// For now, uuid.Nil is used as a placeholder until the routes wiring task.
-	approvedBy := uuid.Nil
-
-	updated, err := h.service.ApproveBudget(r.Context(), budgetID, approvedBy)
+	updated, err := h.service.ApproveBudget(r.Context(), budgetID, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("ApproveBudget failed", "budget_id", budgetID, "error", err)
 		api.WriteError(w, err)
@@ -335,11 +323,7 @@ func (h *BudgetHandler) CreateExpense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: resolve IDP user ID from auth context to a platform UUID via IAM module.
-	// For now, uuid.Nil is used as a placeholder until the routes wiring task.
-	submittedBy := uuid.Nil
-
-	created, err := h.service.CreateExpense(r.Context(), orgID, submittedBy, req)
+	created, err := h.service.CreateExpense(r.Context(), orgID, middleware.UserIDFromContext(r.Context()), req)
 	if err != nil {
 		h.logger.Error("CreateExpense failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
@@ -405,11 +389,7 @@ func (h *BudgetHandler) ApproveExpense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: resolve IDP user ID from auth context to a platform UUID via IAM module.
-	// For now, uuid.Nil is used as a placeholder until the routes wiring task.
-	approvedBy := uuid.Nil
-
-	updated, err := h.service.ApproveExpense(r.Context(), expenseID, approvedBy)
+	updated, err := h.service.ApproveExpense(r.Context(), expenseID, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("ApproveExpense failed", "expense_id", expenseID, "error", err)
 		api.WriteError(w, err)

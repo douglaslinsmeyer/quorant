@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // PaymentHandler handles HTTP requests for payments and payment methods.
@@ -35,11 +35,7 @@ func (h *PaymentHandler) RecordPayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: resolve IDP user ID from auth context to a platform UUID via IAM module.
-	// For now, uuid.Nil is used as a placeholder until the routes wiring task.
-	userID := uuid.Nil
-
-	created, err := h.service.RecordPayment(r.Context(), orgID, userID, req)
+	created, err := h.service.RecordPayment(r.Context(), orgID, middleware.UserIDFromContext(r.Context()), req)
 	if err != nil {
 		h.logger.Error("RecordPayment failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
@@ -118,11 +114,6 @@ func (h *PaymentHandler) AddPaymentMethod(w http.ResponseWriter, r *http.Request
 }
 
 // ListPaymentMethods handles GET /organizations/{org_id}/payment-methods.
-// Uses the user_id query parameter to filter by user; falls back to uuid.Nil
-// (returns all) when not provided. Full user resolution will be wired in the
-// routes task.
-//
-// TODO: resolve user ID from auth context when IAM lookup is wired.
 func (h *PaymentHandler) ListPaymentMethods(w http.ResponseWriter, r *http.Request) {
 	_, err := parseFinOrgID(r)
 	if err != nil {
@@ -130,11 +121,7 @@ func (h *PaymentHandler) ListPaymentMethods(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// TODO: resolve IDP user ID from auth context to a platform UUID via IAM module.
-	// For now, uuid.Nil is used as a placeholder until the routes wiring task.
-	userID := uuid.Nil
-
-	methods, err := h.service.ListPaymentMethods(r.Context(), userID)
+	methods, err := h.service.ListPaymentMethods(r.Context(), middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("ListPaymentMethods failed", "error", err)
 		api.WriteError(w, err)

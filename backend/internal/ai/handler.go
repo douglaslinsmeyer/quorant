@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/org"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // AIHandler handles HTTP requests for all AI endpoints.
@@ -166,8 +167,7 @@ func (h *AIHandler) ApproveExtraction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: wire IAM — use actual user ID from context once IAM wiring is complete.
-	extraction, err := h.policyService.ApproveExtraction(r.Context(), extractionID, uuid.Nil)
+	extraction, err := h.policyService.ApproveExtraction(r.Context(), extractionID, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		api.WriteError(w, err)
 		return
@@ -184,8 +184,7 @@ func (h *AIHandler) RejectExtraction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: wire IAM — use actual user ID from context once IAM wiring is complete.
-	extraction, err := h.policyService.RejectExtraction(r.Context(), extractionID, uuid.Nil)
+	extraction, err := h.policyService.RejectExtraction(r.Context(), extractionID, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		api.WriteError(w, err)
 		return
@@ -208,8 +207,7 @@ func (h *AIHandler) ModifyExtraction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: wire IAM — use actual user ID from context once IAM wiring is complete.
-	extraction, err := h.policyService.ModifyExtraction(r.Context(), extractionID, req.Override, uuid.Nil)
+	extraction, err := h.policyService.ModifyExtraction(r.Context(), extractionID, req.Override, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		api.WriteError(w, err)
 		return
@@ -347,8 +345,7 @@ func (h *AIHandler) DecideResolution(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: wire IAM — use actual user ID from context once IAM wiring is complete.
-	resolution, err := h.policyService.DecideResolution(r.Context(), resolutionID, req.Decision, uuid.Nil)
+	resolution, err := h.policyService.DecideResolution(r.Context(), resolutionID, req.Decision, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		api.WriteError(w, err)
 		return

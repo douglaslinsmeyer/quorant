@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // BallotHandler handles HTTP requests for the ballots sub-domain.
@@ -33,8 +33,7 @@ func (h *BallotHandler) CreateBallot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: wire IAM — extract real creator ID from context
-	created, err := h.service.CreateBallot(r.Context(), orgID, req, uuid.Nil)
+	created, err := h.service.CreateBallot(r.Context(), orgID, req, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("CreateBallot failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
@@ -136,8 +135,7 @@ func (h *BallotHandler) CastVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: wire IAM — extract real voter ID from context
-	vote, err := h.service.CastBallotVote(r.Context(), ballotID, req, uuid.Nil)
+	vote, err := h.service.CastBallotVote(r.Context(), ballotID, req, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("CastVote failed", "ballot_id", ballotID, "error", err)
 		api.WriteError(w, err)
@@ -167,8 +165,7 @@ func (h *BallotHandler) FileProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: wire IAM — extract real grantor ID from context
-	proxy, err := h.service.FileProxy(r.Context(), ballotID, req, uuid.Nil)
+	proxy, err := h.service.FileProxy(r.Context(), ballotID, req, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("FileProxy failed", "ballot_id", ballotID, "error", err)
 		api.WriteError(w, err)

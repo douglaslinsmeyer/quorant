@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // CalendarHandler handles calendar event HTTP requests.
@@ -33,8 +33,7 @@ func (h *CalendarHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: extract real user ID from auth context
-	created, err := h.service.CreateCalendarEvent(r.Context(), orgID, req, uuid.Nil)
+	created, err := h.service.CreateCalendarEvent(r.Context(), orgID, req, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("CreateCalendarEvent failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
@@ -135,8 +134,7 @@ func (h *CalendarHandler) RSVP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: extract real user ID from auth context
-	rsvp, err := h.service.RSVPToEvent(r.Context(), eventID, req, uuid.Nil)
+	rsvp, err := h.service.RSVPToEvent(r.Context(), eventID, req, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("RSVPToEvent failed", "event_id", eventID, "error", err)
 		api.WriteError(w, err)
@@ -237,8 +235,7 @@ func (h *CalendarHandler) GetDirectoryPrefs(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// TODO: extract real user ID from auth context
-	prefs, err := h.service.GetDirectoryPreferences(r.Context(), uuid.Nil, orgID)
+	prefs, err := h.service.GetDirectoryPreferences(r.Context(), middleware.UserIDFromContext(r.Context()), orgID)
 	if err != nil {
 		h.logger.Error("GetDirectoryPreferences failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
@@ -262,8 +259,7 @@ func (h *CalendarHandler) UpdateDirectoryPrefs(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// TODO: extract real user ID from auth context
-	updated, err := h.service.UpdateDirectoryPreferences(r.Context(), uuid.Nil, orgID, req)
+	updated, err := h.service.UpdateDirectoryPreferences(r.Context(), middleware.UserIDFromContext(r.Context()), orgID, req)
 	if err != nil {
 		h.logger.Error("UpdateDirectoryPreferences failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)

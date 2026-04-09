@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // AnnouncementHandler handles announcement HTTP requests.
@@ -33,8 +34,7 @@ func (h *AnnouncementHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: extract real author ID from auth context
-	created, err := h.service.CreateAnnouncement(r.Context(), orgID, req, uuid.Nil)
+	created, err := h.service.CreateAnnouncement(r.Context(), orgID, req, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("CreateAnnouncement failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)

@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // ThreadHandler handles thread and message HTTP requests.
@@ -33,8 +33,7 @@ func (h *ThreadHandler) CreateThread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: extract real user ID from auth context
-	created, err := h.service.CreateThread(r.Context(), orgID, req, uuid.Nil)
+	created, err := h.service.CreateThread(r.Context(), orgID, req, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("CreateThread failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
@@ -94,8 +93,7 @@ func (h *ThreadHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: extract real sender ID from auth context
-	created, err := h.service.SendMessage(r.Context(), threadID, req, uuid.Nil)
+	created, err := h.service.SendMessage(r.Context(), threadID, req, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("SendMessage failed", "thread_id", threadID, "error", err)
 		api.WriteError(w, err)

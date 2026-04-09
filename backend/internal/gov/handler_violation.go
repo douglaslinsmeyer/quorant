@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // ViolationHandler handles HTTP requests for the violations sub-domain.
@@ -33,8 +34,7 @@ func (h *ViolationHandler) ReportViolation(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// TODO: wire IAM — extract real user ID from context
-	created, err := h.service.ReportViolation(r.Context(), orgID, req, uuid.Nil)
+	created, err := h.service.ReportViolation(r.Context(), orgID, req, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("ReportViolation failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
@@ -136,8 +136,7 @@ func (h *ViolationHandler) AddAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: wire IAM — extract real actor ID from context
-	action, err := h.service.AddViolationAction(r.Context(), violationID, req, uuid.Nil)
+	action, err := h.service.AddViolationAction(r.Context(), violationID, req, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("AddAction failed", "violation_id", violationID, "error", err)
 		api.WriteError(w, err)
@@ -161,8 +160,7 @@ func (h *ViolationHandler) VerifyCure(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: wire IAM — extract real verifier ID from context
-	updated, err := h.service.VerifyCure(r.Context(), violationID, uuid.Nil)
+	updated, err := h.service.VerifyCure(r.Context(), violationID, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("VerifyCure failed", "violation_id", violationID, "error", err)
 		api.WriteError(w, err)

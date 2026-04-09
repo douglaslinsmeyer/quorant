@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // DocHandler handles HTTP requests for the document management module.
@@ -37,8 +38,7 @@ func (h *DocHandler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: extract real user ID from JWT claims in context
-	created, err := h.service.UploadDocument(r.Context(), orgID, req, uuid.Nil)
+	created, err := h.service.UploadDocument(r.Context(), orgID, req, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("UploadDocument failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
@@ -190,8 +190,7 @@ func (h *DocHandler) UploadVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: extract real user ID from JWT claims in context
-	newVersion, err := h.service.UploadNewVersion(r.Context(), docID, req, uuid.Nil)
+	newVersion, err := h.service.UploadNewVersion(r.Context(), docID, req, middleware.UserIDFromContext(r.Context()))
 	if err != nil {
 		h.logger.Error("UploadVersion failed", "document_id", docID, "error", err)
 		api.WriteError(w, err)
