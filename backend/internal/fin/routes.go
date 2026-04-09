@@ -18,6 +18,7 @@ func RegisterRoutes(
 	budgetHandler *BudgetHandler,
 	fundHandler *FundHandler,
 	collectionHandler *CollectionHandler,
+	glHandler *GLHandler,
 	validator auth.TokenValidator,
 	checker middleware.PermissionChecker,
 	resolveUserID func(context.Context) (uuid.UUID, error),
@@ -93,4 +94,20 @@ func RegisterRoutes(
 	mux.Handle("POST /api/v1/organizations/{org_id}/collections/{case_id}/payment-plans", permMw("fin.payment_plan.manage", collectionHandler.CreatePaymentPlan))
 	mux.Handle("GET /api/v1/organizations/{org_id}/collections/{case_id}/payment-plans", permMw("fin.payment_plan.manage", collectionHandler.ListPaymentPlans))
 	mux.Handle("GET /api/v1/organizations/{org_id}/units/{unit_id}/collection-status", permMw("fin.collection.read", collectionHandler.GetUnitCollectionStatus))
+
+	// GL: Chart of Accounts
+	mux.Handle("POST /api/v1/organizations/{org_id}/gl/accounts", permMw("fin.gl.account.manage", glHandler.CreateAccount))
+	mux.Handle("GET /api/v1/organizations/{org_id}/gl/accounts", permMw("fin.gl.account.read", glHandler.ListAccounts))
+	mux.Handle("GET /api/v1/organizations/{org_id}/gl/accounts/{account_id}", permMw("fin.gl.account.read", glHandler.GetAccount))
+	mux.Handle("PATCH /api/v1/organizations/{org_id}/gl/accounts/{account_id}", permMw("fin.gl.account.manage", glHandler.UpdateAccount))
+	mux.Handle("DELETE /api/v1/organizations/{org_id}/gl/accounts/{account_id}", permMw("fin.gl.account.manage", glHandler.DeleteAccount))
+
+	// GL: Journal Entries
+	mux.Handle("POST /api/v1/organizations/{org_id}/gl/journal-entries", permMw("fin.gl.journal.create", glHandler.CreateJournalEntry))
+	mux.Handle("GET /api/v1/organizations/{org_id}/gl/journal-entries", permMw("fin.gl.journal.read", glHandler.ListJournalEntries))
+	mux.Handle("GET /api/v1/organizations/{org_id}/gl/journal-entries/{entry_id}", permMw("fin.gl.journal.read", glHandler.GetJournalEntry))
+
+	// GL: Reports
+	mux.Handle("GET /api/v1/organizations/{org_id}/gl/trial-balance", permMw("fin.gl.report.read", glHandler.GetTrialBalance))
+	mux.Handle("GET /api/v1/organizations/{org_id}/gl/account-balances", permMw("fin.gl.report.read", glHandler.GetAccountBalances))
 }

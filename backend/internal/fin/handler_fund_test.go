@@ -41,6 +41,7 @@ func setupFundTestServer(t *testing.T) *fundTestServer {
 		mockBudgetRepo,
 		mockFundRepo,
 		mockCollectionRepo,
+		nil,
 		audit.NewNoopAuditor(),
 		queue.NewInMemoryPublisher(),
 		ai.NewNoopPolicyResolver(),

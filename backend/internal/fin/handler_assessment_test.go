@@ -44,6 +44,7 @@ func setupAssessmentTestServer(t *testing.T) *assessmentTestServer {
 		mockBudgetRepo,
 		mockFundRepo,
 		mockCollectionRepo,
+		nil,
 		audit.NewNoopAuditor(),
 		queue.NewInMemoryPublisher(),
 		ai.NewNoopPolicyResolver(),
