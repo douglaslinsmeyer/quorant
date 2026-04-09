@@ -17,15 +17,15 @@
    ============================================================ */
 :root {
   /* --- Primary (Teal) --- */
-  --color-primary-900: #072D3B;
-  --color-primary-800: #0A3D4F;
-  --color-primary-700: #0E4F65;
-  --color-primary-600: #13647E;
-  --color-primary-500: #1A7A9A;
-  --color-primary-400: #2196B8;
-  --color-primary-300: #3DACC9;
-  --color-primary-200: #5BBDD6;
-  --color-primary-100: #A3DAE8;
+  --color-primary-900: #0A3D4F;
+  --color-primary-800: #0E4F65;
+  --color-primary-700: #13647E;
+  --color-primary-600: #1A7A9A;
+  --color-primary-500: #2391B4;
+  --color-primary-400: #3DACC9;
+  --color-primary-300: #6FC4DA;
+  --color-primary-200: #A3DAE8;
+  --color-primary-100: #D1EDF4;
   --color-primary-50:  #EBF7FB;
 
   /* --- Secondary (Amber) --- */
