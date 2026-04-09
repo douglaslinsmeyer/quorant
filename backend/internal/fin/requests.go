@@ -188,6 +188,22 @@ func (r CreateFundTransferRequest) Validate() error {
 	return nil
 }
 
+// UpdateBudgetRequest holds the fields that can be patched on an existing budget.
+type UpdateBudgetRequest struct {
+	Name  *string `json:"name,omitempty"`
+	Notes *string `json:"notes,omitempty"`
+}
+
+// UpdateCollectionRequest holds the fields that can be patched on an existing
+// collection case.
+type UpdateCollectionRequest struct {
+	Status           *string    `json:"status,omitempty"`
+	EscalationPaused *bool      `json:"escalation_paused,omitempty"`
+	PauseReason      *string    `json:"pause_reason,omitempty"`
+	AssignedTo       *uuid.UUID `json:"assigned_to,omitempty"`
+	ClosedReason     *string    `json:"closed_reason,omitempty"`
+}
+
 // CreateCollectionActionRequest is the request body for adding an action to a
 // collection case.
 type CreateCollectionActionRequest struct {

@@ -324,6 +324,21 @@ func (s *FinService) ListBudgets(ctx context.Context, orgID uuid.UUID) ([]Budget
 	return s.budgets.ListBudgetsByOrg(ctx, orgID)
 }
 
+// UpdateBudget applies partial updates (name, notes) to an existing budget.
+func (s *FinService) UpdateBudget(ctx context.Context, id uuid.UUID, req UpdateBudgetRequest) (*Budget, error) {
+	b, err := s.GetBudget(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if req.Name != nil {
+		b.Name = *req.Name
+	}
+	if req.Notes != nil {
+		b.Notes = req.Notes
+	}
+	return s.budgets.UpdateBudget(ctx, b)
+}
+
 // ProposeBudget transitions a budget from "draft" to "proposed".
 func (s *FinService) ProposeBudget(ctx context.Context, id uuid.UUID, proposedBy uuid.UUID) (*Budget, error) {
 	b, err := s.GetBudget(ctx, id)
