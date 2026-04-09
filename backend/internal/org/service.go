@@ -15,13 +15,16 @@ import (
 
 // OrgService provides business logic for organization operations.
 type OrgService struct {
-	orgRepo        OrgRepository
-	membershipRepo MembershipRepository
-	unitRepo       UnitRepository
-	userRepo UserFinder
-	auditor        audit.Auditor
-	publisher      queue.Publisher
-	logger         *slog.Logger
+	orgRepo          OrgRepository
+	membershipRepo   MembershipRepository
+	unitRepo         UnitRepository
+	amenityRepo      AmenityRepository
+	vendorRepo       VendorRepository
+	registrationRepo RegistrationRepository
+	userRepo         UserFinder
+	auditor          audit.Auditor
+	publisher        queue.Publisher
+	logger           *slog.Logger
 }
 
 // NewOrgService constructs an OrgService backed by the given repositories.
@@ -43,6 +46,24 @@ func NewOrgService(
 		publisher:      publisher,
 		logger:         logger,
 	}
+}
+
+// WithAmenityRepo sets the amenity repository on the service (optional).
+func (s *OrgService) WithAmenityRepo(repo AmenityRepository) *OrgService {
+	s.amenityRepo = repo
+	return s
+}
+
+// WithVendorRepo sets the vendor repository on the service (optional).
+func (s *OrgService) WithVendorRepo(repo VendorRepository) *OrgService {
+	s.vendorRepo = repo
+	return s
+}
+
+// WithRegistrationRepo sets the registration repository on the service (optional).
+func (s *OrgService) WithRegistrationRepo(repo RegistrationRepository) *OrgService {
+	s.registrationRepo = repo
+	return s
 }
 
 // ─── Organization operations ─────────────────────────────────────────────────
@@ -592,4 +613,542 @@ func (s *OrgService) GetOwnershipHistory(ctx context.Context, unitID uuid.UUID) 
 		return nil, fmt.Errorf("org service: GetOwnershipHistory: %w", err)
 	}
 	return history, nil
+}
+
+// ─── Amenity operations ──────────────────────────────────────────────────────
+
+// CreateAmenity validates the request and creates a new amenity within an org.
+func (s *OrgService) CreateAmenity(ctx context.Context, orgID uuid.UUID, req CreateAmenityRequest) (*Amenity, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	a := &Amenity{
+		OrgID:            orgID,
+		Name:             req.Name,
+		AmenityType:      req.AmenityType,
+		Description:      req.Description,
+		Location:         req.Location,
+		Capacity:         req.Capacity,
+		IsReservable:     req.IsReservable,
+		ReservationRules: req.ReservationRules,
+		FeeCents:         req.FeeCents,
+		Hours:            req.Hours,
+		Status:           "open",
+		Metadata:         req.Metadata,
+	}
+	if a.ReservationRules == nil {
+		a.ReservationRules = map[string]any{}
+	}
+	if a.Hours == nil {
+		a.Hours = map[string]any{}
+	}
+	if a.Metadata == nil {
+		a.Metadata = map[string]any{}
+	}
+
+	created, err := s.amenityRepo.CreateAmenity(ctx, a)
+	if err != nil {
+		return nil, fmt.Errorf("org service: CreateAmenity: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "amenity created", "amenity_id", created.ID, "org_id", orgID)
+	return created, nil
+}
+
+// GetAmenity returns an amenity by ID, or a NotFoundError if it does not exist.
+func (s *OrgService) GetAmenity(ctx context.Context, id uuid.UUID) (*Amenity, error) {
+	a, err := s.amenityRepo.FindAmenityByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("org service: GetAmenity: %w", err)
+	}
+	if a == nil {
+		return nil, api.NewNotFoundError(fmt.Sprintf("amenity %s not found", id))
+	}
+	return a, nil
+}
+
+// ListAmenities returns amenities for the given org, supporting cursor-based pagination.
+func (s *OrgService) ListAmenities(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Amenity, bool, error) {
+	amenities, hasMore, err := s.amenityRepo.ListAmenitiesByOrg(ctx, orgID, limit, afterID)
+	if err != nil {
+		return nil, false, fmt.Errorf("org service: ListAmenities: %w", err)
+	}
+	return amenities, hasMore, nil
+}
+
+// UpdateAmenity applies partial updates to an amenity.
+func (s *OrgService) UpdateAmenity(ctx context.Context, id uuid.UUID, req UpdateAmenityRequest) (*Amenity, error) {
+	a, err := s.GetAmenity(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.Name != nil {
+		a.Name = *req.Name
+	}
+	if req.AmenityType != nil {
+		a.AmenityType = *req.AmenityType
+	}
+	if req.Description != nil {
+		a.Description = req.Description
+	}
+	if req.Location != nil {
+		a.Location = req.Location
+	}
+	if req.Capacity != nil {
+		a.Capacity = req.Capacity
+	}
+	if req.IsReservable != nil {
+		a.IsReservable = *req.IsReservable
+	}
+	if req.ReservationRules != nil {
+		a.ReservationRules = req.ReservationRules
+	}
+	if req.FeeCents != nil {
+		a.FeeCents = req.FeeCents
+	}
+	if req.Hours != nil {
+		a.Hours = req.Hours
+	}
+	if req.Status != nil {
+		a.Status = *req.Status
+	}
+	if req.Metadata != nil {
+		a.Metadata = req.Metadata
+	}
+
+	updated, err := s.amenityRepo.UpdateAmenity(ctx, a)
+	if err != nil {
+		return nil, fmt.Errorf("org service: UpdateAmenity: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "amenity updated", "amenity_id", id)
+	return updated, nil
+}
+
+// DeleteAmenity soft-deletes an amenity by ID.
+func (s *OrgService) DeleteAmenity(ctx context.Context, id uuid.UUID) error {
+	if err := s.amenityRepo.SoftDeleteAmenity(ctx, id); err != nil {
+		return fmt.Errorf("org service: DeleteAmenity: %w", err)
+	}
+	s.logger.InfoContext(ctx, "amenity deleted", "amenity_id", id)
+	return nil
+}
+
+// CreateReservation validates the request and creates a new amenity reservation.
+func (s *OrgService) CreateReservation(ctx context.Context, orgID, amenityID uuid.UUID, req CreateReservationRequest) (*AmenityReservation, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	res := &AmenityReservation{
+		AmenityID:  amenityID,
+		OrgID:      orgID,
+		UserID:     req.UserID,
+		UnitID:     req.UnitID,
+		StartsAt:   req.StartsAt,
+		EndsAt:     req.EndsAt,
+		GuestCount: req.GuestCount,
+		Notes:      req.Notes,
+	}
+
+	created, err := s.amenityRepo.CreateReservation(ctx, res)
+	if err != nil {
+		return nil, fmt.Errorf("org service: CreateReservation: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "reservation created", "reservation_id", created.ID, "amenity_id", amenityID)
+	return created, nil
+}
+
+// ListAmenityReservations returns all reservations for an amenity.
+func (s *OrgService) ListAmenityReservations(ctx context.Context, amenityID uuid.UUID) ([]AmenityReservation, error) {
+	reservations, err := s.amenityRepo.ListReservationsByAmenity(ctx, amenityID)
+	if err != nil {
+		return nil, fmt.Errorf("org service: ListAmenityReservations: %w", err)
+	}
+	return reservations, nil
+}
+
+// ListUserReservations returns all reservations for the current user within an org.
+func (s *OrgService) ListUserReservations(ctx context.Context, orgID, userID uuid.UUID) ([]AmenityReservation, error) {
+	reservations, err := s.amenityRepo.ListReservationsByUser(ctx, orgID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("org service: ListUserReservations: %w", err)
+	}
+	return reservations, nil
+}
+
+// GetReservation returns a reservation by ID, or a NotFoundError if it does not exist.
+func (s *OrgService) GetReservation(ctx context.Context, id uuid.UUID) (*AmenityReservation, error) {
+	res, err := s.amenityRepo.FindReservationByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("org service: GetReservation: %w", err)
+	}
+	if res == nil {
+		return nil, api.NewNotFoundError(fmt.Sprintf("reservation %s not found", id))
+	}
+	return res, nil
+}
+
+// UpdateReservation applies partial updates to a reservation.
+func (s *OrgService) UpdateReservation(ctx context.Context, id uuid.UUID, req UpdateReservationRequest) (*AmenityReservation, error) {
+	res, err := s.GetReservation(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.Status != nil {
+		res.Status = *req.Status
+	}
+	if req.StartsAt != nil {
+		res.StartsAt = *req.StartsAt
+	}
+	if req.EndsAt != nil {
+		res.EndsAt = *req.EndsAt
+	}
+	if req.GuestCount != nil {
+		res.GuestCount = req.GuestCount
+	}
+	if req.Notes != nil {
+		res.Notes = req.Notes
+	}
+
+	updated, err := s.amenityRepo.UpdateReservation(ctx, res)
+	if err != nil {
+		return nil, fmt.Errorf("org service: UpdateReservation: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "reservation updated", "reservation_id", id)
+	return updated, nil
+}
+
+// ─── Vendor operations ───────────────────────────────────────────────────────
+
+// CreateVendor validates the request and creates a new vendor.
+func (s *OrgService) CreateVendor(ctx context.Context, req CreateVendorRequest) (*Vendor, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	v := &Vendor{
+		Name:            req.Name,
+		ContactEmail:    req.ContactEmail,
+		ContactPhone:    req.ContactPhone,
+		ServiceTypes:    req.ServiceTypes,
+		LicenseNumber:   req.LicenseNumber,
+		InsuranceExpiry: req.InsuranceExpiry,
+		Metadata:        req.Metadata,
+	}
+	if v.ServiceTypes == nil {
+		v.ServiceTypes = []string{}
+	}
+	if v.Metadata == nil {
+		v.Metadata = map[string]any{}
+	}
+
+	created, err := s.vendorRepo.CreateVendor(ctx, v)
+	if err != nil {
+		return nil, fmt.Errorf("org service: CreateVendor: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "vendor created", "vendor_id", created.ID)
+	return created, nil
+}
+
+// GetVendor returns a vendor by ID, or a NotFoundError if it does not exist.
+func (s *OrgService) GetVendor(ctx context.Context, id uuid.UUID) (*Vendor, error) {
+	v, err := s.vendorRepo.FindVendorByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("org service: GetVendor: %w", err)
+	}
+	if v == nil {
+		return nil, api.NewNotFoundError(fmt.Sprintf("vendor %s not found", id))
+	}
+	return v, nil
+}
+
+// ListVendors returns vendors, supporting cursor-based pagination.
+func (s *OrgService) ListVendors(ctx context.Context, limit int, afterID *uuid.UUID) ([]Vendor, bool, error) {
+	vendors, hasMore, err := s.vendorRepo.ListVendors(ctx, limit, afterID)
+	if err != nil {
+		return nil, false, fmt.Errorf("org service: ListVendors: %w", err)
+	}
+	return vendors, hasMore, nil
+}
+
+// UpdateVendor applies partial updates to a vendor.
+func (s *OrgService) UpdateVendor(ctx context.Context, id uuid.UUID, req UpdateVendorRequest) (*Vendor, error) {
+	v, err := s.GetVendor(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.Name != nil {
+		v.Name = *req.Name
+	}
+	if req.ContactEmail != nil {
+		v.ContactEmail = req.ContactEmail
+	}
+	if req.ContactPhone != nil {
+		v.ContactPhone = req.ContactPhone
+	}
+	if req.ServiceTypes != nil {
+		v.ServiceTypes = req.ServiceTypes
+	}
+	if req.LicenseNumber != nil {
+		v.LicenseNumber = req.LicenseNumber
+	}
+	if req.InsuranceExpiry != nil {
+		v.InsuranceExpiry = req.InsuranceExpiry
+	}
+	if req.Metadata != nil {
+		v.Metadata = req.Metadata
+	}
+
+	updated, err := s.vendorRepo.UpdateVendor(ctx, v)
+	if err != nil {
+		return nil, fmt.Errorf("org service: UpdateVendor: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "vendor updated", "vendor_id", id)
+	return updated, nil
+}
+
+// DeleteVendor soft-deletes a vendor by ID.
+func (s *OrgService) DeleteVendor(ctx context.Context, id uuid.UUID) error {
+	if err := s.vendorRepo.SoftDeleteVendor(ctx, id); err != nil {
+		return fmt.Errorf("org service: DeleteVendor: %w", err)
+	}
+	s.logger.InfoContext(ctx, "vendor deleted", "vendor_id", id)
+	return nil
+}
+
+// CreateVendorAssignment validates the request and assigns a vendor to an org.
+func (s *OrgService) CreateVendorAssignment(ctx context.Context, orgID uuid.UUID, req CreateVendorAssignmentRequest) (*VendorAssignment, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	a := &VendorAssignment{
+		VendorID:     req.VendorID,
+		OrgID:        orgID,
+		ServiceScope: req.ServiceScope,
+		ContractRef:  req.ContractRef,
+	}
+
+	created, err := s.vendorRepo.CreateAssignment(ctx, a)
+	if err != nil {
+		return nil, fmt.Errorf("org service: CreateVendorAssignment: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "vendor assignment created", "assignment_id", created.ID, "org_id", orgID, "vendor_id", req.VendorID)
+	return created, nil
+}
+
+// ListVendorAssignments returns all active vendor assignments for an org.
+func (s *OrgService) ListVendorAssignments(ctx context.Context, orgID uuid.UUID) ([]VendorAssignment, error) {
+	assignments, err := s.vendorRepo.ListAssignmentsByOrg(ctx, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("org service: ListVendorAssignments: %w", err)
+	}
+	return assignments, nil
+}
+
+// DeleteVendorAssignment ends a vendor assignment.
+func (s *OrgService) DeleteVendorAssignment(ctx context.Context, id uuid.UUID) error {
+	if err := s.vendorRepo.DeleteAssignment(ctx, id); err != nil {
+		return fmt.Errorf("org service: DeleteVendorAssignment: %w", err)
+	}
+	s.logger.InfoContext(ctx, "vendor assignment deleted", "assignment_id", id)
+	return nil
+}
+
+// ─── Registration operations ─────────────────────────────────────────────────
+
+// CreateRegistrationType validates the request and creates a new registration type.
+func (s *OrgService) CreateRegistrationType(ctx context.Context, orgID uuid.UUID, req CreateRegistrationTypeRequest) (*RegistrationType, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	rt := &RegistrationType{
+		OrgID:            orgID,
+		Name:             req.Name,
+		Slug:             req.Slug,
+		Schema:           req.Schema,
+		MaxPerUnit:       req.MaxPerUnit,
+		RequiresApproval: req.RequiresApproval,
+		IsActive:         true,
+	}
+	if rt.Schema == nil {
+		rt.Schema = map[string]any{}
+	}
+
+	created, err := s.registrationRepo.CreateRegistrationType(ctx, rt)
+	if err != nil {
+		return nil, fmt.Errorf("org service: CreateRegistrationType: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "registration type created", "registration_type_id", created.ID, "org_id", orgID)
+	return created, nil
+}
+
+// ListRegistrationTypes returns all registration types for an org.
+func (s *OrgService) ListRegistrationTypes(ctx context.Context, orgID uuid.UUID) ([]RegistrationType, error) {
+	types, err := s.registrationRepo.ListRegistrationTypesByOrg(ctx, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("org service: ListRegistrationTypes: %w", err)
+	}
+	return types, nil
+}
+
+// UpdateRegistrationType applies partial updates to a registration type.
+func (s *OrgService) UpdateRegistrationType(ctx context.Context, id uuid.UUID, req UpdateRegistrationTypeRequest) (*RegistrationType, error) {
+	rt, err := s.registrationRepo.FindRegistrationTypeByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("org service: UpdateRegistrationType find: %w", err)
+	}
+	if rt == nil {
+		return nil, api.NewNotFoundError(fmt.Sprintf("registration type %s not found", id))
+	}
+
+	if req.Name != nil {
+		rt.Name = *req.Name
+	}
+	if req.Slug != nil {
+		rt.Slug = *req.Slug
+	}
+	if req.Schema != nil {
+		rt.Schema = req.Schema
+	}
+	if req.MaxPerUnit != nil {
+		rt.MaxPerUnit = req.MaxPerUnit
+	}
+	if req.RequiresApproval != nil {
+		rt.RequiresApproval = *req.RequiresApproval
+	}
+	if req.IsActive != nil {
+		rt.IsActive = *req.IsActive
+	}
+
+	updated, err := s.registrationRepo.UpdateRegistrationType(ctx, rt)
+	if err != nil {
+		return nil, fmt.Errorf("org service: UpdateRegistrationType: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "registration type updated", "registration_type_id", id)
+	return updated, nil
+}
+
+// CreateRegistration validates the request and creates a new registration.
+func (s *OrgService) CreateRegistration(ctx context.Context, orgID, unitID uuid.UUID, req CreateRegistrationRequest) (*Registration, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	reg := &Registration{
+		OrgID:              orgID,
+		UnitID:             unitID,
+		UserID:             req.UserID,
+		RegistrationTypeID: req.RegistrationTypeID,
+		Data:               req.Data,
+		ExpiresAt:          req.ExpiresAt,
+	}
+	if reg.Data == nil {
+		reg.Data = map[string]any{}
+	}
+
+	created, err := s.registrationRepo.CreateRegistration(ctx, reg)
+	if err != nil {
+		return nil, fmt.Errorf("org service: CreateRegistration: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "registration created", "registration_id", created.ID, "unit_id", unitID)
+	return created, nil
+}
+
+// ListRegistrations returns all registrations for a unit.
+func (s *OrgService) ListRegistrations(ctx context.Context, unitID uuid.UUID) ([]Registration, error) {
+	registrations, err := s.registrationRepo.ListRegistrationsByUnit(ctx, unitID)
+	if err != nil {
+		return nil, fmt.Errorf("org service: ListRegistrations: %w", err)
+	}
+	return registrations, nil
+}
+
+// GetRegistration returns a registration by ID, or a NotFoundError if it does not exist.
+func (s *OrgService) GetRegistration(ctx context.Context, id uuid.UUID) (*Registration, error) {
+	reg, err := s.registrationRepo.FindRegistrationByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("org service: GetRegistration: %w", err)
+	}
+	if reg == nil {
+		return nil, api.NewNotFoundError(fmt.Sprintf("registration %s not found", id))
+	}
+	return reg, nil
+}
+
+// UpdateRegistration applies partial updates to a registration.
+func (s *OrgService) UpdateRegistration(ctx context.Context, id uuid.UUID, req UpdateRegistrationRequest) (*Registration, error) {
+	reg, err := s.GetRegistration(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.Data != nil {
+		reg.Data = req.Data
+	}
+	if req.Status != nil {
+		reg.Status = *req.Status
+	}
+	if req.ExpiresAt != nil {
+		reg.ExpiresAt = req.ExpiresAt
+	}
+
+	updated, err := s.registrationRepo.UpdateRegistration(ctx, reg)
+	if err != nil {
+		return nil, fmt.Errorf("org service: UpdateRegistration: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "registration updated", "registration_id", id)
+	return updated, nil
+}
+
+// ApproveRegistration sets a registration's status to approved.
+func (s *OrgService) ApproveRegistration(ctx context.Context, id, approverID uuid.UUID) (*Registration, error) {
+	reg, err := s.GetRegistration(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	now := reg.UpdatedAt
+	_ = now
+	reg.Status = "active"
+	reg.ApprovedBy = &approverID
+
+	updated, err := s.registrationRepo.UpdateRegistration(ctx, reg)
+	if err != nil {
+		return nil, fmt.Errorf("org service: ApproveRegistration: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "registration approved", "registration_id", id, "approved_by", approverID)
+	return updated, nil
+}
+
+// RevokeRegistration soft-deletes a registration by marking it revoked.
+func (s *OrgService) RevokeRegistration(ctx context.Context, id uuid.UUID) error {
+	reg, err := s.GetRegistration(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	reg.Status = "revoked"
+	if _, err := s.registrationRepo.UpdateRegistration(ctx, reg); err != nil {
+		return fmt.Errorf("org service: RevokeRegistration: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "registration revoked", "registration_id", id)
+	return nil
 }

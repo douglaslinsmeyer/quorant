@@ -139,3 +139,68 @@ type Amenity struct {
 	UpdatedAt        time.Time      `json:"updated_at"`
 	DeletedAt        *time.Time     `json:"deleted_at,omitempty"`
 }
+
+// AmenityReservation represents a reservation of an amenity by a resident.
+type AmenityReservation struct {
+	ID                 uuid.UUID  `json:"id"`
+	AmenityID          uuid.UUID  `json:"amenity_id"`
+	OrgID              uuid.UUID  `json:"org_id"`
+	UserID             uuid.UUID  `json:"user_id"`
+	UnitID             uuid.UUID  `json:"unit_id"`
+	Status             string     `json:"status"` // pending, confirmed, cancelled, completed, no_show
+	StartsAt           time.Time  `json:"starts_at"`
+	EndsAt             time.Time  `json:"ends_at"`
+	GuestCount         *int       `json:"guest_count,omitempty"`
+	FeeCents           *int64     `json:"fee_cents,omitempty"`
+	DepositCents       *int64     `json:"deposit_cents,omitempty"`
+	DepositRefunded    bool       `json:"deposit_refunded"`
+	Notes              *string    `json:"notes,omitempty"`
+	CancelledAt        *time.Time `json:"cancelled_at,omitempty"`
+	CancelledBy        *uuid.UUID `json:"cancelled_by,omitempty"`
+	CancellationReason *string    `json:"cancellation_reason,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+}
+
+// VendorAssignment links a vendor to an organization with a service scope.
+type VendorAssignment struct {
+	ID           uuid.UUID  `json:"id"`
+	VendorID     uuid.UUID  `json:"vendor_id"`
+	OrgID        uuid.UUID  `json:"org_id"`
+	ServiceScope string     `json:"service_scope"`
+	ContractRef  *string    `json:"contract_ref,omitempty"`
+	StartedAt    time.Time  `json:"started_at"`
+	EndedAt      *time.Time `json:"ended_at,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+}
+
+// RegistrationType defines a type of unit registration (e.g., pet, vehicle).
+type RegistrationType struct {
+	ID               uuid.UUID      `json:"id"`
+	OrgID            uuid.UUID      `json:"org_id"`
+	Name             string         `json:"name"`
+	Slug             string         `json:"slug"`
+	Schema           map[string]any `json:"schema"`
+	MaxPerUnit       *int           `json:"max_per_unit,omitempty"`
+	RequiresApproval bool           `json:"requires_approval"`
+	IsActive         bool           `json:"is_active"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
+}
+
+// Registration represents a unit registration record (e.g., pet, vehicle).
+type Registration struct {
+	ID                 uuid.UUID      `json:"id"`
+	OrgID              uuid.UUID      `json:"org_id"`
+	UnitID             uuid.UUID      `json:"unit_id"`
+	UserID             uuid.UUID      `json:"user_id"`
+	RegistrationTypeID uuid.UUID      `json:"registration_type_id"`
+	Data               map[string]any `json:"data"`
+	Status             string         `json:"status"` // active, pending, revoked
+	ApprovedBy         *uuid.UUID     `json:"approved_by,omitempty"`
+	ApprovedAt         *time.Time     `json:"approved_at,omitempty"`
+	ExpiresAt          *time.Time     `json:"expires_at,omitempty"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	DeletedAt          *time.Time     `json:"deleted_at,omitempty"`
+}
