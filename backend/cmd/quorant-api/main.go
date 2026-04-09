@@ -14,6 +14,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/quorant/quorant/internal/audit"
+	"github.com/quorant/quorant/internal/com"
 	"github.com/quorant/quorant/internal/fin"
 	"github.com/quorant/quorant/internal/gov"
 	"github.com/quorant/quorant/internal/iam"
@@ -144,6 +145,22 @@ func run() error {
 	ballotHandler := gov.NewBallotHandler(govService, logger)
 	meetingHandler := gov.NewMeetingHandler(govService, logger)
 	gov.RegisterRoutes(mux, violationHandler, arbHandler, ballotHandler, meetingHandler, tokenValidator)
+
+	// Com module
+	announcementRepo := com.NewPostgresAnnouncementRepository(pool)
+	threadRepo := com.NewPostgresThreadRepository(pool)
+	notificationRepo := com.NewPostgresNotificationRepository(pool)
+	calendarRepo := com.NewPostgresCalendarRepository(pool)
+	templateRepo := com.NewPostgresTemplateRepository(pool)
+	directoryRepo := com.NewPostgresDirectoryRepository(pool)
+	commLogRepo := com.NewPostgresCommLogRepository(pool)
+	comService := com.NewComService(announcementRepo, threadRepo, notificationRepo, calendarRepo, templateRepo, directoryRepo, commLogRepo, logger)
+	announcementHandler := com.NewAnnouncementHandler(comService, logger)
+	threadHandler := com.NewThreadHandler(comService, logger)
+	calendarHandler := com.NewCalendarHandler(comService, logger)
+	notificationHandler := com.NewNotificationHandler(comService, logger)
+	commLogHandler := com.NewCommLogHandler(comService, logger)
+	com.RegisterRoutes(mux, announcementHandler, threadHandler, calendarHandler, notificationHandler, commLogHandler, tokenValidator)
 
 	// 10. Middleware chain (innermost to outermost)
 	var handler http.Handler = mux
