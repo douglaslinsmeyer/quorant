@@ -512,6 +512,82 @@ func TestUpdateDelivery_UpdatesStatusAndAttempts(t *testing.T) {
 	assert.Equal(t, `{"ok":true}`, *updated.ResponseBody)
 }
 
+func TestCreateDelivery_TruncatesLongResponseBody(t *testing.T) {
+	fix := newWebhookTestFixture(t)
+	repo := webhook.NewPostgresWebhookRepository(fix.pool)
+	ctx := context.Background()
+
+	sub, err := repo.CreateSubscription(ctx, &webhook.Subscription{
+		OrgID:         fix.orgID,
+		Name:          "Truncation Test Hook",
+		EventPatterns: []string{"quorant.gov.*"},
+		TargetURL:     "https://example.com/hook",
+		Secret:        "secret",
+		Headers:       map[string]string{},
+		IsActive:      true,
+		RetryPolicy:   webhook.DefaultRetryPolicy(),
+		CreatedBy:     fix.userID,
+	})
+	require.NoError(t, err)
+
+	longBody := strings.Repeat("x", 8192) // 8KB — should be truncated to 4096
+	code := 200
+	created, err := repo.CreateDelivery(ctx, &webhook.Delivery{
+		SubscriptionID: sub.ID,
+		EventID:        uuid.New(),
+		EventType:      "quorant.gov.ViolationCreated",
+		Status:         webhook.DeliveryStatusDelivered,
+		Attempts:       1,
+		ResponseCode:   &code,
+		ResponseBody:   &longBody,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, created.ResponseBody)
+	assert.Len(t, *created.ResponseBody, 4096, "response body should be truncated to 4096 bytes")
+}
+
+func TestUpdateDelivery_TruncatesLongResponseBody(t *testing.T) {
+	fix := newWebhookTestFixture(t)
+	repo := webhook.NewPostgresWebhookRepository(fix.pool)
+	ctx := context.Background()
+
+	sub, err := repo.CreateSubscription(ctx, &webhook.Subscription{
+		OrgID:         fix.orgID,
+		Name:          "Update Truncation Hook",
+		EventPatterns: []string{"quorant.gov.*"},
+		TargetURL:     "https://example.com/hook",
+		Secret:        "secret",
+		Headers:       map[string]string{},
+		IsActive:      true,
+		RetryPolicy:   webhook.DefaultRetryPolicy(),
+		CreatedBy:     fix.userID,
+	})
+	require.NoError(t, err)
+
+	created, err := repo.CreateDelivery(ctx, &webhook.Delivery{
+		SubscriptionID: sub.ID,
+		EventID:        uuid.New(),
+		EventType:      "quorant.gov.ViolationCreated",
+		Status:         webhook.DeliveryStatusPending,
+		Attempts:       0,
+	})
+	require.NoError(t, err)
+
+	longBody := strings.Repeat("y", 5000)
+	code := 500
+	created.Status = webhook.DeliveryStatusFailed
+	created.Attempts = 1
+	created.ResponseCode = &code
+	created.ResponseBody = &longBody
+
+	updated, err := repo.UpdateDelivery(ctx, created)
+
+	require.NoError(t, err)
+	require.NotNil(t, updated.ResponseBody)
+	assert.Len(t, *updated.ResponseBody, 4096, "response body should be truncated to 4096 bytes on update")
+}
+
 func TestFindPendingDeliveries_ReturnsPendingAndRetrying(t *testing.T) {
 	fix := newWebhookTestFixture(t)
 	repo := webhook.NewPostgresWebhookRepository(fix.pool)

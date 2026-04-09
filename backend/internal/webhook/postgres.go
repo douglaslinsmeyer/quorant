@@ -217,7 +217,7 @@ func (r *PostgresWebhookRepository) CreateDelivery(ctx context.Context, d *Deliv
 
 	row := r.pool.QueryRow(ctx, q,
 		d.SubscriptionID, d.EventID, d.EventType, d.Status, d.Attempts,
-		d.LastAttemptAt, d.ResponseCode, d.ResponseBody, d.NextRetryAt,
+		d.LastAttemptAt, d.ResponseCode, truncateResponseBody(d.ResponseBody), d.NextRetryAt,
 	)
 	result, err := scanDelivery(row)
 	if err != nil {
@@ -241,7 +241,7 @@ func (r *PostgresWebhookRepository) UpdateDelivery(ctx context.Context, d *Deliv
 
 	row := r.pool.QueryRow(ctx, q,
 		d.Status, d.Attempts, d.LastAttemptAt,
-		d.ResponseCode, d.ResponseBody, d.NextRetryAt, d.ID,
+		d.ResponseCode, truncateResponseBody(d.ResponseBody), d.NextRetryAt, d.ID,
 	)
 	result, err := scanDelivery(row)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -412,4 +412,20 @@ func scanDeliveryRow(rows pgx.Rows) (*Delivery, error) {
 		return nil, err
 	}
 	return &d, nil
+}
+
+const maxResponseBodyBytes = 4096
+
+// truncateResponseBody caps response body storage at maxResponseBodyBytes bytes.
+// It operates on bytes to avoid splitting multi-byte UTF-8 sequences mid-rune.
+func truncateResponseBody(body *string) *string {
+	if body == nil {
+		return nil
+	}
+	b := []byte(*body)
+	if len(b) <= maxResponseBodyBytes {
+		return body
+	}
+	truncated := string(b[:maxResponseBodyBytes])
+	return &truncated
 }

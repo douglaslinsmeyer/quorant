@@ -183,7 +183,130 @@ func TestCreateSubscriptionRequest_Validate_HTTPAllowed(t *testing.T) {
 	req := webhook.CreateSubscriptionRequest{
 		Name:          "My Hook",
 		EventPatterns: []string{"quorant.gov.*"},
-		TargetURL:     "http://localhost:8080/webhook",
+		TargetURL:     "http://external.example.com/webhook",
+	}
+	assert.NoError(t, req.Validate())
+}
+
+// ─── SSRF protection ──────────────────────────────────────────────────────────
+
+func TestCreateSubscriptionRequest_Validate_BlocksLocalhost(t *testing.T) {
+	for _, rawURL := range []string{
+		"http://localhost/hook",
+		"http://localhost:8080/hook",
+		"https://localhost/hook",
+	} {
+		req := webhook.CreateSubscriptionRequest{
+			Name:          "Hook",
+			EventPatterns: []string{"quorant.gov.*"},
+			TargetURL:     rawURL,
+		}
+		err := req.Validate()
+		require.Errorf(t, err, "expected SSRF block for %s", rawURL)
+		assert.Contains(t, err.Error(), "target_url")
+	}
+}
+
+func TestCreateSubscriptionRequest_Validate_BlocksPrivateIPv4(t *testing.T) {
+	privateURLs := []string{
+		"http://127.0.0.1/hook",
+		"http://10.0.0.1/hook",
+		"http://172.16.0.1/hook",
+		"http://172.31.255.255/hook",
+		"http://192.168.1.1/hook",
+		"http://169.254.169.254/hook", // AWS metadata
+	}
+	for _, rawURL := range privateURLs {
+		req := webhook.CreateSubscriptionRequest{
+			Name:          "Hook",
+			EventPatterns: []string{"quorant.gov.*"},
+			TargetURL:     rawURL,
+		}
+		err := req.Validate()
+		require.Errorf(t, err, "expected SSRF block for %s", rawURL)
+		assert.Contains(t, err.Error(), "target_url")
+	}
+}
+
+func TestCreateSubscriptionRequest_Validate_BlocksPrivateIPv6(t *testing.T) {
+	for _, rawURL := range []string{
+		"http://[::1]/hook",
+		"http://[fc00::1]/hook",
+	} {
+		req := webhook.CreateSubscriptionRequest{
+			Name:          "Hook",
+			EventPatterns: []string{"quorant.gov.*"},
+			TargetURL:     rawURL,
+		}
+		err := req.Validate()
+		require.Errorf(t, err, "expected SSRF block for %s", rawURL)
+		assert.Contains(t, err.Error(), "target_url")
+	}
+}
+
+func TestCreateSubscriptionRequest_Validate_AllowsPublicIP(t *testing.T) {
+	req := webhook.CreateSubscriptionRequest{
+		Name:          "Hook",
+		EventPatterns: []string{"quorant.gov.*"},
+		TargetURL:     "https://8.8.8.8/hook",
+	}
+	assert.NoError(t, req.Validate())
+}
+
+// ─── RetryPolicy validation ───────────────────────────────────────────────────
+
+func TestCreateSubscriptionRequest_Validate_RetryPolicyTooManyRetries(t *testing.T) {
+	req := webhook.CreateSubscriptionRequest{
+		Name:          "Hook",
+		EventPatterns: []string{"quorant.gov.*"},
+		TargetURL:     "https://example.com/hook",
+		RetryPolicy: &webhook.RetryPolicy{
+			MaxRetries:     11,
+			BackoffSeconds: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
+		},
+	}
+	err := req.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "max_retries")
+}
+
+func TestCreateSubscriptionRequest_Validate_RetryPolicyInsufficientBackoff(t *testing.T) {
+	req := webhook.CreateSubscriptionRequest{
+		Name:          "Hook",
+		EventPatterns: []string{"quorant.gov.*"},
+		TargetURL:     "https://example.com/hook",
+		RetryPolicy: &webhook.RetryPolicy{
+			MaxRetries:     3,
+			BackoffSeconds: []int{5, 30}, // only 2 entries for 3 retries
+		},
+	}
+	err := req.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "backoff_seconds")
+}
+
+func TestCreateSubscriptionRequest_Validate_RetryPolicyValid(t *testing.T) {
+	req := webhook.CreateSubscriptionRequest{
+		Name:          "Hook",
+		EventPatterns: []string{"quorant.gov.*"},
+		TargetURL:     "https://example.com/hook",
+		RetryPolicy: &webhook.RetryPolicy{
+			MaxRetries:     3,
+			BackoffSeconds: []int{5, 30, 300},
+		},
+	}
+	assert.NoError(t, req.Validate())
+}
+
+func TestCreateSubscriptionRequest_Validate_RetryPolicyZeroRetries(t *testing.T) {
+	req := webhook.CreateSubscriptionRequest{
+		Name:          "Hook",
+		EventPatterns: []string{"quorant.gov.*"},
+		TargetURL:     "https://example.com/hook",
+		RetryPolicy: &webhook.RetryPolicy{
+			MaxRetries:     0,
+			BackoffSeconds: []int{},
+		},
 	}
 	assert.NoError(t, req.Validate())
 }
