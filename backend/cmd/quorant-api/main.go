@@ -13,6 +13,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/quorant/quorant/internal/admin"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/billing"
 	"github.com/quorant/quorant/internal/com"
@@ -186,6 +187,12 @@ func run() error {
 	billingService := billing.NewBillingService(billingRepo, logger)
 	billingHandler := billing.NewBillingHandler(billingService, logger)
 	billing.RegisterRoutes(mux, billingHandler, tokenValidator)
+
+	// Admin module
+	adminRepo := admin.NewPostgresAdminRepository(pool)
+	adminService := admin.NewAdminService(adminRepo, logger)
+	adminHandler := admin.NewAdminHandler(adminService, logger)
+	admin.RegisterRoutes(mux, adminHandler, tokenValidator)
 
 	// Doc module
 	s3Client, err := storage.NewS3Client(cfg.S3)
