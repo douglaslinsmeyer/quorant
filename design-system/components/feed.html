@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Feed / Pulse — Quorant Design System</title>
+
+  <link rel="stylesheet" href="../tokens/colors.css" />
+  <link rel="stylesheet" href="../tokens/typography.css" />
+  <link rel="stylesheet" href="../tokens/spacing.css" />
+  <link rel="stylesheet" href="../tokens/elevation.css" />
+  <link rel="stylesheet" href="../tokens/motion.css" />
+
+  <style>
+    /* ── Reset & Base ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: var(--type-body-size);
+      line-height: var(--type-body-line-height);
+      color: var(--color-neutral-900);
+      background: var(--surface-page);
+      padding: var(--space-8);
+      animation: page-enter var(--duration-slow) var(--ease-out) both;
+    }
+
+    /* ── Dark Mode Toggle ──────────────────────────────────────── */
+    .theme-btn {
+      position: fixed;
+      top: var(--space-4);
+      right: var(--space-4);
+      background: var(--surface-card);
+      border: 1px solid var(--color-neutral-200);
+      color: var(--color-neutral-700);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition:
+        background var(--duration-normal) var(--ease-smooth),
+        color var(--duration-normal) var(--ease-smooth),
+        box-shadow var(--duration-normal) var(--ease-smooth);
+      z-index: 100;
+    }
+    .theme-btn:hover {
+      box-shadow: var(--shadow-md);
+      background: var(--surface-elevated);
+    }
+
+    /* ── Page Header ────────────────────────────────────────────── */
+    .page-header {
+      margin-bottom: var(--space-8);
+      padding-right: 120px;
+    }
+    .page-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--type-h1-size);
+      font-weight: var(--type-h1-weight);
+      line-height: var(--type-h1-line-height);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-2);
+    }
+    .page-header p {
+      font-size: var(--type-body-lg-size);
+      color: var(--color-neutral-600);
+    }
+
+    /* ── Section Wrapper ────────────────────────────────────────── */
+    .section {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-8);
+      margin-bottom: var(--space-6);
+    }
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h3-size);
+      font-weight: var(--type-h3-weight);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-1);
+    }
+    .section-desc {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-6);
+    }
+
+    /* ── Side-by-Side Layout ────────────────────────────────────── */
+    .feed-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-6);
+    }
+
+    @media (max-width: 900px) {
+      .feed-split {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ── Feed Panel ─────────────────────────────────────────────── */
+    .feed-panel {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--color-neutral-100);
+      overflow: hidden;
+    }
+
+    /* ── Feed Header ────────────────────────────────────────────── */
+    .feed-header {
+      padding: var(--space-5) var(--space-6);
+      border-bottom: 1px solid var(--color-neutral-100);
+      background: var(--surface-elevated);
+    }
+
+    .feed-header__top {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+
+    .feed-header__title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h4-size);
+      font-weight: var(--type-h4-weight);
+      color: var(--color-neutral-900);
+    }
+
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color-success-600);
+      animation: pulse-dot 2s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    /* ── Filter Tabs ────────────────────────────────────────────── */
+    .filter-tabs {
+      display: flex;
+      gap: var(--space-1);
+    }
+
+    .filter-tab {
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      padding: var(--space-1) var(--space-3);
+      border-radius: var(--radius-full);
+      border: none;
+      cursor: pointer;
+      transition:
+        background var(--duration-fast) var(--ease-default),
+        color var(--duration-fast) var(--ease-default);
+      background: transparent;
+      color: var(--color-neutral-500);
+    }
+
+    .filter-tab:hover {
+      background: var(--color-neutral-100);
+      color: var(--color-neutral-700);
+    }
+
+    .filter-tab.active {
+      background: var(--color-primary-50);
+      color: var(--color-primary-700);
+    }
+
+    /* ── Feed Body ──────────────────────────────────────────────── */
+    .feed-body {
+      padding: var(--space-3);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+
+    /* ── Activity Stream Item (Management — stagger-left) ───────── */
+    .stream-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-4) var(--space-3);
+      border-radius: var(--radius-md);
+      opacity: 0;
+      animation: stagger-left 400ms var(--ease-out) both;
+      transition:
+        background var(--duration-fast) var(--ease-default);
+    }
+
+    .stream-item:hover {
+      background: var(--color-neutral-50);
+    }
+
+    .stream-item:nth-child(1) { animation-delay: 0ms; }
+    .stream-item:nth-child(2) { animation-delay: 60ms; }
+    .stream-item:nth-child(3) { animation-delay: 120ms; }
+    .stream-item:nth-child(4) { animation-delay: 180ms; }
+    .stream-item:nth-child(5) { animation-delay: 240ms; }
+
+    .stream-item__avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-heading);
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+      color: #ffffff;
+      letter-spacing: 0;
+    }
+
+    .avatar--teal   { background: var(--color-primary-600); }
+    .avatar--red    { background: var(--color-error-600); }
+    .avatar--amber  { background: var(--color-secondary-500); }
+    .avatar--info   { background: var(--color-info-600); }
+    .avatar--warn   { background: var(--color-warning-600); }
+
+    .stream-item__content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .stream-item__text {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-800);
+      line-height: 1.45;
+    }
+
+    .stream-item__text strong {
+      font-weight: 600;
+      color: var(--color-neutral-900);
+    }
+
+    .stream-item__text .amount {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      color: var(--color-primary-600);
+    }
+
+    .stream-item__meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-top: 3px;
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-400);
+    }
+
+    .meta-sep {
+      color: var(--color-neutral-300);
+    }
+
+    /* ── Stream Item Right Slot ─────────────────────────────────── */
+    .stream-item__action {
+      flex-shrink: 0;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .pill--paid     { background: var(--color-success-100); color: var(--color-success-600); }
+    .pill--new      { background: var(--color-info-100);    color: var(--color-info-600); }
+    .pill--reminded { background: var(--color-warning-100); color: var(--color-warning-600); }
+
+    .review-link {
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      color: var(--color-primary-600);
+      text-decoration: none;
+      white-space: nowrap;
+      transition: color var(--duration-fast) var(--ease-default);
+    }
+
+    .review-link:hover {
+      color: var(--color-primary-500);
+    }
+
+    /* ── Pulse Item (Member — stagger-up) ───────────────────────── */
+    .pulse-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-4);
+      padding: var(--space-4) var(--space-3);
+      border-radius: var(--radius-md);
+      opacity: 0;
+      animation: stagger-up 400ms var(--ease-out) both;
+      transition:
+        background var(--duration-fast) var(--ease-default);
+    }
+
+    .pulse-item:hover {
+      background: var(--color-neutral-50);
+    }
+
+    .pulse-item:nth-child(1) { animation-delay: 0ms; }
+    .pulse-item:nth-child(2) { animation-delay: 60ms; }
+    .pulse-item:nth-child(3) { animation-delay: 120ms; }
+    .pulse-item:nth-child(4) { animation-delay: 180ms; }
+
+    .pulse-item__icon {
+      width: 30px;
+      height: 30px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    .icon-bg--pool     { background: linear-gradient(135deg, var(--color-info-100), var(--color-primary-50)); }
+    .icon-bg--meeting  { background: linear-gradient(135deg, var(--color-warning-100), var(--color-secondary-50)); }
+    .icon-bg--update   { background: linear-gradient(135deg, var(--color-info-100), var(--color-primary-50)); }
+    .icon-bg--garden   { background: linear-gradient(135deg, var(--color-success-100), #e8f5ee); }
+
+    .pulse-item__content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .pulse-item__text {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-800);
+      line-height: 1.5;
+    }
+
+    .pulse-item__text strong {
+      font-weight: 600;
+      color: var(--color-neutral-900);
+    }
+
+    .pulse-item__meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-top: 4px;
+    }
+
+    .pulse-item__time {
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-400);
+    }
+
+    .category-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: var(--radius-sm);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .tag--amenity { background: var(--color-info-100);    color: var(--color-info-600); }
+    .tag--meeting { background: var(--color-warning-100); color: var(--color-warning-600); }
+    .tag--update  { background: var(--color-primary-50);  color: var(--color-primary-700); }
+    .tag--notice  { background: var(--color-success-100); color: var(--color-success-600); }
+
+    /* ── Bottom Status Cards ────────────────────────────────────── */
+    .status-cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-6);
+    }
+
+    @media (max-width: 900px) {
+      .status-cards-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ── Conversational Status Card ─────────────────────────────── */
+    .convo-status-card {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-8);
+      border: 1px solid var(--color-neutral-100);
+      opacity: 0;
+      animation: hero-entrance 500ms var(--ease-out) 300ms both;
+    }
+
+    .convo-status-card__label {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: var(--color-primary-600);
+      margin-bottom: var(--space-4);
+    }
+
+    .convo-status-card__label .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-success-600);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    .convo-status-card__text {
+      font-size: var(--type-body-lg-size);
+      line-height: 1.7;
+      color: var(--color-neutral-800);
+    }
+
+    .convo-status-card__text .amount {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      color: var(--color-primary-600);
+    }
+
+    .convo-status-card__text .date {
+      font-weight: 600;
+      color: var(--color-secondary-600);
+    }
+
+    .convo-status-card__text .emphasis {
+      font-weight: 600;
+      color: var(--color-neutral-900);
+    }
+
+    .convo-status-card__text .status-good {
+      font-weight: 600;
+      color: var(--color-success-600);
+    }
+
+    .convo-status-card__text .status-warn {
+      font-weight: 600;
+      color: var(--color-warning-600);
+    }
+
+    .convo-status-card__badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-top: var(--space-3);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      color: var(--color-success-600);
+    }
+
+    .convo-status-card__badge .check-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--color-success-100);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Replay Button ──────────────────────────────────────────── */
+    .replay-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      background: var(--color-primary-50);
+      color: var(--color-primary-700);
+      border: 1.5px solid var(--color-primary-200);
+      border-radius: var(--radius-full);
+      padding: var(--space-2) var(--space-5);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      cursor: pointer;
+      transition:
+        background var(--duration-fast) var(--ease-default),
+        box-shadow var(--duration-fast) var(--ease-default);
+    }
+
+    .replay-btn:hover {
+      background: var(--color-primary-100);
+      box-shadow: var(--shadow-xs);
+    }
+
+    .replay-controls {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+
+    /* ── Variant Label ──────────────────────────────────────────── */
+    .variant-label {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-3);
+    }
+
+    .variant-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .variant-dot--mgmt   { background: var(--color-primary-600); }
+    .variant-dot--member { background: var(--color-secondary-500); }
+  </style>
+</head>
+<body>
+
+  <button class="theme-btn" onclick="toggleTheme()">Toggle Dark Mode</button>
+
+  <div class="page-header">
+    <h1>Feed &amp; Pulse</h1>
+    <p>The signature Quorant component. Management sees a factual activity stream; members see a friendly community pulse. Same data, two distinct voices.</p>
+  </div>
+
+  <!-- ── Side-by-Side Feed Section ────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Stream Variants</h2>
+    <p class="section-desc">
+      Left: Management Portal "Recent Activity" — staggered left entrance (translateX −6px).
+      Right: Member App "Community Pulse" — staggered up entrance (translateY 8px).
+    </p>
+
+    <div class="replay-controls">
+      <button class="replay-btn" onclick="replayAll()">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M2 8a6 6 0 1 0 1.5-3.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M2 4v4h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Replay Animations
+      </button>
+    </div>
+
+    <div class="feed-split">
+
+      <!-- ── Management: Recent Activity ──────────────────────── -->
+      <div>
+        <div class="variant-label">
+          <span class="variant-dot variant-dot--mgmt"></span>
+          Management Portal
+        </div>
+        <div class="feed-panel">
+          <div class="feed-header">
+            <div class="feed-header__top">
+              <span class="feed-header__title">Recent Activity</span>
+              <span class="pulse-dot" aria-label="Live"></span>
+            </div>
+            <div class="filter-tabs">
+              <button class="filter-tab active">All</button>
+              <button class="filter-tab">Payments</button>
+              <button class="filter-tab">Violations</button>
+              <button class="filter-tab">Requests</button>
+            </div>
+          </div>
+
+          <div class="feed-body" id="stream-list">
+
+            <!-- Item 1: Paid -->
+            <div class="stream-item">
+              <div class="stream-item__avatar avatar--teal">SC</div>
+              <div class="stream-item__content">
+                <div class="stream-item__text">
+                  <strong>Sarah Chen</strong> paid April assessment — <span class="amount">$285.00</span>
+                </div>
+                <div class="stream-item__meta">
+                  <span>Unit 101-A</span>
+                  <span class="meta-sep">•</span>
+                  <span>12 minutes ago</span>
+                </div>
+              </div>
+              <div class="stream-item__action">
+                <span class="status-pill pill--paid">Paid</span>
+              </div>
+            </div>
+
+            <!-- Item 2: Past Due -->
+            <div class="stream-item">
+              <div class="stream-item__avatar avatar--red">JW</div>
+              <div class="stream-item__content">
+                <div class="stream-item__text">
+                  <strong>James Wright</strong> is now 90 days past due — balance <span class="amount">$1,140</span>
+                </div>
+                <div class="stream-item__meta">
+                  <span>Unit 218-C</span>
+                  <span class="meta-sep">•</span>
+                  <span>1 hour ago</span>
+                </div>
+              </div>
+              <div class="stream-item__action">
+                <a href="#" class="review-link">Review ›</a>
+              </div>
+            </div>
+
+            <!-- Item 3: Architectural Review -->
+            <div class="stream-item">
+              <div class="stream-item__avatar avatar--info">LN</div>
+              <div class="stream-item__content">
+                <div class="stream-item__text">
+                  <strong>Lisa Nguyen</strong> submitted architectural review request
+                </div>
+                <div class="stream-item__meta">
+                  <span>Unit 305-B</span>
+                  <span class="meta-sep">•</span>
+                  <span>3 hours ago</span>
+                </div>
+              </div>
+              <div class="stream-item__action">
+                <a href="#" class="review-link">Review ›</a>
+              </div>
+            </div>
+
+            <!-- Item 4: Streetlight -->
+            <div class="stream-item">
+              <div class="stream-item__avatar avatar--amber">PP</div>
+              <div class="stream-item__content">
+                <div class="stream-item__text">
+                  <strong>Priya Patel</strong> reported streetlight outage on Maple Drive
+                </div>
+                <div class="stream-item__meta">
+                  <span>Common Area</span>
+                  <span class="meta-sep">•</span>
+                  <span>5 hours ago</span>
+                </div>
+              </div>
+              <div class="stream-item__action">
+                <span class="status-pill pill--new">New</span>
+              </div>
+            </div>
+
+            <!-- Item 5: Reminder Sent -->
+            <div class="stream-item">
+              <div class="stream-item__avatar avatar--warn">MJ</div>
+              <div class="stream-item__content">
+                <div class="stream-item__text">
+                  Payment reminder sent to <strong>Marcus Johnson</strong> — <span class="amount">$570</span> past due
+                </div>
+                <div class="stream-item__meta">
+                  <span>Unit 412-A</span>
+                  <span class="meta-sep">•</span>
+                  <span>Yesterday</span>
+                </div>
+              </div>
+              <div class="stream-item__action">
+                <span class="status-pill pill--reminded">Reminded</span>
+              </div>
+            </div>
+
+          </div><!-- /feed-body -->
+        </div><!-- /feed-panel -->
+      </div>
+
+      <!-- ── Member: Community Pulse ───────────────────────────── -->
+      <div>
+        <div class="variant-label">
+          <span class="variant-dot variant-dot--member"></span>
+          Member App
+        </div>
+        <div class="feed-panel">
+          <div class="feed-header">
+            <div class="feed-header__top">
+              <span class="feed-header__title">Community Pulse</span>
+              <span class="pulse-dot" aria-label="Live"></span>
+            </div>
+          </div>
+
+          <div class="feed-body" id="pulse-list">
+
+            <!-- Item 1: Pool -->
+            <div class="pulse-item">
+              <div class="pulse-item__icon icon-bg--pool" aria-hidden="true">🏊</div>
+              <div class="pulse-item__content">
+                <div class="pulse-item__text">
+                  The <strong>community pool</strong> opens <strong>May 1st</strong> — pick up new key fobs at the management office
+                </div>
+                <div class="pulse-item__meta">
+                  <span class="pulse-item__time">Today</span>
+                  <span class="category-tag tag--amenity">Amenity</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Item 2: Board Meeting -->
+            <div class="pulse-item">
+              <div class="pulse-item__icon icon-bg--meeting" aria-hidden="true">📢</div>
+              <div class="pulse-item__content">
+                <div class="pulse-item__text">
+                  <strong>Board meeting</strong> next Tuesday — budget review and landscaping proposals on the agenda
+                </div>
+                <div class="pulse-item__meta">
+                  <span class="pulse-item__time">Yesterday</span>
+                  <span class="category-tag tag--meeting">Meeting</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Item 3: Parking Light -->
+            <div class="pulse-item">
+              <div class="pulse-item__icon icon-bg--update" aria-hidden="true">🔧</div>
+              <div class="pulse-item__content">
+                <div class="pulse-item__text">
+                  Your <strong>parking lot light</strong> request is now in progress — estimated completion this week
+                </div>
+                <div class="pulse-item__meta">
+                  <span class="pulse-item__time">2 days ago</span>
+                  <span class="category-tag tag--update">Update</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Item 4: Landscaping -->
+            <div class="pulse-item">
+              <div class="pulse-item__icon icon-bg--garden" aria-hidden="true">🌱</div>
+              <div class="pulse-item__content">
+                <div class="pulse-item__text">
+                  <strong>Spring landscaping</strong> starts next week — expect crews on Monday and Wednesday mornings
+                </div>
+                <div class="pulse-item__meta">
+                  <span class="pulse-item__time">3 days ago</span>
+                  <span class="category-tag tag--notice">Notice</span>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /feed-body -->
+        </div><!-- /feed-panel -->
+      </div>
+
+    </div><!-- /feed-split -->
+  </div>
+
+  <!-- ── Conversational Status Cards ──────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">Conversational Status Cards</h2>
+    <p class="section-desc">
+      Hero entrance animation (translateY 16px → 0, 500ms ease-out). Member variant uses personal "you" voice; Management variant uses third-person community narrative.
+    </p>
+
+    <div class="status-cards-grid" id="status-cards">
+
+      <!-- Member Variant -->
+      <div>
+        <div class="variant-label" style="margin-bottom: var(--space-3);">
+          <span class="variant-dot variant-dot--member"></span>
+          Member App — Personal Voice
+        </div>
+        <div class="convo-status-card">
+          <div class="convo-status-card__label">
+            <span class="dot"></span>
+            Your April Summary
+          </div>
+          <p class="convo-status-card__text">
+            Your April assessment of <span class="amount">$285.00</span> is ready.
+            Autopay handles it on the <span class="date">12th</span> — you're all set.
+          </p>
+          <div class="convo-status-card__badge">
+            <span class="check-icon">
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <path d="M2.5 6L5 8.5L9.5 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            Autopay active · No action needed
+          </div>
+        </div>
+      </div>
+
+      <!-- Management Variant -->
+      <div>
+        <div class="variant-label" style="margin-bottom: var(--space-3);">
+          <span class="variant-dot variant-dot--mgmt"></span>
+          Management Portal — Community Narrative
+        </div>
+        <div class="convo-status-card">
+          <div class="convo-status-card__label">
+            <span class="dot"></span>
+            April Overview — Oakridge Commons
+          </div>
+          <p class="convo-status-card__text">
+            <span class="emphasis">Oakridge Commons</span> is in good shape this month.
+            Collections at <span class="amount">94.2%</span> — up from last month.
+            <span class="status-warn">3 accounts</span> need attention before they go delinquent.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    }
+
+    function replayAll() {
+      // Replay stream items
+      const streamList = document.getElementById('stream-list');
+      const streamItems = [...streamList.querySelectorAll('.stream-item')];
+      streamItems.forEach(item => {
+        item.style.animation = 'none';
+        item.offsetHeight; // force reflow
+      });
+      streamItems.forEach(item => {
+        item.style.animation = '';
+      });
+
+      // Replay pulse items
+      const pulseList = document.getElementById('pulse-list');
+      const pulseItems = [...pulseList.querySelectorAll('.pulse-item')];
+      pulseItems.forEach(item => {
+        item.style.animation = 'none';
+        item.offsetHeight;
+      });
+      pulseItems.forEach(item => {
+        item.style.animation = '';
+      });
+
+      // Replay status cards
+      const statusCards = document.getElementById('status-cards');
+      const cards = [...statusCards.querySelectorAll('.convo-status-card')];
+      cards.forEach(card => {
+        card.style.animation = 'none';
+        card.offsetHeight;
+      });
+      cards.forEach(card => {
+        card.style.animation = '';
+      });
+    }
+
+    // Filter tab interactivity
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+      tab.addEventListener('click', function() {
+        this.closest('.filter-tabs').querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>
