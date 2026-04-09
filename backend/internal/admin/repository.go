@@ -44,4 +44,16 @@ type AdminRepository interface {
 
 	// ListTenants returns all organizations as maps (simplified).
 	ListTenants(ctx context.Context) ([]map[string]any, error)
+
+	// SuspendTenant sets the subscription status to 'suspended' for the given org.
+	SuspendTenant(ctx context.Context, orgID uuid.UUID) error
+
+	// ReactivateTenant sets the subscription status to 'active' for the given org.
+	ReactivateTenant(ctx context.Context, orgID uuid.UUID) error
+
+	// SearchUsers returns users whose email or display_name match the query string.
+	SearchUsers(ctx context.Context, query string) ([]UserSearchResult, error)
+
+	// UnlockAccount sets is_active = true for the given user.
+	UnlockAccount(ctx context.Context, userID uuid.UUID) error
 }

@@ -19,15 +19,20 @@ import (
 // ─── mockAdminRepository ──────────────────────────────────────────────────────
 
 type mockAdminRepository struct {
-	flags       map[uuid.UUID]*admin.FeatureFlag
-	overrides   map[uuid.UUID][]admin.FeatureFlagOverride // keyed by flag ID
-	activities  map[uuid.UUID][]admin.TenantActivity
-	tenants     []map[string]any
-	createErr   error
-	findErr     error
-	listErr     error
-	overrideErr error
-	activityErr error
+	flags            map[uuid.UUID]*admin.FeatureFlag
+	overrides        map[uuid.UUID][]admin.FeatureFlagOverride // keyed by flag ID
+	activities       map[uuid.UUID][]admin.TenantActivity
+	tenants          []map[string]any
+	userSearchResult []admin.UserSearchResult
+	createErr        error
+	findErr          error
+	listErr          error
+	overrideErr      error
+	activityErr      error
+	suspendErr       error
+	reactivateErr    error
+	searchUsersErr   error
+	unlockErr        error
 }
 
 func newMockAdminRepo() *mockAdminRepository {
@@ -147,6 +152,25 @@ func (m *mockAdminRepository) ListTenants(_ context.Context) ([]map[string]any, 
 		return nil, m.listErr
 	}
 	return m.tenants, nil
+}
+
+func (m *mockAdminRepository) SuspendTenant(_ context.Context, _ uuid.UUID) error {
+	return m.suspendErr
+}
+
+func (m *mockAdminRepository) ReactivateTenant(_ context.Context, _ uuid.UUID) error {
+	return m.reactivateErr
+}
+
+func (m *mockAdminRepository) SearchUsers(_ context.Context, _ string) ([]admin.UserSearchResult, error) {
+	if m.searchUsersErr != nil {
+		return nil, m.searchUsersErr
+	}
+	return m.userSearchResult, nil
+}
+
+func (m *mockAdminRepository) UnlockAccount(_ context.Context, _ uuid.UUID) error {
+	return m.unlockErr
 }
 
 // newTestService returns an AdminService backed by a mock repository.
@@ -276,4 +300,112 @@ func TestGetTenantDashboard_NoActivity(t *testing.T) {
 	assert.Equal(t, int64(0), dashboard.ActiveUsers)
 	assert.Equal(t, int64(0), dashboard.StorageBytes)
 	assert.Empty(t, dashboard.RecentActivity)
+}
+
+// ─── TestSuspendTenant ────────────────────────────────────────────────────────
+
+func TestSuspendTenant_CallsRepo(t *testing.T) {
+	svc, _ := newTestService(t)
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	result, err := svc.SuspendTenant(ctx, orgID)
+
+	require.NoError(t, err)
+	assert.Equal(t, "ok", result["status"])
+	assert.Equal(t, "suspended", result["action"])
+	assert.Equal(t, orgID, result["org_id"])
+}
+
+func TestSuspendTenant_RepoError(t *testing.T) {
+	svc, repo := newTestService(t)
+	repo.suspendErr = errors.New("db error")
+	ctx := context.Background()
+
+	_, err := svc.SuspendTenant(ctx, uuid.New())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "db error")
+}
+
+// ─── TestReactivateTenant ─────────────────────────────────────────────────────
+
+func TestReactivateTenant_CallsRepo(t *testing.T) {
+	svc, _ := newTestService(t)
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	result, err := svc.ReactivateTenant(ctx, orgID)
+
+	require.NoError(t, err)
+	assert.Equal(t, "ok", result["status"])
+	assert.Equal(t, "reactivated", result["action"])
+	assert.Equal(t, orgID, result["org_id"])
+}
+
+// ─── TestSearchUsers ──────────────────────────────────────────────────────────
+
+func TestSearchUsers_ReturnsResults(t *testing.T) {
+	svc, repo := newTestService(t)
+	ctx := context.Background()
+	repo.userSearchResult = []admin.UserSearchResult{
+		{ID: uuid.New(), Email: "alice@example.com", DisplayName: "Alice", IsActive: true},
+		{ID: uuid.New(), Email: "bob@example.com", DisplayName: "Bob", IsActive: true},
+	}
+
+	results, err := svc.SearchUsers(ctx, "alice")
+
+	require.NoError(t, err)
+	assert.Len(t, results, 2)
+	assert.Equal(t, "Alice", results[0].DisplayName)
+}
+
+func TestSearchUsers_EmptyQuery_ReturnsAll(t *testing.T) {
+	svc, repo := newTestService(t)
+	ctx := context.Background()
+	repo.userSearchResult = []admin.UserSearchResult{
+		{ID: uuid.New(), Email: "user@example.com", DisplayName: "User One", IsActive: true},
+	}
+
+	results, err := svc.SearchUsers(ctx, "")
+
+	require.NoError(t, err)
+	assert.Len(t, results, 1)
+}
+
+func TestSearchUsers_RepoError(t *testing.T) {
+	svc, repo := newTestService(t)
+	repo.searchUsersErr = errors.New("db error")
+	ctx := context.Background()
+
+	_, err := svc.SearchUsers(ctx, "query")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "db error")
+}
+
+// ─── TestUnlockAccount ────────────────────────────────────────────────────────
+
+func TestUnlockAccount_CallsRepoAndAuditor(t *testing.T) {
+	svc, _ := newTestService(t)
+	ctx := context.Background()
+	userID := uuid.New()
+
+	result, err := svc.UnlockAccount(ctx, userID)
+
+	require.NoError(t, err)
+	assert.Equal(t, "ok", result["status"])
+	assert.Equal(t, "account_unlocked", result["action"])
+	assert.Equal(t, userID, result["user_id"])
+}
+
+func TestUnlockAccount_RepoError(t *testing.T) {
+	svc, repo := newTestService(t)
+	repo.unlockErr = errors.New("db error")
+	ctx := context.Background()
+
+	_, err := svc.UnlockAccount(ctx, uuid.New())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "db error")
 }

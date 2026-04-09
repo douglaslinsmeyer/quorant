@@ -252,6 +252,87 @@ func (r *PostgresAdminRepository) ListTenants(ctx context.Context) ([]map[string
 	return tenants, nil
 }
 
+// ─── Tenant suspension / reactivation ────────────────────────────────────────
+
+// SuspendTenant sets the org subscription status to 'suspended'.
+func (r *PostgresAdminRepository) SuspendTenant(ctx context.Context, orgID uuid.UUID) error {
+	const q = `
+		UPDATE org_subscriptions
+		SET    status     = 'suspended',
+		       updated_at = now()
+		WHERE  org_id = $1
+		  AND  status IN ('active', 'trial')`
+
+	_, err := r.pool.Exec(ctx, q, orgID)
+	if err != nil {
+		return fmt.Errorf("admin: SuspendTenant: %w", err)
+	}
+	return nil
+}
+
+// ReactivateTenant sets the org subscription status back to 'active'.
+func (r *PostgresAdminRepository) ReactivateTenant(ctx context.Context, orgID uuid.UUID) error {
+	const q = `
+		UPDATE org_subscriptions
+		SET    status     = 'active',
+		       updated_at = now()
+		WHERE  org_id = $1
+		  AND  status = 'suspended'`
+
+	_, err := r.pool.Exec(ctx, q, orgID)
+	if err != nil {
+		return fmt.Errorf("admin: ReactivateTenant: %w", err)
+	}
+	return nil
+}
+
+// ─── User operations ──────────────────────────────────────────────────────────
+
+// SearchUsers returns up to 50 users whose email or display_name match query.
+func (r *PostgresAdminRepository) SearchUsers(ctx context.Context, query string) ([]UserSearchResult, error) {
+	const q = `
+		SELECT id, email, display_name, is_active, created_at
+		FROM   users
+		WHERE  (email ILIKE '%' || $1 || '%' OR display_name ILIKE '%' || $1 || '%')
+		  AND  deleted_at IS NULL
+		ORDER  BY display_name
+		LIMIT  50`
+
+	rows, err := r.pool.Query(ctx, q, query)
+	if err != nil {
+		return nil, fmt.Errorf("admin: SearchUsers: %w", err)
+	}
+	defer rows.Close()
+
+	var results []UserSearchResult
+	for rows.Next() {
+		var u UserSearchResult
+		if err := rows.Scan(&u.ID, &u.Email, &u.DisplayName, &u.IsActive, &u.CreatedAt); err != nil {
+			return nil, fmt.Errorf("admin: SearchUsers scan: %w", err)
+		}
+		results = append(results, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("admin: SearchUsers rows: %w", err)
+	}
+	return results, nil
+}
+
+// UnlockAccount sets is_active = true for the given user.
+func (r *PostgresAdminRepository) UnlockAccount(ctx context.Context, userID uuid.UUID) error {
+	const q = `
+		UPDATE users
+		SET    is_active  = true,
+		       updated_at = now()
+		WHERE  id = $1`
+
+	_, err := r.pool.Exec(ctx, q, userID)
+	if err != nil {
+		return fmt.Errorf("admin: UnlockAccount: %w", err)
+	}
+	return nil
+}
+
 // ─── scan helpers ─────────────────────────────────────────────────────────────
 
 // scanFlag scans a single row into a FeatureFlag.

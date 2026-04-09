@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/audit"
+	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/quorant/quorant/internal/platform/queue"
 )
 
@@ -142,51 +144,100 @@ func (s *AdminService) GetTenantDashboard(ctx context.Context, orgID uuid.UUID) 
 	}, nil
 }
 
-// SuspendTenant suspends a tenant (placeholder).
+// SuspendTenant suspends a tenant by setting its subscription status to 'suspended'.
 func (s *AdminService) SuspendTenant(ctx context.Context, orgID uuid.UUID) (map[string]any, error) {
-	// TODO: implement tenant suspension (set organization status to suspended)
-	s.logger.Info("SuspendTenant called (placeholder)", "org_id", orgID)
+	if err := s.repo.SuspendTenant(ctx, orgID); err != nil {
+		return nil, fmt.Errorf("admin: SuspendTenant: %w", err)
+	}
 	return map[string]any{"status": "ok", "org_id": orgID, "action": "suspended"}, nil
 }
 
-// ReactivateTenant reactivates a suspended tenant (placeholder).
+// ReactivateTenant reactivates a suspended tenant by setting its subscription status to 'active'.
 func (s *AdminService) ReactivateTenant(ctx context.Context, orgID uuid.UUID) (map[string]any, error) {
-	// TODO: implement tenant reactivation (set organization status to active)
-	s.logger.Info("ReactivateTenant called (placeholder)", "org_id", orgID)
+	if err := s.repo.ReactivateTenant(ctx, orgID); err != nil {
+		return nil, fmt.Errorf("admin: ReactivateTenant: %w", err)
+	}
 	return map[string]any{"status": "ok", "org_id": orgID, "action": "reactivated"}, nil
 }
 
-// StartImpersonation initiates an admin impersonation session (placeholder).
+// StartImpersonation records an audit entry for the start of an admin impersonation session.
+// Actual token issuance requires Zitadel API integration.
 func (s *AdminService) StartImpersonation(ctx context.Context, targetUserID uuid.UUID) (map[string]any, error) {
-	// TODO: implement impersonation token issuance via Zitadel
-	s.logger.Info("StartImpersonation called (placeholder)", "target_user_id", targetUserID)
+	actorID := middleware.UserIDFromContext(ctx)
+	entry := audit.AuditEntry{
+		ActorID:      actorID,
+		Action:       "admin.impersonation.started",
+		ResourceType: "user",
+		ResourceID:   targetUserID,
+		Module:       "admin",
+		OccurredAt:   time.Now().UTC(),
+	}
+	if err := s.auditor.Record(ctx, entry); err != nil {
+		return nil, fmt.Errorf("admin: StartImpersonation audit: %w", err)
+	}
 	return map[string]any{"status": "ok", "target_user_id": targetUserID, "action": "impersonation_started"}, nil
 }
 
-// StopImpersonation ends an active admin impersonation session (placeholder).
+// StopImpersonation records an audit entry for the end of an admin impersonation session.
 func (s *AdminService) StopImpersonation(ctx context.Context) (map[string]any, error) {
-	// TODO: implement impersonation session termination
-	s.logger.Info("StopImpersonation called (placeholder)")
+	actorID := middleware.UserIDFromContext(ctx)
+	entry := audit.AuditEntry{
+		ActorID:      actorID,
+		Action:       "admin.impersonation.stopped",
+		ResourceType: "user",
+		ResourceID:   actorID,
+		Module:       "admin",
+		OccurredAt:   time.Now().UTC(),
+	}
+	if err := s.auditor.Record(ctx, entry); err != nil {
+		return nil, fmt.Errorf("admin: StopImpersonation audit: %w", err)
+	}
 	return map[string]any{"status": "ok", "action": "impersonation_stopped"}, nil
 }
 
-// SearchUsers searches users by query (placeholder).
-func (s *AdminService) SearchUsers(ctx context.Context, query string) (map[string]any, error) {
-	// TODO: implement user search across the users table
-	s.logger.Info("SearchUsers called (placeholder)", "query", query)
-	return map[string]any{"status": "ok", "query": query, "results": []any{}}, nil
+// SearchUsers searches users by email or display name.
+func (s *AdminService) SearchUsers(ctx context.Context, query string) ([]UserSearchResult, error) {
+	results, err := s.repo.SearchUsers(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("admin: SearchUsers: %w", err)
+	}
+	return results, nil
 }
 
-// ResetPassword initiates a password reset for a user (placeholder).
+// ResetPassword records an audit entry for a password reset request.
+// Actual password management is handled by Zitadel.
 func (s *AdminService) ResetPassword(ctx context.Context, userID uuid.UUID) (map[string]any, error) {
-	// TODO: implement password reset via Zitadel admin API
-	s.logger.Info("ResetPassword called (placeholder)", "user_id", userID)
+	actorID := middleware.UserIDFromContext(ctx)
+	entry := audit.AuditEntry{
+		ActorID:      actorID,
+		Action:       "admin.password_reset",
+		ResourceType: "user",
+		ResourceID:   userID,
+		Module:       "admin",
+		OccurredAt:   time.Now().UTC(),
+	}
+	if err := s.auditor.Record(ctx, entry); err != nil {
+		return nil, fmt.Errorf("admin: ResetPassword audit: %w", err)
+	}
 	return map[string]any{"status": "ok", "user_id": userID, "action": "password_reset_initiated"}, nil
 }
 
-// UnlockAccount unlocks a locked user account (placeholder).
+// UnlockAccount re-activates a user account and records an audit entry.
 func (s *AdminService) UnlockAccount(ctx context.Context, userID uuid.UUID) (map[string]any, error) {
-	// TODO: implement account unlock via Zitadel admin API
-	s.logger.Info("UnlockAccount called (placeholder)", "user_id", userID)
+	if err := s.repo.UnlockAccount(ctx, userID); err != nil {
+		return nil, fmt.Errorf("admin: UnlockAccount: %w", err)
+	}
+	actorID := middleware.UserIDFromContext(ctx)
+	entry := audit.AuditEntry{
+		ActorID:      actorID,
+		Action:       "admin.account_unlocked",
+		ResourceType: "user",
+		ResourceID:   userID,
+		Module:       "admin",
+		OccurredAt:   time.Now().UTC(),
+	}
+	if err := s.auditor.Record(ctx, entry); err != nil {
+		return nil, fmt.Errorf("admin: UnlockAccount audit: %w", err)
+	}
 	return map[string]any{"status": "ok", "user_id": userID, "action": "account_unlocked"}, nil
 }

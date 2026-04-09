@@ -43,3 +43,12 @@ type TenantDashboard struct {
 	StorageBytes   int64            `json:"storage_bytes"`
 	RecentActivity []TenantActivity `json:"recent_activity"`
 }
+
+// UserSearchResult is a lightweight user record returned from admin user searches.
+type UserSearchResult struct {
+	ID          uuid.UUID `json:"id"`
+	Email       string    `json:"email"`
+	DisplayName string    `json:"display_name"`
+	IsActive    bool      `json:"is_active"`
+	CreatedAt   time.Time `json:"created_at"`
+}
