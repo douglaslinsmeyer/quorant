@@ -284,7 +284,7 @@ func run() error {
 	handler = middleware.RequestID(handler)
 	handler = middleware.Metrics(handler)  // after RequestID, before Tracing
 	handler = middleware.Tracing(handler)  // outermost: creates root span before RequestID
-	handler = middleware.CORS([]string{"*"}, handler) // permissive for dev; configured per-env in production
+	handler = middleware.CORS(cfg.CORSAllowedOrigins(), handler) // permissive for dev; configured per-env in production
 
 	// 11. HTTP server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
