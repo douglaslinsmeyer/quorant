@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Modals — Quorant Design System</title>
+
+  <link rel="stylesheet" href="../tokens/colors.css" />
+  <link rel="stylesheet" href="../tokens/typography.css" />
+  <link rel="stylesheet" href="../tokens/spacing.css" />
+  <link rel="stylesheet" href="../tokens/elevation.css" />
+  <link rel="stylesheet" href="../tokens/motion.css" />
+
+  <style>
+    /* ── Reset & Base ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: var(--type-body-size);
+      line-height: var(--type-body-line-height);
+      color: var(--color-neutral-900);
+      background: var(--surface-page);
+      padding: var(--space-8);
+      animation: page-enter var(--duration-slow) var(--ease-out) both;
+    }
+
+    /* ── Dark Mode Toggle ──────────────────────────────────────── */
+    .theme-btn {
+      position: fixed;
+      top: var(--space-4);
+      right: var(--space-4);
+      background: var(--surface-card);
+      border: 1px solid var(--color-neutral-200);
+      color: var(--color-neutral-700);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition:
+        background var(--duration-normal) var(--ease-smooth),
+        color var(--duration-normal) var(--ease-smooth),
+        box-shadow var(--duration-normal) var(--ease-smooth);
+      z-index: 9999;
+    }
+
+    .theme-btn:hover {
+      box-shadow: var(--shadow-md);
+      background: var(--surface-elevated);
+    }
+
+    /* ── Page Header ────────────────────────────────────────────── */
+    .page-header {
+      margin-bottom: var(--space-8);
+      padding-right: 120px;
+    }
+
+    .page-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--type-h1-size);
+      font-weight: var(--type-h1-weight);
+      line-height: var(--type-h1-line-height);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-2);
+    }
+
+    .page-header p {
+      font-size: var(--type-body-lg-size);
+      color: var(--color-neutral-600);
+    }
+
+    /* ── Section ────────────────────────────────────────────────── */
+    .section {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-8);
+      margin-bottom: var(--space-6);
+    }
+
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h3-size);
+      font-weight: var(--type-h3-weight);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-1);
+    }
+
+    .section-desc {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-6);
+    }
+
+    .overline {
+      font-family: var(--font-body);
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-3);
+    }
+
+    /* ── Trigger Buttons ────────────────────────────────────────── */
+    .trigger-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      white-space: nowrap;
+      padding: 10px 20px;
+      min-height: 40px;
+      transition:
+        background var(--duration-fast) var(--ease-default),
+        box-shadow var(--duration-fast) var(--ease-default),
+        transform var(--duration-fast) var(--ease-default);
+    }
+
+    .btn--primary {
+      background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
+      color: #fff;
+      box-shadow: var(--shadow-xs);
+    }
+
+    .btn--primary:hover {
+      background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-800));
+      box-shadow: var(--shadow-sm);
+      transform: scale(1.02);
+    }
+
+    .btn--secondary {
+      background: var(--surface-card);
+      color: var(--color-neutral-700);
+      border: 1px solid var(--color-neutral-200);
+      box-shadow: var(--shadow-xs);
+    }
+
+    .btn--secondary:hover {
+      background: var(--color-neutral-50);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn--destructive {
+      background: linear-gradient(135deg, var(--color-error-600), #a02a1e);
+      color: #fff;
+      box-shadow: var(--shadow-xs);
+    }
+
+    .btn--destructive:hover {
+      background: linear-gradient(135deg, #a02a1e, #891e14);
+      box-shadow: var(--shadow-sm);
+      transform: scale(1.02);
+    }
+
+    /* ── Backdrop ───────────────────────────────────────────────── */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: var(--backdrop);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-4);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--duration-moderate) var(--ease-out);
+    }
+
+    .modal-backdrop--visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* ── Modal Container ────────────────────────────────────────── */
+    .modal {
+      background: var(--surface-elevated);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-xl);
+      max-width: 480px;
+      width: 100%;
+      padding: var(--space-6);
+      position: relative;
+      opacity: 0;
+      transform: translateY(8px);
+      transition:
+        opacity var(--duration-slow) var(--ease-out),
+        transform var(--duration-slow) var(--ease-out);
+    }
+
+    .modal-backdrop--visible .modal {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── Modal Header ───────────────────────────────────────────── */
+    .modal__header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .modal__title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h4-size);
+      font-weight: 600;
+      color: var(--color-neutral-900);
+      line-height: 1.3;
+    }
+
+    .modal__close {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-md);
+      border: none;
+      background: none;
+      color: var(--color-neutral-400);
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-top: -2px;
+      transition:
+        background var(--duration-fast) var(--ease-default),
+        color var(--duration-fast) var(--ease-default);
+    }
+
+    .modal__close:hover {
+      background: var(--color-neutral-100);
+      color: var(--color-neutral-700);
+    }
+
+    /* ── Modal Body ─────────────────────────────────────────────── */
+    .modal__body {
+      font-family: var(--font-body);
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-600);
+      line-height: 1.6;
+      margin-bottom: var(--space-6);
+    }
+
+    .modal__body strong {
+      color: var(--color-neutral-900);
+      font-weight: 600;
+    }
+
+    /* Payment summary block */
+    .payment-summary {
+      background: var(--surface-page);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      margin-top: var(--space-4);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+    }
+
+    .payment-summary__label {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+    }
+
+    .payment-summary__amount {
+      font-family: var(--font-mono);
+      font-size: var(--type-h4-size);
+      font-weight: 700;
+      color: var(--color-neutral-900);
+    }
+
+    .payment-summary__method {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      margin-top: 2px;
+    }
+
+    /* ── Modal Actions ──────────────────────────────────────────── */
+    .modal__actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: var(--space-3);
+    }
+
+    /* ── Destructive Modal ──────────────────────────────────────── */
+    .modal__warning-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--color-error-100);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: var(--space-4);
+      color: var(--color-error-600);
+      flex-shrink: 0;
+    }
+
+    .modal__warning-icon svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .modal--destructive .modal__title {
+      color: var(--color-neutral-900);
+    }
+
+    .violation-ref {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      background: var(--color-error-100);
+      color: var(--color-error-600);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: var(--radius-sm);
+      margin-top: var(--space-3);
+    }
+
+    /* ── Drawer Backdrop ────────────────────────────────────────── */
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: var(--backdrop);
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--duration-moderate) var(--ease-out);
+    }
+
+    .drawer-backdrop--visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* ── Drawer Panel ───────────────────────────────────────────── */
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 400px;
+      max-width: 100vw;
+      background: var(--surface-elevated);
+      box-shadow: var(--shadow-2xl);
+      z-index: 1001;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform var(--duration-slow) var(--ease-out);
+    }
+
+    .drawer-backdrop--visible ~ .drawer,
+    .drawer--visible {
+      transform: translateX(0);
+    }
+
+    .drawer__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      padding: var(--space-5) var(--space-6);
+      border-bottom: 1px solid var(--color-neutral-200);
+      flex-shrink: 0;
+    }
+
+    .drawer__title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h4-size);
+      font-weight: 600;
+      color: var(--color-neutral-900);
+    }
+
+    .drawer__close {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-md);
+      border: none;
+      background: none;
+      color: var(--color-neutral-400);
+      cursor: pointer;
+      transition:
+        background var(--duration-fast) var(--ease-default),
+        color var(--duration-fast) var(--ease-default);
+    }
+
+    .drawer__close:hover {
+      background: var(--color-neutral-100);
+      color: var(--color-neutral-700);
+    }
+
+    .drawer__body {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--space-6);
+    }
+
+    .drawer__footer {
+      border-top: 1px solid var(--color-neutral-200);
+      padding: var(--space-4) var(--space-6);
+      display: flex;
+      gap: var(--space-3);
+      justify-content: flex-end;
+      flex-shrink: 0;
+    }
+
+    /* ── Resident Detail Content ────────────────────────────────── */
+    .resident-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+
+    .resident-avatar {
+      width: 52px;
+      height: 52px;
+      border-radius: var(--radius-lg);
+      background: #1A7A9A;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-heading);
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .resident-info__name {
+      font-family: var(--font-heading);
+      font-size: var(--type-h4-size);
+      font-weight: 600;
+      color: var(--color-neutral-900);
+    }
+
+    .resident-info__unit {
+      font-family: var(--font-mono);
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      margin-top: 3px;
+    }
+
+    .resident-info__badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      background: var(--color-success-100);
+      color: var(--color-success-600);
+      margin-top: var(--space-2);
+    }
+
+    .resident-info__badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .drawer-section-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-3);
+      margin-top: var(--space-5);
+    }
+
+    .drawer-section-label:first-child {
+      margin-top: 0;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: var(--space-2) 0;
+      border-bottom: 1px solid var(--color-neutral-100);
+      font-size: var(--type-body-sm-size);
+    }
+
+    .detail-row:last-child {
+      border-bottom: none;
+    }
+
+    .detail-row__key {
+      color: var(--color-neutral-500);
+    }
+
+    .detail-row__val {
+      color: var(--color-neutral-800);
+      font-weight: 500;
+      text-align: right;
+    }
+
+    .detail-row__val--mono {
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .detail-row__val--positive {
+      color: var(--color-success-600);
+    }
+
+    .payment-history-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--color-neutral-100);
+      font-size: var(--type-body-sm-size);
+    }
+
+    .payment-history-item:last-child {
+      border-bottom: none;
+    }
+
+    .phist__date {
+      color: var(--color-neutral-500);
+      font-size: 12px;
+      width: 90px;
+    }
+
+    .phist__desc {
+      flex: 1;
+      color: var(--color-neutral-700);
+    }
+
+    .phist__amount {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-success-600);
+    }
+
+    /* ── Spec Grid ──────────────────────────────────────────────── */
+    .spec-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+      margin-top: var(--space-6);
+    }
+
+    .spec-grid-2 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .spec-item {
+      background: var(--surface-page);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+    }
+
+    .spec-item__label {
+      font-size: var(--type-overline-size);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-2);
+    }
+
+    .spec-item__value {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--color-primary-600);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <button class="theme-btn" id="themeToggle" aria-label="Toggle dark mode">☀ Light</button>
+
+  <!-- ── Page Header ──────────────────────────────────────────────── -->
+  <header class="page-header">
+    <h1>Modals</h1>
+    <p>Dialog, confirmation, and drawer patterns for the Quorant HOA platform. All modals use the backdrop token, elevation shadow, and motion tokens for entrance animation.</p>
+  </header>
+
+  <!-- ── Section 1: Dialog Modal ──────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Confirm Payment Dialog</h2>
+    <p class="section-desc">A centered dialog for confirming a payment action. Entry uses <code>opacity 0→1</code> + <code>translateY(8px)→0</code> over <code>var(--duration-slow)</code>. Dismiss by clicking the backdrop or Cancel.</p>
+
+    <div class="trigger-row">
+      <button class="btn btn--primary" onclick="showModal('payment-modal')">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="1.5" stroke="white" stroke-width="1.25"/><path d="M1 6h12" stroke="white" stroke-width="1.25"/></svg>
+        Show Dialog
+      </button>
+    </div>
+
+    <div class="spec-grid">
+      <div class="spec-item">
+        <div class="spec-item__label">Backdrop</div>
+        <div class="spec-item__value">var(--backdrop)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Container</div>
+        <div class="spec-item__value">var(--surface-elevated)<br>var(--radius-lg) · var(--shadow-xl)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Max Width</div>
+        <div class="spec-item__value">480px</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Padding</div>
+        <div class="spec-item__value">var(--space-6) — 24px</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Entry Duration</div>
+        <div class="spec-item__value">var(--duration-slow) — 400ms</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Easing</div>
+        <div class="spec-item__value">var(--ease-out)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 2: Destructive Confirmation ────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Destructive Confirmation</h2>
+    <p class="section-desc">A confirmation dialog for irreversible actions. Uses an error-100 background icon circle and a destructive red action button to signal danger clearly.</p>
+
+    <div class="trigger-row">
+      <button class="btn btn--destructive" onclick="showModal('delete-modal')">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3.5h10M5.5 3.5V2h3v1.5M5 5.5v5M9 5.5v5M3 3.5l.5 8h7l.5-8" stroke="white" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Show Confirmation
+      </button>
+    </div>
+
+    <div class="spec-grid spec-grid-2" style="margin-top:var(--space-6)">
+      <div class="spec-item">
+        <div class="spec-item__label">Warning Icon BG</div>
+        <div class="spec-item__value">var(--color-error-100)<br>48px circle</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Destructive Button</div>
+        <div class="spec-item__value">error-600 gradient<br>"Delete Record"</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 3: Side Drawer ──────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Side Drawer</h2>
+    <p class="section-desc">A 400px drawer that slides in from the right edge of the viewport. Used for resident detail panels, audit logs, and extended forms. Entry uses <code>translateX(100%)→0</code> over <code>var(--duration-slow)</code>.</p>
+
+    <div class="trigger-row">
+      <button class="btn btn--secondary" onclick="showDrawer()">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.25"/><path d="M9 1v12" stroke="currentColor" stroke-width="1.25"/></svg>
+        Show Drawer
+      </button>
+    </div>
+
+    <div class="spec-grid">
+      <div class="spec-item">
+        <div class="spec-item__label">Width</div>
+        <div class="spec-item__value">400px</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Entry</div>
+        <div class="spec-item__value">translateX(100%) → 0</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Duration</div>
+        <div class="spec-item__value">var(--duration-slow) — 400ms</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Background</div>
+        <div class="spec-item__value">var(--surface-elevated)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Shadow</div>
+        <div class="spec-item__value">var(--shadow-2xl)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Easing</div>
+        <div class="spec-item__value">var(--ease-out)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       MODALS (hidden by default)
+       ══════════════════════════════════════════════════════════════ -->
+
+  <!-- ── Payment Confirmation Modal ──────────────────────────────── -->
+  <div class="modal-backdrop" id="payment-modal" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title" onclick="handleBackdropClick(event, 'payment-modal')">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal__header">
+        <h2 class="modal__title" id="payment-modal-title">Confirm Payment</h2>
+        <button class="modal__close" onclick="hideModal('payment-modal')" aria-label="Close dialog">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3L13 13M13 3L3 13" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <p>You're about to pay <strong>$285.00</strong> for your April assessment. This will be charged to your <strong>Visa ending in 4821</strong>.</p>
+        <div class="payment-summary">
+          <div>
+            <div class="payment-summary__label">April 2025 Assessment</div>
+            <div class="payment-summary__method">Visa •••• 4821</div>
+          </div>
+          <div class="payment-summary__amount">$285.00</div>
+        </div>
+      </div>
+      <div class="modal__actions">
+        <button class="btn btn--secondary" onclick="hideModal('payment-modal')">Cancel</button>
+        <button class="btn btn--primary" onclick="hideModal('payment-modal')">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7l4 4 6-6" stroke="white" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Confirm Payment
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Delete Violation Modal ───────────────────────────────────── -->
+  <div class="modal-backdrop modal--destructive" id="delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title" onclick="handleBackdropClick(event, 'delete-modal')">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal__warning-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M12 3L22 20H2L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M12 10V14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="12" cy="17.5" r="1" fill="currentColor"/>
+        </svg>
+      </div>
+      <div class="modal__header" style="margin-bottom: var(--space-3)">
+        <h2 class="modal__title" id="delete-modal-title">Delete Violation Record</h2>
+        <button class="modal__close" onclick="hideModal('delete-modal')" aria-label="Close dialog">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3L13 13M13 3L3 13" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <p>Are you sure you want to delete violation <strong>#VIO-247</strong>? This action <strong>cannot be undone</strong> and will permanently remove the record from the system.</p>
+        <div class="violation-ref" aria-label="Violation reference">
+          #VIO-247 — Landscaping / Unmaintained Lawn · Unit 104-C
+        </div>
+      </div>
+      <div class="modal__actions">
+        <button class="btn btn--secondary" onclick="hideModal('delete-modal')">Cancel</button>
+        <button class="btn btn--destructive" onclick="hideModal('delete-modal')">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3.5h10M5.5 3.5V2h3v1.5M5 5.5v5M9 5.5v5M3 3.5l.5 8h7l.5-8" stroke="white" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Delete Record
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Resident Drawer ──────────────────────────────────────────── -->
+  <div class="drawer-backdrop" id="drawer-backdrop" onclick="hideDrawer()"></div>
+  <aside class="drawer" id="resident-drawer" role="complementary" aria-label="Resident details">
+    <div class="drawer__header">
+      <h2 class="drawer__title">Resident Details</h2>
+      <button class="drawer__close" onclick="hideDrawer()" aria-label="Close drawer">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3L13 13M13 3L3 13" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="drawer__body">
+
+      <!-- Resident meta -->
+      <div class="resident-meta">
+        <div class="resident-avatar" aria-hidden="true">SC</div>
+        <div class="resident-info">
+          <div class="resident-info__name">Sarah Chen</div>
+          <div class="resident-info__unit">Unit 101-A · Oakridge Commons</div>
+          <div class="resident-info__badge">Current</div>
+        </div>
+      </div>
+
+      <!-- Account details -->
+      <div class="drawer-section-label">Account Details</div>
+      <div class="detail-row">
+        <span class="detail-row__key">Current Balance</span>
+        <span class="detail-row__val detail-row__val--mono detail-row__val--positive">$0.00</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-row__key">Monthly Assessment</span>
+        <span class="detail-row__val detail-row__val--mono">$285.00</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-row__key">Member Since</span>
+        <span class="detail-row__val">March 2019</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-row__key">Auto-Pay</span>
+        <span class="detail-row__val" style="color:var(--color-success-600);font-weight:600">Enabled</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-row__key">Payment Method</span>
+        <span class="detail-row__val">Visa •••• 4821</span>
+      </div>
+
+      <!-- Contact -->
+      <div class="drawer-section-label">Contact</div>
+      <div class="detail-row">
+        <span class="detail-row__key">Email</span>
+        <span class="detail-row__val">s.chen@example.com</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-row__key">Phone</span>
+        <span class="detail-row__val">(415) 555-0182</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-row__key">Emergency Contact</span>
+        <span class="detail-row__val">Michael Chen · (415) 555-0193</span>
+      </div>
+
+      <!-- Payment history -->
+      <div class="drawer-section-label">Recent Payments</div>
+      <div class="payment-history-item">
+        <span class="phist__date">Apr 1, 2025</span>
+        <span class="phist__desc">April Assessment</span>
+        <span class="phist__amount">$285.00</span>
+      </div>
+      <div class="payment-history-item">
+        <span class="phist__date">Mar 3, 2025</span>
+        <span class="phist__desc">March Assessment</span>
+        <span class="phist__amount">$285.00</span>
+      </div>
+      <div class="payment-history-item">
+        <span class="phist__date">Feb 1, 2025</span>
+        <span class="phist__desc">February Assessment</span>
+        <span class="phist__amount">$285.00</span>
+      </div>
+      <div class="payment-history-item">
+        <span class="phist__date">Jan 2, 2025</span>
+        <span class="phist__desc">January Assessment</span>
+        <span class="phist__amount">$285.00</span>
+      </div>
+      <div class="payment-history-item">
+        <span class="phist__date">Dec 3, 2024</span>
+        <span class="phist__desc">December Assessment</span>
+        <span class="phist__amount">$285.00</span>
+      </div>
+
+    </div>
+    <div class="drawer__footer">
+      <button class="btn btn--secondary" onclick="hideDrawer()">Close</button>
+      <button class="btn btn--primary">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="white" stroke-width="1.75" stroke-linecap="round"/></svg>
+        Record Payment
+      </button>
+    </div>
+  </aside>
+
+  <script>
+    // ── Theme Toggle ──────────────────────────────────────────────
+    const themeBtn = document.getElementById('themeToggle');
+    const html = document.documentElement;
+
+    themeBtn.addEventListener('click', () => {
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        html.removeAttribute('data-theme');
+        themeBtn.textContent = '☀ Light';
+      } else {
+        html.setAttribute('data-theme', 'dark');
+        themeBtn.textContent = '☾ Dark';
+      }
+    });
+
+    // ── Modal Helpers ──────────────────────────────────────────────
+    function showModal(id) {
+      const backdrop = document.getElementById(id);
+      backdrop.classList.add('modal-backdrop--visible');
+      document.body.style.overflow = 'hidden';
+      // Focus management
+      const closeBtn = backdrop.querySelector('.modal__close');
+      if (closeBtn) {
+        setTimeout(() => closeBtn.focus(), 50);
+      }
+    }
+
+    function hideModal(id) {
+      const backdrop = document.getElementById(id);
+      backdrop.classList.remove('modal-backdrop--visible');
+      document.body.style.overflow = '';
+    }
+
+    function handleBackdropClick(event, id) {
+      // Only dismiss when clicking the backdrop itself, not the modal content
+      if (event.target === document.getElementById(id)) {
+        hideModal(id);
+      }
+    }
+
+    // ── Drawer Helpers ────────────────────────────────────────────
+    function showDrawer() {
+      const backdrop = document.getElementById('drawer-backdrop');
+      const drawer = document.getElementById('resident-drawer');
+      backdrop.classList.add('drawer-backdrop--visible');
+      drawer.classList.add('drawer--visible');
+      document.body.style.overflow = 'hidden';
+      // Focus management
+      const closeBtn = drawer.querySelector('.drawer__close');
+      if (closeBtn) {
+        setTimeout(() => closeBtn.focus(), 50);
+      }
+    }
+
+    function hideDrawer() {
+      const backdrop = document.getElementById('drawer-backdrop');
+      const drawer = document.getElementById('resident-drawer');
+      backdrop.classList.remove('drawer-backdrop--visible');
+      drawer.classList.remove('drawer--visible');
+      document.body.style.overflow = '';
+    }
+
+    // ── Keyboard Dismiss ──────────────────────────────────────────
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        // Close any open modals
+        document.querySelectorAll('.modal-backdrop--visible').forEach(el => {
+          hideModal(el.id);
+        });
+        // Close drawer if open
+        if (document.getElementById('drawer-backdrop').classList.contains('drawer-backdrop--visible')) {
+          hideDrawer();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
