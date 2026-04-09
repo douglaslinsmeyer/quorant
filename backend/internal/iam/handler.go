@@ -1,6 +1,8 @@
 package iam
 
 import (
+	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -10,13 +12,19 @@ import (
 
 // Handler handles IAM HTTP requests.
 type Handler struct {
-	service *UserService
-	logger  *slog.Logger
+	service               *UserService
+	logger                *slog.Logger
+	zitadelWebhookSecret  string
 }
 
 // NewHandler constructs a Handler backed by the given service and logger.
 func NewHandler(service *UserService, logger *slog.Logger) *Handler {
 	return &Handler{service: service, logger: logger}
+}
+
+// NewHandlerWithSecret constructs a Handler with a Zitadel webhook secret for signature verification.
+func NewHandlerWithSecret(service *UserService, logger *slog.Logger, zitadelWebhookSecret string) *Handler {
+	return &Handler{service: service, logger: logger, zitadelWebhookSecret: zitadelWebhookSecret}
 }
 
 // GetMe handles GET /api/v1/auth/me
@@ -56,10 +64,21 @@ func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 // ZitadelWebhook handles POST /api/v1/webhooks/zitadel
 // Syncs user data when Zitadel sends webhook events (user.created, user.changed, etc.)
 func (h *Handler) ZitadelWebhook(w http.ResponseWriter, r *http.Request) {
-	// For Phase 2, implement a basic handler that:
-	// 1. Reads a simple JSON payload: {"user_id": "...", "email": "...", "name": "...", "event": "user.created|user.changed"}
-	// 2. Upserts the user via the service
-	// Full Zitadel webhook verification (HMAC signature) will be added later.
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		api.WriteError(w, api.NewInternalError(err))
+		return
+	}
+
+	signature := r.Header.Get("X-Zitadel-Signature")
+	if signature == "" {
+		api.WriteError(w, api.NewUnauthenticatedError("missing webhook signature"))
+		return
+	}
+
+	// TODO: implement full HMAC-SHA256 verification using zitadelWebhookSecret
+	// once the Zitadel signing scheme is fully integrated.
+	h.logger.Info("zitadel webhook received", "signature_present", true, "body_bytes", len(body))
 
 	var payload struct {
 		UserID string `json:"user_id"`
@@ -67,8 +86,8 @@ func (h *Handler) ZitadelWebhook(w http.ResponseWriter, r *http.Request) {
 		Name   string `json:"name"`
 		Event  string `json:"event"`
 	}
-	if err := api.ReadJSON(r, &payload); err != nil {
-		api.WriteError(w, err)
+	if err := json.Unmarshal(body, &payload); err != nil {
+		api.WriteError(w, api.NewValidationError("invalid JSON payload", ""))
 		return
 	}
 
@@ -83,7 +102,7 @@ func (h *Handler) ZitadelWebhook(w http.ResponseWriter, r *http.Request) {
 		Name:    payload.Name,
 	}
 
-	_, err := h.service.GetOrCreateUser(r.Context(), claims)
+	_, err = h.service.GetOrCreateUser(r.Context(), claims)
 	if err != nil {
 		h.logger.Error("webhook user sync", "error", err, "event", payload.Event)
 		api.WriteError(w, api.NewInternalError(err))

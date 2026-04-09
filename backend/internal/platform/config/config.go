@@ -17,14 +17,16 @@ type Config struct {
 	NATS      NATSConfig
 	S3        S3Config
 	Zitadel   ZitadelConfig
+	Stripe    StripeConfig
 	Log       LogConfig
 	Telemetry TelemetryConfig
 }
 
 // ServerConfig holds HTTP server settings.
 type ServerConfig struct {
-	Host string // env: SERVER_HOST, default: "0.0.0.0"
-	Port int    // env: SERVER_PORT, default: 8080
+	Host        string // env: SERVER_HOST, default: "0.0.0.0"
+	Port        int    // env: SERVER_PORT, default: 8080
+	Environment string // env: APP_ENV, default: "development"
 }
 
 // DatabaseConfig holds PostgreSQL connection settings.
@@ -69,8 +71,14 @@ type S3Config struct {
 
 // ZitadelConfig holds Zitadel identity provider settings.
 type ZitadelConfig struct {
-	Domain string // env: ZITADEL_DOMAIN, default: "localhost:8085"
-	Issuer string // env: ZITADEL_ISSUER, default: "http://localhost:8085"
+	Domain          string // env: ZITADEL_DOMAIN, default: "localhost:8085"
+	Issuer          string // env: ZITADEL_ISSUER, default: "http://localhost:8085"
+	WebhookSecret   string // env: ZITADEL_WEBHOOK_SECRET, default: ""
+}
+
+// StripeConfig holds Stripe payment provider settings.
+type StripeConfig struct {
+	WebhookSecret string // env: STRIPE_WEBHOOK_SECRET, default: ""
 }
 
 // LogConfig holds structured logging settings.
@@ -173,8 +181,9 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		Server: ServerConfig{
-			Host: getEnv("SERVER_HOST", "0.0.0.0"),
-			Port: serverPort,
+			Host:        getEnv("SERVER_HOST", "0.0.0.0"),
+			Port:        serverPort,
+			Environment: getEnv("APP_ENV", "development"),
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -201,8 +210,12 @@ func Load() (*Config, error) {
 			UseSSL:    s3UseSSL,
 		},
 		Zitadel: ZitadelConfig{
-			Domain: getEnv("ZITADEL_DOMAIN", "localhost:8085"),
-			Issuer: getEnv("ZITADEL_ISSUER", "http://localhost:8085"),
+			Domain:        getEnv("ZITADEL_DOMAIN", "localhost:8085"),
+			Issuer:        getEnv("ZITADEL_ISSUER", "http://localhost:8085"),
+			WebhookSecret: os.Getenv("ZITADEL_WEBHOOK_SECRET"),
+		},
+		Stripe: StripeConfig{
+			WebhookSecret: os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		},
 		Log: LogConfig{
 			Level: getEnv("LOG_LEVEL", "info"),

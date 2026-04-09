@@ -338,7 +338,6 @@ func (w *RetryWorker) retryDelivery(ctx context.Context, d Delivery) {
 	}
 
 	signature := SignPayload([]byte{}, sub.Secret) // payload not stored; re-sign would need original payload
-	_ = signature
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, sub.TargetURL, bytes.NewReader([]byte{}))
 	if err != nil {
@@ -346,6 +345,7 @@ func (w *RetryWorker) retryDelivery(ctx context.Context, d Delivery) {
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Webhook-Signature", "sha256="+signature)
 
 	now := time.Now()
 	d.Attempts++

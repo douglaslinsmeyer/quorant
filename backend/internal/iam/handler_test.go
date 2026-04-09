@@ -261,6 +261,7 @@ func TestZitadelWebhook_CreatesUser(t *testing.T) {
 	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/webhooks/zitadel", bytes.NewBufferString(payload))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Zitadel-Signature", "sha256=test-signature")
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
@@ -291,6 +292,7 @@ func TestZitadelWebhook_MissingFields(t *testing.T) {
 	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/webhooks/zitadel", bytes.NewBufferString(payload))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Zitadel-Signature", "sha256=test-signature")
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
@@ -303,4 +305,23 @@ func TestZitadelWebhook_MissingFields(t *testing.T) {
 	errs := responseErrors(t, buf.Bytes())
 	require.NotEmpty(t, errs)
 	assert.Equal(t, "VALIDATION_ERROR", errs[0].Code)
+}
+
+func TestZitadelWebhook_MissingSignature(t *testing.T) {
+	repo := newMockRepo()
+	validator := auth.NewStaticValidator(&auth.Claims{})
+	srv := newTestServer(t, repo, validator)
+	defer srv.Close()
+
+	payload := `{"user_id":"zitadel-user-1","email":"webhook@example.com","name":"User","event":"user.created"}`
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/webhooks/zitadel", bytes.NewBufferString(payload))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	// No X-Zitadel-Signature header — should be rejected.
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }

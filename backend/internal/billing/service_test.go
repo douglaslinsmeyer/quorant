@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/billing"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -149,7 +151,7 @@ func (m *mockBillingRepo) ListLineItemsByInvoice(_ context.Context, invoiceID uu
 
 func newTestBillingService(repo *mockBillingRepo) *billing.BillingService {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return billing.NewBillingService(repo, logger)
+	return billing.NewBillingService(repo, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 }
 
 // ─── GetBillingAccount tests ──────────────────────────────────────────────────

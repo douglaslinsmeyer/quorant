@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/billing"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +30,7 @@ func setupBillingTestServer(t *testing.T) *billingTestServer {
 
 	repo := newMockBillingRepo()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	svc := billing.NewBillingService(repo, logger)
+	svc := billing.NewBillingService(repo, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 	handler := billing.NewBillingHandler(svc, logger)
 
 	mux := http.NewServeMux()
@@ -239,15 +241,32 @@ func TestGetInvoice_Handler_InvalidInvoiceID(t *testing.T) {
 func TestStripeWebhook_Handler(t *testing.T) {
 	ts := setupBillingTestServer(t)
 
-	resp := doBillingRequest(t, ts, http.MethodPost,
-		"/api/v1/webhooks/stripe",
-		map[string]any{"type": "invoice.paid"},
-	)
+	body, err := json.Marshal(map[string]any{"type": "invoice.paid"})
+	require.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodPost, ts.server.URL+"/api/v1/webhooks/stripe", bytes.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Stripe-Signature", "t=1234567890,v1=test-signature")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var envelope struct {
 		Data map[string]string `json:"data"`
 	}
 	decodeBillingBody(t, resp, &envelope)
-	assert.Equal(t, "ok", envelope.Data["status"])
+	assert.Equal(t, "received", envelope.Data["status"])
+}
+
+func TestStripeWebhook_MissingSignature(t *testing.T) {
+	ts := setupBillingTestServer(t)
+
+	resp := doBillingRequest(t, ts, http.MethodPost,
+		"/api/v1/webhooks/stripe",
+		map[string]any{"type": "invoice.paid"},
+	)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }

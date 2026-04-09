@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 
@@ -46,6 +47,24 @@ func main() {
 	}
 }
 
+// iamUserFinder adapts iam.UserRepository to the middleware.UserFinder interface.
+// iam.UserRepository.FindByIDPUserID returns (*iam.User, error), but UserFinder
+// returns (uuid.UUID, error) — this adapter bridges the gap.
+type iamUserFinder struct {
+	repo iam.UserRepository
+}
+
+func (f iamUserFinder) FindByIDPUserID(ctx context.Context, idpUserID string) (uuid.UUID, error) {
+	user, err := f.repo.FindByIDPUserID(ctx, idpUserID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if user == nil {
+		return uuid.Nil, fmt.Errorf("user not found for idp_user_id: %s", idpUserID)
+	}
+	return user.ID, nil
+}
+
 func run() error {
 	ctx := context.Background()
 
@@ -80,9 +99,7 @@ func run() error {
 
 	// 5. Audit and event infrastructure
 	auditor := audit.NewPostgresAuditor(pool)
-	_ = auditor
 	outboxPublisher := queue.NewOutboxPublisher(pool)
-	_ = outboxPublisher
 	logger.Info("audit and event infrastructure initialized")
 
 	// 5. Redis
@@ -133,18 +150,22 @@ func run() error {
 	// IAM module
 	userRepo := iam.NewPostgresUserRepository(pool)
 	userService := iam.NewUserService(userRepo)
-	iamHandler := iam.NewHandler(userService, logger)
+	iamHandler := iam.NewHandlerWithSecret(userService, logger, cfg.Zitadel.WebhookSecret)
 	iam.RegisterRoutes(mux, iamHandler, tokenValidator)
+
+	// RBAC: permission checker and user ID resolver shared across all modules
+	permChecker := middleware.NewPostgresPermissionChecker(pool)
+	resolveUserID := middleware.NewUserIDResolver(iamUserFinder{repo: userRepo})
 
 	// Org module
 	orgRepo := org.NewPostgresOrgRepository(pool)
 	membershipRepo := org.NewPostgresMembershipRepository(pool)
 	unitRepo := org.NewPostgresUnitRepository(pool)
-	orgService := org.NewOrgService(orgRepo, membershipRepo, unitRepo, userRepo, logger)
+	orgService := org.NewOrgService(orgRepo, membershipRepo, unitRepo, userRepo, auditor, outboxPublisher, logger)
 	orgHandler := org.NewOrgHandler(orgService, logger)
 	membershipHandler := org.NewMembershipHandler(orgService, logger)
 	unitHandler := org.NewUnitHandler(orgService, logger)
-	org.RegisterRoutes(mux, orgHandler, membershipHandler, unitHandler, tokenValidator)
+	org.RegisterRoutes(mux, orgHandler, membershipHandler, unitHandler, tokenValidator, permChecker, resolveUserID)
 
 	// Fin module
 	assessmentRepo := fin.NewPostgresAssessmentRepository(pool)
@@ -152,25 +173,25 @@ func run() error {
 	budgetRepo := fin.NewPostgresBudgetRepository(pool)
 	fundRepo := fin.NewPostgresFundRepository(pool)
 	collectionRepo := fin.NewPostgresCollectionRepository(pool)
-	finService := fin.NewFinService(assessmentRepo, paymentRepo, budgetRepo, fundRepo, collectionRepo, logger)
+	finService := fin.NewFinService(assessmentRepo, paymentRepo, budgetRepo, fundRepo, collectionRepo, auditor, outboxPublisher, logger)
 	assessmentHandler := fin.NewAssessmentHandler(finService, logger)
 	paymentHandler := fin.NewPaymentHandler(finService, logger)
 	budgetHandler := fin.NewBudgetHandler(finService, logger)
 	fundHandler := fin.NewFundHandler(finService, logger)
 	collectionHandler := fin.NewCollectionHandler(finService, logger)
-	fin.RegisterRoutes(mux, assessmentHandler, paymentHandler, budgetHandler, fundHandler, collectionHandler, tokenValidator)
+	fin.RegisterRoutes(mux, assessmentHandler, paymentHandler, budgetHandler, fundHandler, collectionHandler, tokenValidator, permChecker, resolveUserID)
 
 	// Gov module
 	violationRepo := gov.NewPostgresViolationRepository(pool)
 	arbRepo := gov.NewPostgresARBRepository(pool)
 	ballotRepo := gov.NewPostgresBallotRepository(pool)
 	meetingRepo := gov.NewPostgresMeetingRepository(pool)
-	govService := gov.NewGovService(violationRepo, arbRepo, ballotRepo, meetingRepo, logger)
+	govService := gov.NewGovService(violationRepo, arbRepo, ballotRepo, meetingRepo, auditor, outboxPublisher, logger)
 	violationHandler := gov.NewViolationHandler(govService, logger)
 	arbHandler := gov.NewARBHandler(govService, logger)
 	ballotHandler := gov.NewBallotHandler(govService, logger)
 	meetingHandler := gov.NewMeetingHandler(govService, logger)
-	gov.RegisterRoutes(mux, violationHandler, arbHandler, ballotHandler, meetingHandler, tokenValidator)
+	gov.RegisterRoutes(mux, violationHandler, arbHandler, ballotHandler, meetingHandler, tokenValidator, permChecker, resolveUserID)
 
 	// Com module
 	announcementRepo := com.NewPostgresAnnouncementRepository(pool)
@@ -180,39 +201,38 @@ func run() error {
 	templateRepo := com.NewPostgresTemplateRepository(pool)
 	directoryRepo := com.NewPostgresDirectoryRepository(pool)
 	commLogRepo := com.NewPostgresCommLogRepository(pool)
-	comService := com.NewComService(announcementRepo, threadRepo, notificationRepo, calendarRepo, templateRepo, directoryRepo, commLogRepo, logger)
+	comService := com.NewComService(announcementRepo, threadRepo, notificationRepo, calendarRepo, templateRepo, directoryRepo, commLogRepo, auditor, outboxPublisher, logger)
 	announcementHandler := com.NewAnnouncementHandler(comService, logger)
 	threadHandler := com.NewThreadHandler(comService, logger)
 	calendarHandler := com.NewCalendarHandler(comService, logger)
 	notificationHandler := com.NewNotificationHandler(comService, logger)
 	commLogHandler := com.NewCommLogHandler(comService, logger)
-	com.RegisterRoutes(mux, announcementHandler, threadHandler, calendarHandler, notificationHandler, commLogHandler, tokenValidator)
+	com.RegisterRoutes(mux, announcementHandler, threadHandler, calendarHandler, notificationHandler, commLogHandler, tokenValidator, permChecker, resolveUserID)
 
 	// Task module
 	taskRepo := task.NewPostgresTaskRepository(pool)
-	taskService := task.NewTaskService(taskRepo, logger)
+	taskService := task.NewTaskService(taskRepo, auditor, outboxPublisher, logger)
 	taskHandler := task.NewTaskHandler(taskService, logger)
-	task.RegisterRoutes(mux, taskHandler, tokenValidator)
+	task.RegisterRoutes(mux, taskHandler, tokenValidator, permChecker, resolveUserID)
 
 	// License module
 	licenseRepo := license.NewPostgresLicenseRepository(pool)
 	entitlementChecker := license.NewPostgresEntitlementChecker(licenseRepo)
-	_ = entitlementChecker // Will be injected into middleware in a future phase
-	licenseService := license.NewLicenseService(licenseRepo, entitlementChecker, logger)
+	licenseService := license.NewLicenseService(licenseRepo, entitlementChecker, auditor, outboxPublisher, logger)
 	licenseHandler := license.NewLicenseHandler(licenseService, logger)
-	license.RegisterRoutes(mux, licenseHandler, tokenValidator)
+	license.RegisterRoutes(mux, licenseHandler, tokenValidator, permChecker, resolveUserID)
 
 	// Billing module
 	billingRepo := billing.NewPostgresBillingRepository(pool)
-	billingService := billing.NewBillingService(billingRepo, logger)
-	billingHandler := billing.NewBillingHandler(billingService, logger)
-	billing.RegisterRoutes(mux, billingHandler, tokenValidator)
+	billingService := billing.NewBillingService(billingRepo, auditor, outboxPublisher, logger)
+	billingHandler := billing.NewBillingHandlerWithSecret(billingService, logger, cfg.Stripe.WebhookSecret)
+	billing.RegisterRoutes(mux, billingHandler, tokenValidator, permChecker, resolveUserID)
 
 	// Admin module
 	adminRepo := admin.NewPostgresAdminRepository(pool)
-	adminService := admin.NewAdminService(adminRepo, logger)
+	adminService := admin.NewAdminService(adminRepo, auditor, outboxPublisher, logger)
 	adminHandler := admin.NewAdminHandler(adminService, logger)
-	admin.RegisterRoutes(mux, adminHandler, tokenValidator)
+	admin.RegisterRoutes(mux, adminHandler, tokenValidator, permChecker, resolveUserID)
 
 	// AI module
 	contextChunkRepo := ai.NewPostgresContextChunkRepository(pool)
@@ -220,17 +240,19 @@ func run() error {
 	policyRepo := ai.NewPostgresPolicyRepository(pool)
 	policyService := ai.NewPolicyService(policyRepo, logger)
 	aiHandler := ai.NewAIHandler(policyService, contextLakeService, orgRepo, logger)
-	ai.RegisterRoutes(mux, aiHandler, tokenValidator)
+	ai.RegisterRoutes(mux, aiHandler, tokenValidator, permChecker, resolveUserID)
 
-	// Replace stub resolvers with real implementations (for future module injection).
-	_ = ai.NewPostgresContextRetriever(contextLakeService)
-	_ = ai.NewPostgresPolicyResolver(policyService)
+	// Real implementations of AI interfaces (for future module injection).
+	contextRetriever := ai.NewPostgresContextRetriever(contextLakeService)
+	policyResolver := ai.NewPostgresPolicyResolver(policyService)
+	_ = contextRetriever
+	_ = policyResolver
 
 	// Webhook module
 	webhookRepo := webhook.NewPostgresWebhookRepository(pool)
-	webhookService := webhook.NewWebhookService(webhookRepo, logger)
+	webhookService := webhook.NewWebhookService(webhookRepo, auditor, outboxPublisher, logger)
 	webhookHandler := webhook.NewWebhookHandler(webhookService, logger)
-	webhook.RegisterRoutes(mux, webhookHandler, tokenValidator)
+	webhook.RegisterRoutes(mux, webhookHandler, tokenValidator, permChecker, resolveUserID)
 
 	// Doc module
 	s3Client, err := storage.NewS3Client(cfg.S3)
@@ -243,14 +265,18 @@ func run() error {
 		}
 	}
 	docRepo := doc.NewPostgresDocRepository(pool)
-	// Use MockStorageClient if s3Client is nil (S3 unavailable)
-	var storageClient storage.StorageClient = s3Client
-	if storageClient == nil {
+	var storageClient storage.StorageClient
+	if s3Client != nil {
+		storageClient = s3Client
+	} else if cfg.Server.Environment == "production" {
+		return fmt.Errorf("S3 storage is required in production")
+	} else {
+		logger.Warn("S3 storage not available — using in-memory mock (dev only)")
 		storageClient = storage.NewMockStorageClient()
 	}
-	docService := doc.NewDocService(docRepo, storageClient, cfg.S3.Bucket, logger)
+	docService := doc.NewDocService(docRepo, storageClient, cfg.S3.Bucket, auditor, outboxPublisher, logger)
 	docHandler := doc.NewDocHandler(docService, logger)
-	doc.RegisterRoutes(mux, docHandler, tokenValidator)
+	doc.RegisterRoutes(mux, docHandler, tokenValidator, permChecker, resolveUserID)
 
 	// 10. Middleware chain (innermost to outermost)
 	var handler http.Handler = mux

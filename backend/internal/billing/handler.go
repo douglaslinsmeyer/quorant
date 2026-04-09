@@ -1,6 +1,7 @@
 package billing
 
 import (
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -10,13 +11,19 @@ import (
 
 // BillingHandler handles HTTP requests for the billing domain.
 type BillingHandler struct {
-	service *BillingService
-	logger  *slog.Logger
+	service             *BillingService
+	logger              *slog.Logger
+	stripeWebhookSecret string
 }
 
 // NewBillingHandler constructs a BillingHandler backed by the given service.
 func NewBillingHandler(service *BillingService, logger *slog.Logger) *BillingHandler {
 	return &BillingHandler{service: service, logger: logger}
+}
+
+// NewBillingHandlerWithSecret constructs a BillingHandler with a Stripe webhook secret for signature verification.
+func NewBillingHandlerWithSecret(service *BillingService, logger *slog.Logger, stripeWebhookSecret string) *BillingHandler {
+	return &BillingHandler{service: service, logger: logger, stripeWebhookSecret: stripeWebhookSecret}
 }
 
 // GetAccount handles GET /api/v1/organizations/{org_id}/billing.
@@ -94,11 +101,27 @@ func (h *BillingHandler) GetInvoice(w http.ResponseWriter, r *http.Request) {
 }
 
 // StripeWebhook handles POST /api/v1/webhooks/stripe.
-// This is a placeholder — Stripe webhook verification and event handling will be
-// implemented in a future phase.
 func (h *BillingHandler) StripeWebhook(w http.ResponseWriter, r *http.Request) {
-	// TODO: implement Stripe webhook verification and event handling
-	api.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		api.WriteError(w, api.NewInternalError(err))
+		return
+	}
+
+	sigHeader := r.Header.Get("Stripe-Signature")
+	if sigHeader == "" {
+		api.WriteError(w, api.NewUnauthenticatedError("missing Stripe-Signature header"))
+		return
+	}
+
+	// TODO: implement full Stripe signature verification using HMAC-SHA256 with
+	// stripeWebhookSecret once the Stripe signing scheme is fully integrated.
+	// See: https://stripe.com/docs/webhooks/signatures
+	h.logger.Warn("Stripe webhook signature verification not fully implemented",
+		"signature_present", true,
+		"body_bytes", len(body))
+
+	api.WriteJSON(w, http.StatusOK, map[string]string{"status": "received"})
 }
 
 // ─── Path value helpers ───────────────────────────────────────────────────────
