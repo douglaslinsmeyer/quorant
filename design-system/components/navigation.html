@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Navigation — Quorant Design System</title>
+
+  <link rel="stylesheet" href="../tokens/colors.css" />
+  <link rel="stylesheet" href="../tokens/typography.css" />
+  <link rel="stylesheet" href="../tokens/spacing.css" />
+  <link rel="stylesheet" href="../tokens/elevation.css" />
+  <link rel="stylesheet" href="../tokens/motion.css" />
+
+  <style>
+    /* ── Reset & Base ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: var(--type-body-size);
+      line-height: var(--type-body-line-height);
+      color: var(--color-neutral-900);
+      background: var(--surface-page);
+      padding: var(--space-8);
+      animation: page-enter var(--duration-slow) var(--ease-out) both;
+    }
+
+    /* ── Dark Mode Toggle ──────────────────────────────────────── */
+    .theme-btn {
+      position: fixed;
+      top: var(--space-4);
+      right: var(--space-4);
+      background: var(--surface-card);
+      border: 1px solid var(--color-neutral-200);
+      color: var(--color-neutral-700);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition:
+        background var(--duration-normal) var(--ease-smooth),
+        color var(--duration-normal) var(--ease-smooth),
+        box-shadow var(--duration-normal) var(--ease-smooth);
+      z-index: 100;
+    }
+
+    .theme-btn:hover {
+      box-shadow: var(--shadow-md);
+      background: var(--surface-elevated);
+    }
+
+    /* ── Page Header ────────────────────────────────────────────── */
+    .page-header {
+      margin-bottom: var(--space-8);
+      padding-right: 120px;
+    }
+
+    .page-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--type-h1-size);
+      font-weight: var(--type-h1-weight);
+      line-height: var(--type-h1-line-height);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-2);
+    }
+
+    .page-header p {
+      font-size: var(--type-body-lg-size);
+      color: var(--color-neutral-600);
+    }
+
+    /* ── Section ────────────────────────────────────────────────── */
+    .section {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-8);
+      margin-bottom: var(--space-6);
+    }
+
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h3-size);
+      font-weight: var(--type-h3-weight);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-1);
+    }
+
+    .section-desc {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-6);
+    }
+
+    .overline {
+      font-family: var(--font-body);
+      font-size: var(--type-overline-size);
+      font-weight: var(--type-overline-weight);
+      letter-spacing: var(--type-overline-letter-spacing);
+      text-transform: var(--type-overline-text-transform);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-3);
+    }
+
+    /* ── Two-column layout for sidebar + spec ───────────────────── */
+    .sidebar-demo-layout {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: var(--space-8);
+      align-items: start;
+    }
+
+    /* ── Management Sidebar ──────────────────────────────────────── */
+    .mgmt-sidebar {
+      width: var(--sidebar-width); /* 230px */
+      min-height: 520px;
+      background: var(--surface-sidebar);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-xl);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    /* Logo area */
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 18px 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .sidebar-logo__mark {
+      width: 34px;
+      height: 34px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-heading);
+      font-size: 16px;
+      font-weight: 800;
+      color: #fff;
+      flex-shrink: 0;
+      letter-spacing: -0.5px;
+    }
+
+    .sidebar-logo__text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-logo__wordmark {
+      font-family: var(--font-heading);
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.2;
+      letter-spacing: -0.2px;
+    }
+
+    .sidebar-logo__subtitle {
+      font-family: var(--font-body);
+      font-size: 10px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.45);
+      letter-spacing: 0.04em;
+      line-height: 1.3;
+      margin-top: 1px;
+    }
+
+    /* Nav body */
+    .sidebar-nav {
+      flex: 1;
+      padding: var(--space-3) var(--space-2);
+      overflow-y: auto;
+    }
+
+    /* Section label */
+    .sidebar-section-label {
+      font-family: var(--font-body);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.25);
+      padding: var(--space-3) 12px var(--space-2);
+    }
+
+    /* Nav item */
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px 12px;
+      border-radius: var(--radius-md);
+      font-family: var(--font-body);
+      font-size: 12.5px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.5);
+      cursor: pointer;
+      transition:
+        background var(--duration-fast) var(--ease-default),
+        color var(--duration-fast) var(--ease-default);
+      text-decoration: none;
+      position: relative;
+    }
+
+    .sidebar-item:hover:not(.sidebar-item--active) {
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.75);
+    }
+
+    .sidebar-item--active {
+      background: rgba(26, 122, 154, 0.3);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .sidebar-item__icon {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      opacity: 0.7;
+    }
+
+    .sidebar-item--active .sidebar-item__icon {
+      opacity: 1;
+    }
+
+    .sidebar-item__label {
+      flex: 1;
+    }
+
+    .sidebar-item__badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-body);
+      font-size: 9px;
+      font-weight: 700;
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      border-radius: var(--radius-full);
+      background: var(--color-secondary-500);
+      color: #fff;
+    }
+
+    /* User profile at bottom */
+    .sidebar-user {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: 12px 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      margin-top: auto;
+    }
+
+    .sidebar-user__avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .sidebar-user__info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .sidebar-user__name {
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.9);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebar-user__org {
+      font-family: var(--font-body);
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.4);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+
+    /* ── Sidebar Spec Panel ─────────────────────────────────────── */
+    .spec-list {
+      list-style: none;
+    }
+
+    .spec-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: var(--space-2) 0;
+      border-bottom: 1px solid var(--color-neutral-100);
+      font-size: var(--type-body-sm-size);
+    }
+
+    .spec-list li:last-child {
+      border-bottom: none;
+    }
+
+    .spec-list__key {
+      color: var(--color-neutral-500);
+      font-weight: 500;
+    }
+
+    .spec-list__val {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--color-primary-600);
+      text-align: right;
+    }
+
+    /* ── Member Bottom Tab Bar ──────────────────────────────────── */
+    .phone-frame {
+      width: 375px;
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      border: 1px solid var(--color-neutral-200);
+    }
+
+    .phone-screen {
+      height: 180px;
+      background: var(--color-neutral-50);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-neutral-400);
+      font-size: var(--type-body-sm-size);
+      border-bottom: 1px solid var(--color-neutral-200);
+    }
+
+    .bottom-tab-bar {
+      display: flex;
+      align-items: stretch;
+      height: var(--bottombar-height); /* 56px */
+      background: var(--surface-card);
+      border-top: 1px solid var(--color-neutral-200);
+    }
+
+    .bottom-tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 6px 0 8px;
+      cursor: pointer;
+      border: none;
+      background: none;
+      font-family: var(--font-body);
+      color: var(--color-neutral-400);
+      font-size: 10px;
+      font-weight: 500;
+      transition: color var(--duration-fast) var(--ease-default);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .bottom-tab--active {
+      color: var(--color-primary-600);
+      font-weight: 700;
+    }
+
+    .bottom-tab__icon {
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .bottom-tab__label {
+      font-size: 10px;
+      line-height: 1;
+    }
+
+    .bottom-tab__badge {
+      position: relative;
+    }
+
+    .bottom-tab__badge::after {
+      content: '3';
+      position: absolute;
+      top: -6px;
+      right: -10px;
+      background: var(--color-error-600);
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      min-width: 15px;
+      height: 15px;
+      border-radius: var(--radius-full);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 3px;
+    }
+
+    /* ── Breadcrumbs ─────────────────────────────────────────────── */
+    .breadcrumbs {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0;
+      font-family: var(--font-body);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .breadcrumbs__link {
+      color: var(--color-primary-600);
+      text-decoration: none;
+      font-weight: 500;
+      transition: opacity var(--duration-fast) var(--ease-default);
+    }
+
+    .breadcrumbs__link:hover {
+      opacity: 0.75;
+      text-decoration: underline;
+    }
+
+    .breadcrumbs__sep {
+      color: var(--color-neutral-400);
+      margin: 0 var(--space-2);
+      font-weight: 400;
+    }
+
+    .breadcrumbs__current {
+      color: var(--color-neutral-950);
+      font-weight: 500;
+    }
+
+    /* ── Horizontal Tabs ─────────────────────────────────────────── */
+    .h-tabs {
+      display: flex;
+      align-items: stretch;
+      border-bottom: 1px solid var(--color-neutral-200);
+    }
+
+    .h-tab {
+      display: flex;
+      align-items: center;
+      padding: var(--space-3) var(--space-4);
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-neutral-500);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition:
+        color var(--duration-fast) var(--ease-default),
+        border-color var(--duration-fast) var(--ease-default);
+      white-space: nowrap;
+    }
+
+    .h-tab:hover:not(.h-tab--active) {
+      color: var(--color-neutral-700);
+    }
+
+    .h-tab--active {
+      color: var(--color-primary-600);
+      border-bottom-color: var(--color-primary-600);
+      font-weight: 600;
+    }
+
+    .h-tab__badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: var(--radius-full);
+      background: var(--color-neutral-100);
+      color: var(--color-neutral-600);
+      margin-left: var(--space-2);
+    }
+
+    .h-tab--active .h-tab__badge {
+      background: var(--color-primary-50);
+      color: var(--color-primary-600);
+    }
+
+    /* Tab content preview */
+    .tab-content {
+      padding: var(--space-6);
+      background: var(--surface-page);
+      border-radius: 0 0 var(--radius-md) var(--radius-md);
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      display: none;
+    }
+
+    .tab-content--active {
+      display: block;
+    }
+
+    /* ── Spec Grid ──────────────────────────────────────────────── */
+    .spec-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+      margin-top: var(--space-6);
+    }
+
+    .spec-grid-3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .spec-item {
+      background: var(--surface-page);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+    }
+
+    .spec-item__label {
+      font-size: var(--type-overline-size);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-2);
+    }
+
+    .spec-item__value {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--color-primary-600);
+      line-height: 1.6;
+    }
+
+    /* ── Inline demo area ───────────────────────────────────────── */
+    .demo-bg {
+      background: var(--surface-page);
+      border-radius: var(--radius-md);
+      padding: var(--space-6);
+    }
+  </style>
+</head>
+<body>
+
+  <button class="theme-btn" id="themeToggle" aria-label="Toggle dark mode">☀ Light</button>
+
+  <!-- ── Page Header ──────────────────────────────────────────────── -->
+  <header class="page-header">
+    <h1>Navigation</h1>
+    <p>Navigation patterns for both the Management Portal (sidebar, breadcrumbs, tabs) and the Member App (bottom tab bar).</p>
+  </header>
+
+  <!-- ── Section 1: Management Sidebar ────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Management Sidebar</h2>
+    <p class="section-desc">230px fixed sidebar for the Management Portal. Uses the surface-sidebar gradient token with distinct active state, count badges, and a user profile footer.</p>
+
+    <div class="sidebar-demo-layout">
+
+      <!-- Sidebar rendered at actual size -->
+      <nav class="mgmt-sidebar" aria-label="Management portal navigation">
+
+        <!-- Logo -->
+        <div class="sidebar-logo">
+          <div class="sidebar-logo__mark" aria-hidden="true">Q</div>
+          <div class="sidebar-logo__text">
+            <span class="sidebar-logo__wordmark">Quorant</span>
+            <span class="sidebar-logo__subtitle">Management</span>
+          </div>
+        </div>
+
+        <!-- Nav Items -->
+        <div class="sidebar-nav">
+
+          <!-- Overview -->
+          <div class="sidebar-section-label">Overview</div>
+
+          <a class="sidebar-item sidebar-item--active" href="#" aria-current="page">
+            <svg class="sidebar-item__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.8"/>
+              <rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.5"/>
+              <rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.5"/>
+              <rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.5"/>
+            </svg>
+            <span class="sidebar-item__label">Dashboard</span>
+          </a>
+
+          <a class="sidebar-item" href="#">
+            <svg class="sidebar-item__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <rect x="1" y="1" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.25"/>
+              <path d="M5 15h6M8 11v4" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+            </svg>
+            <span class="sidebar-item__label">Properties</span>
+            <span class="sidebar-item__badge">12</span>
+          </a>
+
+          <!-- Operations -->
+          <div class="sidebar-section-label">Operations</div>
+
+          <a class="sidebar-item" href="#">
+            <svg class="sidebar-item__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M2 5h12M2 8h8M2 11h5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+            </svg>
+            <span class="sidebar-item__label">Financials</span>
+          </a>
+
+          <a class="sidebar-item" href="#">
+            <svg class="sidebar-item__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 1L14 8H10V15H6V8H2L8 1Z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>
+            </svg>
+            <span class="sidebar-item__label">Violations</span>
+            <span class="sidebar-item__badge">7</span>
+          </a>
+
+          <a class="sidebar-item" href="#">
+            <svg class="sidebar-item__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <rect x="1.5" y="1.5" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.25"/>
+              <path d="M5 8h6M8 5v6" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+            </svg>
+            <span class="sidebar-item__label">Work Orders</span>
+          </a>
+
+          <a class="sidebar-item" href="#">
+            <svg class="sidebar-item__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="8" cy="6" r="3" stroke="currentColor" stroke-width="1.25"/>
+              <path d="M2 14c0-3.31 2.69-6 6-6s6 2.69 6 6" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+            </svg>
+            <span class="sidebar-item__label">Vendors</span>
+          </a>
+
+          <!-- Communication -->
+          <div class="sidebar-section-label">Communication</div>
+
+          <a class="sidebar-item" href="#">
+            <svg class="sidebar-item__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M2 4a1 1 0 011-1h10a1 1 0 011 1v7a1 1 0 01-1 1H5l-3 2V4z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>
+            </svg>
+            <span class="sidebar-item__label">Announcements</span>
+          </a>
+
+          <a class="sidebar-item" href="#">
+            <svg class="sidebar-item__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v6a1 1 0 01-1 1H9l-3 3V10H3a1 1 0 01-1-1V3z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>
+            </svg>
+            <span class="sidebar-item__label">Messages</span>
+            <span class="sidebar-item__badge">3</span>
+          </a>
+
+        </div><!-- /.sidebar-nav -->
+
+        <!-- User profile -->
+        <div class="sidebar-user">
+          <div class="sidebar-user__avatar" aria-hidden="true">AM</div>
+          <div class="sidebar-user__info">
+            <div class="sidebar-user__name">Alex Martinez</div>
+            <div class="sidebar-user__org">Oakridge Commons HOA</div>
+          </div>
+        </div>
+
+      </nav>
+
+      <!-- Spec panel -->
+      <div>
+        <div class="overline">Sidebar Tokens</div>
+        <ul class="spec-list">
+          <li>
+            <span class="spec-list__key">Background</span>
+            <span class="spec-list__val">var(--surface-sidebar)</span>
+          </li>
+          <li>
+            <span class="spec-list__key">Width</span>
+            <span class="spec-list__val">var(--sidebar-width) — 230px</span>
+          </li>
+          <li>
+            <span class="spec-list__key">Section label</span>
+            <span class="spec-list__val">9px · uppercase · rgba(255,255,255,0.25)</span>
+          </li>
+          <li>
+            <span class="spec-list__key">Nav item font</span>
+            <span class="spec-list__val">12.5px · var(--font-body)</span>
+          </li>
+          <li>
+            <span class="spec-list__key">Item padding</span>
+            <span class="spec-list__val">9px 12px</span>
+          </li>
+          <li>
+            <span class="spec-list__key">Item radius</span>
+            <span class="spec-list__val">var(--radius-md)</span>
+          </li>
+          <li>
+            <span class="spec-list__key">Active bg</span>
+            <span class="spec-list__val">rgba(26,122,154,0.3)</span>
+          </li>
+          <li>
+            <span class="spec-list__key">Active text</span>
+            <span class="spec-list__val">#fff · weight 600</span>
+          </li>
+          <li>
+            <span class="spec-list__key">Inactive text</span>
+            <span class="spec-list__val">rgba(255,255,255,0.5)</span>
+          </li>
+          <li>
+            <span class="spec-list__key">Badge bg</span>
+            <span class="spec-list__val">var(--color-secondary-500)</span>
+          </li>
+          <li>
+            <span class="spec-list__key">Badge font</span>
+            <span class="spec-list__val">9px · weight 700 · radius-full</span>
+          </li>
+          <li>
+            <span class="spec-list__key">Logo mark</span>
+            <span class="spec-list__val">34px × 34px · radius-md</span>
+          </li>
+          <li>
+            <span class="spec-list__key">User avatar</span>
+            <span class="spec-list__val">32px · radius-full</span>
+          </li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Section 2: Member Bottom Tab Bar ──────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Member Bottom Tab Bar</h2>
+    <p class="section-desc">56px bottom navigation for the Member App, rendered at 375px phone width. Uses primary-600 for the active tab and neutral-400 for inactive items.</p>
+
+    <div class="overline">Mobile Tab Bar — 375px</div>
+    <div class="phone-frame" role="region" aria-label="Member app bottom navigation demo">
+      <div class="phone-screen">
+        <span>App Screen Content</span>
+      </div>
+      <nav class="bottom-tab-bar" aria-label="Main navigation">
+        <button class="bottom-tab bottom-tab--active" aria-current="page">
+          <span class="bottom-tab__icon" aria-hidden="true">●</span>
+          <span class="bottom-tab__label">Home</span>
+        </button>
+        <button class="bottom-tab">
+          <span class="bottom-tab__icon" aria-hidden="true">□</span>
+          <span class="bottom-tab__label">Payments</span>
+        </button>
+        <button class="bottom-tab">
+          <span class="bottom-tab__icon" aria-hidden="true">✎</span>
+          <span class="bottom-tab__label">Requests</span>
+        </button>
+        <button class="bottom-tab">
+          <span class="bottom-tab__icon bottom-tab__badge" aria-hidden="true">✉</span>
+          <span class="bottom-tab__label">Messages</span>
+        </button>
+        <button class="bottom-tab">
+          <span class="bottom-tab__icon" aria-hidden="true">⋯</span>
+          <span class="bottom-tab__label">More</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="spec-grid" style="margin-top:var(--space-6)">
+      <div class="spec-item">
+        <div class="spec-item__label">Height</div>
+        <div class="spec-item__value">var(--bottombar-height) — 56px</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Border Top</div>
+        <div class="spec-item__value">1px solid var(--color-neutral-200)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Active Color</div>
+        <div class="spec-item__value">var(--color-primary-600) · weight 700</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Inactive Color</div>
+        <div class="spec-item__value">var(--color-neutral-400)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 3: Breadcrumbs ────────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Breadcrumbs</h2>
+    <p class="section-desc">Hierarchical path navigation for the Management Portal. Ancestor links use primary-600; the current page item is non-interactive, in neutral-950.</p>
+
+    <div class="overline">Breadcrumb Examples</div>
+
+    <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+      <!-- Example 1 -->
+      <div class="demo-bg">
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a class="breadcrumbs__link" href="#">Properties</a>
+          <span class="breadcrumbs__sep" aria-hidden="true">/</span>
+          <a class="breadcrumbs__link" href="#">Oakridge Commons</a>
+          <span class="breadcrumbs__sep" aria-hidden="true">/</span>
+          <a class="breadcrumbs__link" href="#">Residents</a>
+          <span class="breadcrumbs__sep" aria-hidden="true">/</span>
+          <span class="breadcrumbs__current" aria-current="page">Sarah Chen</span>
+        </nav>
+      </div>
+
+      <!-- Example 2 -->
+      <div class="demo-bg">
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a class="breadcrumbs__link" href="#">Financials</a>
+          <span class="breadcrumbs__sep" aria-hidden="true">/</span>
+          <a class="breadcrumbs__link" href="#">Assessments</a>
+          <span class="breadcrumbs__sep" aria-hidden="true">/</span>
+          <span class="breadcrumbs__current" aria-current="page">April 2025</span>
+        </nav>
+      </div>
+
+      <!-- Example 3 -->
+      <div class="demo-bg">
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+          <a class="breadcrumbs__link" href="#">Operations</a>
+          <span class="breadcrumbs__sep" aria-hidden="true">/</span>
+          <a class="breadcrumbs__link" href="#">Violations</a>
+          <span class="breadcrumbs__sep" aria-hidden="true">/</span>
+          <span class="breadcrumbs__current" aria-current="page">VIO-247 — Landscaping</span>
+        </nav>
+      </div>
+    </div>
+
+    <div class="spec-grid" style="margin-top:var(--space-6)">
+      <div class="spec-item">
+        <div class="spec-item__label">Font</div>
+        <div class="spec-item__value">var(--font-body) · 11px</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Separator</div>
+        <div class="spec-item__value">/ · var(--color-neutral-400)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Link Color</div>
+        <div class="spec-item__value">var(--color-primary-600)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Current Color</div>
+        <div class="spec-item__value">var(--color-neutral-950)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 4: Horizontal Tabs ────────────────────────────────── -->
+  <section class="section">
+    <h2 class="section-title">Horizontal Tabs</h2>
+    <p class="section-desc">In-page navigation tabs used on resident detail views, property profiles, and financial dashboards. The active tab shows a 2px bottom border in primary-600.</p>
+
+    <div class="overline">Resident Detail — Tab Bar</div>
+
+    <div style="background: var(--surface-page); border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--color-neutral-200)">
+      <div class="h-tabs" role="tablist">
+        <button class="h-tab h-tab--active" role="tab" aria-selected="true" aria-controls="tab-overview">
+          Overview
+        </button>
+        <button class="h-tab" role="tab" aria-selected="false" aria-controls="tab-payments">
+          Payments
+          <span class="h-tab__badge">14</span>
+        </button>
+        <button class="h-tab" role="tab" aria-selected="false" aria-controls="tab-violations">
+          Violations
+          <span class="h-tab__badge">2</span>
+        </button>
+        <button class="h-tab" role="tab" aria-selected="false" aria-controls="tab-documents">
+          Documents
+        </button>
+        <button class="h-tab" role="tab" aria-selected="false" aria-controls="tab-settings">
+          Settings
+        </button>
+      </div>
+      <div class="tab-content tab-content--active" id="tab-overview" role="tabpanel">
+        <strong style="font-size:var(--type-body-sm-size); color: var(--color-neutral-700)">Overview</strong>
+        <p style="margin-top: var(--space-2)">Resident profile, unit details, emergency contacts, and ownership documents. Click a tab above to see the active state transition.</p>
+      </div>
+      <div class="tab-content" id="tab-payments" role="tabpanel">
+        <strong style="font-size:var(--type-body-sm-size); color: var(--color-neutral-700)">Payments</strong>
+        <p style="margin-top: var(--space-2)">Assessment payment history, receipts, and scheduled payments.</p>
+      </div>
+      <div class="tab-content" id="tab-violations" role="tabpanel">
+        <strong style="font-size:var(--type-body-sm-size); color: var(--color-neutral-700)">Violations</strong>
+        <p style="margin-top: var(--space-2)">Open and resolved violations for this unit.</p>
+      </div>
+      <div class="tab-content" id="tab-documents" role="tabpanel">
+        <strong style="font-size:var(--type-body-sm-size); color: var(--color-neutral-700)">Documents</strong>
+        <p style="margin-top: var(--space-2)">Uploaded files, signed agreements, and inspection reports.</p>
+      </div>
+      <div class="tab-content" id="tab-settings" role="tabpanel">
+        <strong style="font-size:var(--type-body-sm-size); color: var(--color-neutral-700)">Settings</strong>
+        <p style="margin-top: var(--space-2)">Communication preferences, portal access, and notification settings.</p>
+      </div>
+    </div>
+
+    <div class="spec-grid spec-grid-3" style="margin-top:var(--space-6)">
+      <div class="spec-item">
+        <div class="spec-item__label">Font</div>
+        <div class="spec-item__value">var(--font-body) · 13px · weight 500</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Inactive Color</div>
+        <div class="spec-item__value">var(--color-neutral-500)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Active Color</div>
+        <div class="spec-item__value">var(--color-primary-600) · weight 600</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Active Indicator</div>
+        <div class="spec-item__value">2px bottom border · primary-600</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Tab Padding</div>
+        <div class="spec-item__value">var(--space-3) var(--space-4)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-item__label">Divider</div>
+        <div class="spec-item__value">1px solid var(--color-neutral-200)</div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const themeBtn = document.getElementById('themeToggle');
+    const html = document.documentElement;
+
+    themeBtn.addEventListener('click', () => {
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        html.removeAttribute('data-theme');
+        themeBtn.textContent = '☀ Light';
+      } else {
+        html.setAttribute('data-theme', 'dark');
+        themeBtn.textContent = '☾ Dark';
+      }
+    });
+
+    // Horizontal tabs
+    document.querySelectorAll('.h-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        // Deactivate all
+        document.querySelectorAll('.h-tab').forEach(t => {
+          t.classList.remove('h-tab--active');
+          t.setAttribute('aria-selected', 'false');
+        });
+        document.querySelectorAll('.tab-content').forEach(p => {
+          p.classList.remove('tab-content--active');
+        });
+        // Activate clicked
+        tab.classList.add('h-tab--active');
+        tab.setAttribute('aria-selected', 'true');
+        const panelId = tab.getAttribute('aria-controls');
+        const panel = document.getElementById(panelId);
+        if (panel) panel.classList.add('tab-content--active');
+      });
+    });
+
+    // Bottom tabs
+    document.querySelectorAll('.bottom-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.bottom-tab').forEach(t => {
+          t.classList.remove('bottom-tab--active');
+          t.removeAttribute('aria-current');
+        });
+        tab.classList.add('bottom-tab--active');
+        tab.setAttribute('aria-current', 'page');
+      });
+    });
+  </script>
+</body>
+</html>
