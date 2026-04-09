@@ -1,6 +1,9 @@
 package queue
 
-import "context"
+import (
+	"context"
+	"sync"
+)
 
 // Publisher publishes domain events to the event bus.
 type Publisher interface {
@@ -9,6 +12,7 @@ type Publisher interface {
 
 // InMemoryPublisher records published events for use in tests.
 type InMemoryPublisher struct {
+	mu     sync.Mutex
 	events []Event
 }
 
@@ -21,16 +25,24 @@ func NewInMemoryPublisher() *InMemoryPublisher {
 
 // Publish appends the event to the internal slice.
 func (p *InMemoryPublisher) Publish(_ context.Context, event Event) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.events = append(p.events, event)
 	return nil
 }
 
-// Events returns all published events (for test assertions).
+// Events returns a copy of all published events (for test assertions).
 func (p *InMemoryPublisher) Events() []Event {
-	return p.events
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	cp := make([]Event, len(p.events))
+	copy(cp, p.events)
+	return cp
 }
 
 // Reset clears all recorded events.
 func (p *InMemoryPublisher) Reset() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.events = p.events[:0]
 }
