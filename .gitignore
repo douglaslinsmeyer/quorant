@@ -1,5 +1,6 @@
 .superpowers/
 .remember/
+.worktrees/
 node_modules/
 .DS_Store
 *.swp
