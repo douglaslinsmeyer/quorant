@@ -1,0 +1,161 @@
+package com
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/platform/api"
+)
+
+// CreateAnnouncementRequest is the request body for POST /api/v1/orgs/{org_id}/announcements.
+type CreateAnnouncementRequest struct {
+	Title         string     `json:"title"`          // required
+	Body          string     `json:"body"`           // required
+	IsPinned      bool       `json:"is_pinned"`
+	AudienceRoles []string   `json:"audience_roles,omitempty"`
+	ScheduledFor  *time.Time `json:"scheduled_for,omitempty"`
+}
+
+// Validate checks that Title and Body are present.
+func (r CreateAnnouncementRequest) Validate() error {
+	if r.Title == "" {
+		return api.NewValidationError("title is required", "title")
+	}
+	if r.Body == "" {
+		return api.NewValidationError("body is required", "body")
+	}
+	return nil
+}
+
+// CreateThreadRequest is the request body for POST /api/v1/orgs/{org_id}/threads.
+type CreateThreadRequest struct {
+	Subject    string `json:"subject"`     // required
+	ThreadType string `json:"thread_type,omitempty"`
+}
+
+// Validate checks that Subject is present.
+func (r CreateThreadRequest) Validate() error {
+	if r.Subject == "" {
+		return api.NewValidationError("subject is required", "subject")
+	}
+	return nil
+}
+
+// SendMessageRequest is the request body for POST /api/v1/orgs/{org_id}/threads/{thread_id}/messages.
+type SendMessageRequest struct {
+	Body string `json:"body"` // required
+}
+
+// Validate checks that Body is present.
+func (r SendMessageRequest) Validate() error {
+	if r.Body == "" {
+		return api.NewValidationError("body is required", "body")
+	}
+	return nil
+}
+
+// CreateCalendarEventRequest is the request body for POST /api/v1/orgs/{org_id}/calendar.
+type CreateCalendarEventRequest struct {
+	Title       string     `json:"title"`      // required
+	EventType   string     `json:"event_type"` // required
+	StartsAt    time.Time  `json:"starts_at"`  // required (zero value means unset)
+	Description *string    `json:"description,omitempty"`
+	Location    *string    `json:"location,omitempty"`
+	EndsAt      *time.Time `json:"ends_at,omitempty"`
+	IsAllDay    bool       `json:"is_all_day"`
+	RSVPEnabled bool       `json:"rsvp_enabled"`
+}
+
+// Validate checks that Title, EventType, and StartsAt are present.
+func (r CreateCalendarEventRequest) Validate() error {
+	if r.Title == "" {
+		return api.NewValidationError("title is required", "title")
+	}
+	if r.EventType == "" {
+		return api.NewValidationError("event_type is required", "event_type")
+	}
+	if r.StartsAt.IsZero() {
+		return api.NewValidationError("starts_at is required", "starts_at")
+	}
+	return nil
+}
+
+// RSVPRequest is the request body for PUT /api/v1/orgs/{org_id}/calendar/{event_id}/rsvp.
+type RSVPRequest struct {
+	Status     string `json:"status"`      // required: attending, maybe, declined
+	GuestCount int    `json:"guest_count"`
+}
+
+// Validate checks that Status is one of the allowed values.
+func (r RSVPRequest) Validate() error {
+	switch r.Status {
+	case "attending", "maybe", "declined":
+		// valid
+	default:
+		return api.NewValidationError(`status must be one of: attending, maybe, declined`, "status")
+	}
+	return nil
+}
+
+// CreateTemplateRequest is the request body for POST /api/v1/orgs/{org_id}/templates.
+type CreateTemplateRequest struct {
+	TemplateKey string  `json:"template_key"` // required
+	Channel     string  `json:"channel"`      // required
+	Body        string  `json:"body"`         // required
+	Subject     *string `json:"subject,omitempty"`
+}
+
+// Validate checks that TemplateKey, Channel, and Body are present.
+func (r CreateTemplateRequest) Validate() error {
+	if r.TemplateKey == "" {
+		return api.NewValidationError("template_key is required", "template_key")
+	}
+	if r.Channel == "" {
+		return api.NewValidationError("channel is required", "channel")
+	}
+	if r.Body == "" {
+		return api.NewValidationError("body is required", "body")
+	}
+	return nil
+}
+
+// UpdateDirectoryPreferenceRequest is the request body for
+// PUT /api/v1/orgs/{org_id}/directory/preferences.
+type UpdateDirectoryPreferenceRequest struct {
+	OptIn     *bool `json:"opt_in,omitempty"`
+	ShowEmail *bool `json:"show_email,omitempty"`
+	ShowPhone *bool `json:"show_phone,omitempty"`
+	ShowUnit  *bool `json:"show_unit,omitempty"`
+}
+
+// Validate checks that at least one field is provided.
+func (r UpdateDirectoryPreferenceRequest) Validate() error {
+	if r.OptIn == nil && r.ShowEmail == nil && r.ShowPhone == nil && r.ShowUnit == nil {
+		return api.NewValidationError("at least one field must be provided", "")
+	}
+	return nil
+}
+
+// LogCommunicationRequest is the request body for POST /api/v1/orgs/{org_id}/communications.
+type LogCommunicationRequest struct {
+	Direction     string     `json:"direction"` // required: outbound, inbound
+	Channel       string     `json:"channel"`   // required
+	ContactUserID *uuid.UUID `json:"contact_user_id,omitempty"`
+	ContactName   *string    `json:"contact_name,omitempty"`
+	Subject       *string    `json:"subject,omitempty"`
+	Body          *string    `json:"body,omitempty"`
+}
+
+// Validate checks that Direction, Channel, and at least one contact identifier are present.
+func (r LogCommunicationRequest) Validate() error {
+	if r.Direction == "" {
+		return api.NewValidationError("direction is required", "direction")
+	}
+	if r.Channel == "" {
+		return api.NewValidationError("channel is required", "channel")
+	}
+	if r.ContactUserID == nil && r.ContactName == nil {
+		return api.NewValidationError("contact_name or contact_user_id is required", "contact_name")
+	}
+	return nil
+}
