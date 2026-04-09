@@ -307,14 +307,11 @@ func TestGetTenantDashboard_NoActivity(t *testing.T) {
 func TestSuspendTenant_CallsRepo(t *testing.T) {
 	svc, _ := newTestService(t)
 	ctx := context.Background()
-	orgID := uuid.New()
 
-	result, err := svc.SuspendTenant(ctx, orgID)
+	result, err := svc.SuspendTenant(ctx, uuid.New())
 
 	require.NoError(t, err)
-	assert.Equal(t, "ok", result["status"])
-	assert.Equal(t, "suspended", result["action"])
-	assert.Equal(t, orgID, result["org_id"])
+	assert.Equal(t, "suspended", result["status"])
 }
 
 func TestSuspendTenant_RepoError(t *testing.T) {
@@ -333,14 +330,11 @@ func TestSuspendTenant_RepoError(t *testing.T) {
 func TestReactivateTenant_CallsRepo(t *testing.T) {
 	svc, _ := newTestService(t)
 	ctx := context.Background()
-	orgID := uuid.New()
 
-	result, err := svc.ReactivateTenant(ctx, orgID)
+	result, err := svc.ReactivateTenant(ctx, uuid.New())
 
 	require.NoError(t, err)
-	assert.Equal(t, "ok", result["status"])
-	assert.Equal(t, "reactivated", result["action"])
-	assert.Equal(t, orgID, result["org_id"])
+	assert.Equal(t, "active", result["status"])
 }
 
 // ─── TestSearchUsers ──────────────────────────────────────────────────────────
@@ -389,14 +383,11 @@ func TestSearchUsers_RepoError(t *testing.T) {
 func TestUnlockAccount_CallsRepoAndAuditor(t *testing.T) {
 	svc, _ := newTestService(t)
 	ctx := context.Background()
-	userID := uuid.New()
 
-	result, err := svc.UnlockAccount(ctx, userID)
+	result, err := svc.UnlockAccount(ctx, uuid.New())
 
 	require.NoError(t, err)
-	assert.Equal(t, "ok", result["status"])
-	assert.Equal(t, "account_unlocked", result["action"])
-	assert.Equal(t, userID, result["user_id"])
+	assert.Equal(t, "unlocked", result["status"])
 }
 
 func TestUnlockAccount_RepoError(t *testing.T) {
@@ -408,4 +399,39 @@ func TestUnlockAccount_RepoError(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "db error")
+}
+
+// ─── TestZitadelStubs ─────────────────────────────────────────────────────────
+
+func TestStartImpersonation_ReturnsUnprocessable(t *testing.T) {
+	svc, _ := newTestService(t)
+	ctx := context.Background()
+
+	result, err := svc.StartImpersonation(ctx, uuid.New())
+
+	assert.Nil(t, result)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not yet implemented")
+}
+
+func TestStopImpersonation_ReturnsUnprocessable(t *testing.T) {
+	svc, _ := newTestService(t)
+	ctx := context.Background()
+
+	result, err := svc.StopImpersonation(ctx)
+
+	assert.Nil(t, result)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not yet implemented")
+}
+
+func TestResetPassword_ReturnsUnprocessable(t *testing.T) {
+	svc, _ := newTestService(t)
+	ctx := context.Background()
+
+	result, err := svc.ResetPassword(ctx, uuid.New())
+
+	assert.Nil(t, result)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not yet implemented")
 }

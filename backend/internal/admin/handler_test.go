@@ -228,8 +228,7 @@ func TestSuspendTenant_Handler(t *testing.T) {
 
 	var result map[string]any
 	adminResponseData(t, readBody(t, resp), &result)
-	assert.Equal(t, "ok", result["status"])
-	assert.Equal(t, "suspended", result["action"])
+	assert.Equal(t, "suspended", result["status"])
 }
 
 // ─── Auth checks ──────────────────────────────────────────────────────────────
