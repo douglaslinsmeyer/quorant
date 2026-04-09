@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Member Layouts — Quorant Design System</title>
+
+  <link rel="stylesheet" href="../tokens/colors.css" />
+  <link rel="stylesheet" href="../tokens/typography.css" />
+  <link rel="stylesheet" href="../tokens/spacing.css" />
+  <link rel="stylesheet" href="../tokens/elevation.css" />
+  <link rel="stylesheet" href="../tokens/motion.css" />
+
+  <style>
+    /* ── Reset & Base ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: var(--type-body-size);
+      line-height: var(--type-body-line-height);
+      color: var(--color-neutral-900);
+      background: var(--surface-page);
+      padding: var(--space-8);
+      animation: page-enter var(--duration-slow) var(--ease-out) both;
+    }
+
+    /* ── Dark Mode Toggle ──────────────────────────────────────── */
+    .theme-btn {
+      position: fixed;
+      top: var(--space-4);
+      right: var(--space-4);
+      background: var(--surface-card);
+      border: 1px solid var(--color-neutral-200);
+      color: var(--color-neutral-700);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition:
+        background var(--duration-normal) var(--ease-smooth),
+        color var(--duration-normal) var(--ease-smooth),
+        box-shadow var(--duration-normal) var(--ease-smooth);
+      z-index: 100;
+    }
+    .theme-btn:hover {
+      box-shadow: var(--shadow-md);
+      background: var(--surface-elevated);
+    }
+
+    /* ── Page Header ────────────────────────────────────────────── */
+    .page-header {
+      margin-bottom: var(--space-8);
+      padding-right: 120px;
+    }
+    .page-header h1 {
+      font-family: var(--font-heading);
+      font-size: var(--type-h1-size);
+      font-weight: var(--type-h1-weight);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-2);
+    }
+    .page-header p {
+      font-size: var(--type-body-lg-size);
+      color: var(--color-neutral-600);
+    }
+
+    /* ── Section Wrapper ────────────────────────────────────────── */
+    .section {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-8);
+      margin-bottom: var(--space-6);
+    }
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h3-size);
+      font-weight: var(--type-h3-weight);
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-1);
+    }
+    .section-desc {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      margin-bottom: var(--space-6);
+    }
+
+    /* ── Phone Frame Layout ─────────────────────────────────────── */
+    .phones-row {
+      display: flex;
+      gap: var(--space-8);
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .phone-frame {
+      width: 375px;
+      flex-shrink: 0;
+      border-radius: 28px;
+      box-shadow: var(--shadow-xl), 0 0 0 1px var(--color-neutral-200);
+      overflow: hidden;
+      background: var(--surface-page);
+    }
+
+    .phone-frame--narrow {
+      width: 340px;
+    }
+
+    /* Status bar */
+    .status-bar {
+      height: 36px;
+      background: var(--color-primary-900);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 var(--space-5);
+    }
+
+    .status-bar__time {
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.9);
+    }
+
+    .status-bar__icons {
+      display: flex;
+      gap: var(--space-2);
+      align-items: center;
+    }
+
+    .status-bar__icon {
+      width: 16px;
+      height: 8px;
+      background: rgba(255,255,255,0.6);
+      border-radius: 2px;
+    }
+
+    /* ── App Header ─────────────────────────────────────────────── */
+    .app-header {
+      background: var(--surface-header);
+      padding: var(--space-4) var(--space-5) var(--space-5);
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .app-header__greeting {
+      flex: 1;
+    }
+
+    .app-header__greeting-sub {
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+      font-weight: 500;
+    }
+
+    .app-header__greeting-name {
+      font-family: var(--font-heading);
+      font-size: var(--type-h4-size);
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .app-header__avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-heading);
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    /* ── Phone Body (scrollable content) ───────────────────────── */
+    .phone-body {
+      background: var(--surface-page);
+      padding: var(--space-4);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+    }
+
+    /* ── Balance Card ───────────────────────────────────────────── */
+    .balance-card {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      padding: var(--space-5) var(--space-6);
+      box-shadow: var(--shadow-sm);
+      animation: hero-entrance 500ms var(--ease-out) both;
+    }
+
+    .balance-card__label {
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-neutral-400);
+      margin-bottom: var(--space-2);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .balance-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color-success-600);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    .balance-card__text {
+      font-size: var(--type-body-sm-size);
+      line-height: 1.65;
+      color: var(--color-neutral-800);
+    }
+
+    .balance-card__text .amount {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      color: var(--color-primary-600);
+    }
+
+    .balance-card__text .date {
+      font-weight: 600;
+      color: var(--color-secondary-600);
+    }
+
+    .balance-card__footer {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-top: var(--space-3);
+      font-size: var(--type-caption-size);
+      color: var(--color-success-600);
+      font-weight: 600;
+    }
+
+    /* ── Quick Actions ──────────────────────────────────────────── */
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-2);
+    }
+
+    .quick-action {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-1);
+      padding: var(--space-3) var(--space-2);
+      border-radius: var(--radius-md);
+      background: var(--surface-card);
+      box-shadow: var(--shadow-xs);
+      cursor: pointer;
+      transition:
+        box-shadow var(--duration-fast) var(--ease-default),
+        transform var(--duration-fast) var(--ease-default);
+    }
+
+    .quick-action:hover {
+      box-shadow: var(--shadow-sm);
+      transform: translateY(-1px);
+    }
+
+    .quick-action__icon {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .quick-action__label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--color-neutral-600);
+      text-align: center;
+    }
+
+    /* ── Section Header (within phone) ──────────────────────────── */
+    .phone-section-title {
+      font-family: var(--font-heading);
+      font-size: var(--type-body-sm-size);
+      font-weight: 700;
+      color: var(--color-neutral-800);
+      margin-bottom: var(--space-2);
+    }
+
+    /* ── Pulse Items ────────────────────────────────────────────── */
+    .pulse-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .pulse-row {
+      display: flex;
+      gap: var(--space-3);
+      background: var(--surface-card);
+      border-radius: var(--radius-md);
+      padding: var(--space-3) var(--space-4);
+      box-shadow: var(--shadow-xs);
+      animation: stagger-up 400ms var(--ease-out) both;
+    }
+
+    .pulse-row:nth-child(1) { animation-delay: 0ms; }
+    .pulse-row:nth-child(2) { animation-delay: 60ms; }
+    .pulse-row:nth-child(3) { animation-delay: 120ms; }
+
+    .pulse-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+      line-height: 1.4;
+    }
+
+    .pulse-row__content {
+      flex: 1;
+    }
+
+    .pulse-row__text {
+      font-size: var(--type-caption-size);
+      line-height: 1.5;
+      color: var(--color-neutral-800);
+    }
+
+    .pulse-row__time {
+      font-size: 10px;
+      color: var(--color-neutral-400);
+      margin-top: 2px;
+    }
+
+    /* ── Calendar Cards ─────────────────────────────────────────── */
+    .calendar-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .calendar-card {
+      display: flex;
+      gap: var(--space-3);
+      background: var(--surface-card);
+      border-radius: var(--radius-md);
+      padding: var(--space-3) var(--space-4);
+      box-shadow: var(--shadow-xs);
+      align-items: center;
+    }
+
+    .calendar-date-block {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      background: var(--color-primary-50);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .calendar-date-block__month {
+      font-size: 8px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-primary-600);
+      line-height: 1;
+    }
+
+    .calendar-date-block__day {
+      font-family: var(--font-heading);
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--color-primary-700);
+      line-height: 1;
+    }
+
+    .calendar-card__info {
+      flex: 1;
+    }
+
+    .calendar-card__title {
+      font-size: var(--type-caption-size);
+      font-weight: 700;
+      color: var(--color-neutral-900);
+    }
+
+    .calendar-card__sub {
+      font-size: 10px;
+      color: var(--color-neutral-400);
+      margin-top: 1px;
+    }
+
+    /* ── Bottom Nav ─────────────────────────────────────────────── */
+    .bottom-nav {
+      background: var(--surface-card);
+      border-top: 1px solid var(--color-neutral-100);
+      display: flex;
+      height: var(--bottombar-height);
+    }
+
+    .bottom-nav__item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      cursor: pointer;
+    }
+
+    .bottom-nav__icon {
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .bottom-nav__label {
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--color-neutral-400);
+    }
+
+    .bottom-nav__item--active .bottom-nav__label {
+      color: var(--color-primary-600);
+    }
+
+    .bottom-nav__item--active .bottom-nav__icon svg path,
+    .bottom-nav__item--active .bottom-nav__icon svg circle {
+      stroke: var(--color-primary-600);
+    }
+
+    /* ── 2. Payment Flow ────────────────────────────────────────── */
+
+    .payment-step {
+      background: var(--surface-card);
+      border-radius: var(--radius-md);
+      padding: var(--space-5);
+      box-shadow: var(--shadow-xs);
+    }
+
+    .payment-step__label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-neutral-400);
+      margin-bottom: var(--space-3);
+    }
+
+    .payment-amount-display {
+      text-align: center;
+      padding: var(--space-4) 0;
+    }
+
+    .payment-amount-display__value {
+      font-family: var(--font-heading);
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--color-primary-600);
+      line-height: 1;
+    }
+
+    .payment-amount-display__label {
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-400);
+      margin-top: var(--space-1);
+    }
+
+    .pay-btn {
+      width: 100%;
+      height: 44px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
+      color: #fff;
+      font-family: var(--font-body);
+      font-size: var(--type-body-sm-size);
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      margin-top: var(--space-4);
+      box-shadow: var(--shadow-sm);
+      transition:
+        transform var(--duration-fast) cubic-bezier(0.34, 1.56, 0.64, 1),
+        box-shadow var(--duration-fast) var(--ease-default);
+    }
+
+    .pay-btn:hover {
+      transform: scale(1.02);
+      box-shadow: var(--shadow-md);
+    }
+
+    .pay-btn:active {
+      transform: scale(0.98);
+    }
+
+    .pay-btn--success {
+      background: linear-gradient(135deg, var(--color-success-600), #1a7a44);
+    }
+
+    .method-option {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--color-neutral-200);
+      cursor: pointer;
+      margin-bottom: var(--space-2);
+      transition: border-color var(--duration-fast) var(--ease-default);
+    }
+
+    .method-option.selected {
+      border-color: var(--color-primary-500);
+      background: var(--color-primary-50);
+    }
+
+    .method-option__icon {
+      width: 28px;
+      height: 20px;
+      background: var(--color-neutral-100);
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--color-neutral-500);
+    }
+
+    .method-option__text {
+      flex: 1;
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      color: var(--color-neutral-800);
+    }
+
+    .method-option__radio {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid var(--color-neutral-300);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .method-option.selected .method-option__radio {
+      border-color: var(--color-primary-600);
+      background: var(--color-primary-600);
+    }
+
+    .method-option.selected .method-option__radio::after {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #fff;
+    }
+
+    .confirm-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--color-neutral-100);
+      font-size: var(--type-caption-size);
+    }
+
+    .confirm-row__label { color: var(--color-neutral-500); }
+    .confirm-row__value { font-weight: 600; color: var(--color-neutral-900); }
+    .confirm-row__value--primary {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      color: var(--color-primary-600);
+    }
+
+    .confirm-row:last-child { border-bottom: none; }
+
+    /* Success state */
+    .success-state {
+      text-align: center;
+      padding: var(--space-8) var(--space-4);
+    }
+
+    .success-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--color-success-100);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto var(--space-4);
+    }
+
+    .success-state__title {
+      font-family: var(--font-heading);
+      font-size: var(--type-h4-size);
+      font-weight: 700;
+      color: var(--color-neutral-900);
+      margin-bottom: var(--space-2);
+    }
+
+    .success-state__text {
+      font-size: var(--type-body-sm-size);
+      color: var(--color-neutral-500);
+      line-height: 1.6;
+    }
+
+    /* ── 3. Request Flow ────────────────────────────────────────── */
+
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-3);
+    }
+
+    .category-tile {
+      background: var(--surface-elevated);
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--color-neutral-200);
+      padding: var(--space-4);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-2);
+      cursor: pointer;
+      transition:
+        border-color var(--duration-fast) var(--ease-default),
+        background var(--duration-fast) var(--ease-default);
+    }
+
+    .category-tile:hover {
+      border-color: var(--color-primary-400);
+      background: var(--color-primary-50);
+    }
+
+    .category-tile__icon {
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .category-tile__label {
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      color: var(--color-neutral-700);
+    }
+
+    .req-form-field {
+      margin-bottom: var(--space-4);
+    }
+
+    .req-form-field__label {
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      color: var(--color-neutral-700);
+      margin-bottom: var(--space-1);
+      display: block;
+    }
+
+    .req-input {
+      width: 100%;
+      height: 36px;
+      background: var(--color-neutral-50);
+      border: 1.5px solid var(--color-neutral-200);
+      border-radius: var(--radius-sm);
+      padding: 0 var(--space-3);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-600);
+      display: flex;
+      align-items: center;
+    }
+
+    .req-textarea {
+      width: 100%;
+      height: 64px;
+      background: var(--color-neutral-50);
+      border: 1.5px solid var(--color-neutral-200);
+      border-radius: var(--radius-sm);
+      padding: var(--space-2) var(--space-3);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-400);
+      display: flex;
+      align-items: flex-start;
+    }
+
+    .photo-upload {
+      height: 60px;
+      background: var(--color-neutral-50);
+      border: 2px dashed var(--color-neutral-200);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-400);
+      cursor: pointer;
+    }
+
+    .req-confirmation {
+      background: var(--color-primary-50);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      border: 1px solid var(--color-primary-200);
+    }
+
+    .req-confirmation__label {
+      font-size: var(--type-caption-size);
+      font-weight: 600;
+      color: var(--color-primary-700);
+      margin-bottom: var(--space-3);
+    }
+
+    .req-confirmation__row {
+      display: flex;
+      justify-content: space-between;
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-600);
+      padding: var(--space-1) 0;
+    }
+
+    .req-confirmation__row strong {
+      color: var(--color-neutral-800);
+    }
+
+    /* ── 4. Detail View ─────────────────────────────────────────── */
+
+    .status-hero {
+      background: var(--surface-header);
+      padding: var(--space-6) var(--space-5);
+      text-align: center;
+    }
+
+    .status-hero__indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin: 0 auto var(--space-3);
+    }
+
+    .status-hero__text {
+      font-family: var(--font-heading);
+      font-size: var(--type-h2-size);
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: var(--space-1);
+    }
+
+    .status-hero__sub {
+      font-size: var(--type-caption-size);
+      color: rgba(255,255,255,0.65);
+    }
+
+    .timeline {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .timeline-item {
+      display: flex;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      position: relative;
+    }
+
+    .timeline-item__dot-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .timeline-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid var(--color-neutral-300);
+      background: var(--surface-card);
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+
+    .timeline-dot--active {
+      border-color: var(--color-primary-600);
+      background: var(--color-primary-600);
+    }
+
+    .timeline-line {
+      width: 2px;
+      flex: 1;
+      background: var(--color-neutral-100);
+      margin-top: 4px;
+    }
+
+    .timeline-item__content {
+      flex: 1;
+      padding-bottom: var(--space-3);
+    }
+
+    .timeline-item__title {
+      font-size: var(--type-caption-size);
+      font-weight: 700;
+      color: var(--color-neutral-800);
+    }
+
+    .timeline-item__body {
+      font-size: 11px;
+      color: var(--color-neutral-500);
+      margin-top: 2px;
+      line-height: 1.5;
+    }
+
+    .timeline-item__time {
+      font-size: 10px;
+      color: var(--color-neutral-300);
+      margin-top: 3px;
+    }
+
+    .detail-actions {
+      display: flex;
+      gap: var(--space-3);
+      padding: var(--space-4);
+      background: var(--surface-card);
+      border-top: 1px solid var(--color-neutral-100);
+    }
+
+    .detail-action-btn {
+      flex: 1;
+      height: 40px;
+      border-radius: var(--radius-md);
+      font-family: var(--font-body);
+      font-size: var(--type-caption-size);
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .detail-action-btn--primary {
+      background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
+      color: #fff;
+    }
+
+    .detail-action-btn--ghost {
+      background: var(--color-neutral-100);
+      color: var(--color-neutral-700);
+    }
+
+    /* ── 5. Empty States ────────────────────────────────────────── */
+
+    .empty-state-phone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: var(--space-12) var(--space-6);
+    }
+
+    .empty-icon {
+      font-size: 40px;
+      line-height: 1;
+      margin-bottom: var(--space-4);
+    }
+
+    .empty-state-phone__title {
+      font-family: var(--font-heading);
+      font-size: var(--type-body-size);
+      font-weight: 700;
+      color: var(--color-neutral-800);
+      margin-bottom: var(--space-2);
+    }
+
+    .empty-state-phone__text {
+      font-size: var(--type-caption-size);
+      color: var(--color-neutral-500);
+      line-height: 1.6;
+      max-width: 240px;
+    }
+  </style>
+</head>
+<body>
+
+  <button class="theme-btn" onclick="toggleTheme()">Toggle Dark Mode</button>
+
+  <div class="page-header">
+    <h1>Member App Layouts</h1>
+    <p>Phone-width (375px) wireframe patterns for the Member App — conversational, community-first, gesture-friendly.</p>
+  </div>
+
+  <!-- ── 1. Home Layout ────────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">1 — Home Layout</h2>
+    <p class="section-desc">Greeting header → conversational balance card → quick actions (4-up) → community pulse feed → upcoming events.</p>
+
+    <div class="phones-row">
+      <div class="phone-frame">
+        <!-- Status Bar -->
+        <div class="status-bar">
+          <span class="status-bar__time">9:41</span>
+          <div class="status-bar__icons">
+            <div class="status-bar__icon" style="width: 10px; height: 6px;"></div>
+            <div class="status-bar__icon" style="width: 14px;"></div>
+          </div>
+        </div>
+
+        <!-- App Header -->
+        <div class="app-header">
+          <div class="app-header__greeting">
+            <div class="app-header__greeting-sub">Good morning</div>
+            <div class="app-header__greeting-name">Sarah Chen</div>
+          </div>
+          <div class="app-header__avatar">SC</div>
+        </div>
+
+        <!-- Phone Body -->
+        <div class="phone-body">
+
+          <!-- Balance Card -->
+          <div class="balance-card">
+            <div class="balance-card__label">
+              <span class="balance-dot"></span>
+              April Balance
+            </div>
+            <p class="balance-card__text">
+              Your April assessment of <span class="amount">$285.00</span> is ready.
+              Autopay handles it on the <span class="date">12th</span> — you're all set.
+            </p>
+            <div class="balance-card__footer">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M2.5 8L6 11.5L13.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Autopay active · No action needed
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div>
+            <div class="phone-section-title">Quick Actions</div>
+            <div class="quick-actions">
+              <div class="quick-action">
+                <div class="quick-action__icon" style="background: var(--color-primary-50);">💳</div>
+                <span class="quick-action__label">Pay Now</span>
+              </div>
+              <div class="quick-action">
+                <div class="quick-action__icon" style="background: var(--color-info-100);">🔧</div>
+                <span class="quick-action__label">Request</span>
+              </div>
+              <div class="quick-action">
+                <div class="quick-action__icon" style="background: var(--color-warning-100);">📄</div>
+                <span class="quick-action__label">Documents</span>
+              </div>
+              <div class="quick-action">
+                <div class="quick-action__icon" style="background: var(--color-success-100);">💬</div>
+                <span class="quick-action__label">Messages</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Community Pulse -->
+          <div>
+            <div class="phone-section-title">Community Pulse</div>
+            <div class="pulse-list">
+              <div class="pulse-row">
+                <div class="pulse-icon">🏊</div>
+                <div class="pulse-row__content">
+                  <div class="pulse-row__text"><strong>Pool opens May 1st</strong> — new key fobs at the office</div>
+                  <div class="pulse-row__time">Today</div>
+                </div>
+              </div>
+              <div class="pulse-row">
+                <div class="pulse-icon">📢</div>
+                <div class="pulse-row__content">
+                  <div class="pulse-row__text"><strong>Board meeting</strong> next Tuesday — budget review</div>
+                  <div class="pulse-row__time">Yesterday</div>
+                </div>
+              </div>
+              <div class="pulse-row">
+                <div class="pulse-icon">🌱</div>
+                <div class="pulse-row__content">
+                  <div class="pulse-row__text"><strong>Spring landscaping</strong> starts Monday morning</div>
+                  <div class="pulse-row__time">3 days ago</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Upcoming Events -->
+          <div>
+            <div class="phone-section-title">Upcoming</div>
+            <div class="calendar-list">
+              <div class="calendar-card">
+                <div class="calendar-date-block">
+                  <div class="calendar-date-block__month">APR</div>
+                  <div class="calendar-date-block__day">15</div>
+                </div>
+                <div class="calendar-card__info">
+                  <div class="calendar-card__title">Board Meeting</div>
+                  <div class="calendar-card__sub">7:00 PM · Clubhouse</div>
+                </div>
+              </div>
+              <div class="calendar-card">
+                <div class="calendar-date-block">
+                  <div class="calendar-date-block__month">MAY</div>
+                  <div class="calendar-date-block__day">1</div>
+                </div>
+                <div class="calendar-card__info">
+                  <div class="calendar-card__title">Pool Season Opens</div>
+                  <div class="calendar-card__sub">7:00 AM – 9:00 PM daily</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /phone-body -->
+
+        <!-- Bottom Nav -->
+        <div class="bottom-nav">
+          <div class="bottom-nav__item bottom-nav__item--active">
+            <div class="bottom-nav__icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5Z" stroke="var(--color-primary-600)" stroke-width="1.5"/>
+              </svg>
+            </div>
+            <span class="bottom-nav__label" style="color: var(--color-primary-600);">Home</span>
+          </div>
+          <div class="bottom-nav__item">
+            <div class="bottom-nav__icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 2v14M5 9l7 7 7-7" stroke="var(--color-neutral-400)" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <span class="bottom-nav__label">Pay</span>
+          </div>
+          <div class="bottom-nav__item">
+            <div class="bottom-nav__icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" stroke="var(--color-neutral-400)" stroke-width="1.5"/>
+                <path d="M9 12h6M12 9v6" stroke="var(--color-neutral-400)" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <span class="bottom-nav__label">Request</span>
+          </div>
+          <div class="bottom-nav__item">
+            <div class="bottom-nav__icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3 6h18M3 12h18M3 18h18" stroke="var(--color-neutral-400)" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <span class="bottom-nav__label">More</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2. Payment Flow ───────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">2 — Payment Flow</h2>
+    <p class="section-desc">3 steps + success state shown side by side. Step 1: balance + Pay Now. Step 2: method selection. Step 3: confirmation. Success: posted checkmark.</p>
+
+    <div class="phones-row" style="gap: var(--space-5);">
+
+      <!-- Step 1 -->
+      <div class="phone-frame phone-frame--narrow">
+        <div class="status-bar"><span class="status-bar__time">9:41</span></div>
+        <div class="app-header" style="padding-bottom: var(--space-4);">
+          <div style="color: rgba(255,255,255,0.7); font-size: var(--type-caption-size);">← Back</div>
+          <div style="flex: 1; text-align: center; font-family: var(--font-heading); font-weight: 700; color: #fff; font-size: var(--type-body-size);">Pay Assessment</div>
+        </div>
+        <div class="phone-body">
+          <div class="payment-step">
+            <div class="payment-step__label">Step 1 of 3 — Balance</div>
+            <div class="payment-amount-display">
+              <div class="payment-amount-display__value">$285.00</div>
+              <div class="payment-amount-display__label">April assessment · Due May 1</div>
+            </div>
+            <button class="pay-btn">Pay Now</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="phone-frame phone-frame--narrow">
+        <div class="status-bar"><span class="status-bar__time">9:41</span></div>
+        <div class="app-header" style="padding-bottom: var(--space-4);">
+          <div style="color: rgba(255,255,255,0.7); font-size: var(--type-caption-size);">← Back</div>
+          <div style="flex: 1; text-align: center; font-family: var(--font-heading); font-weight: 700; color: #fff; font-size: var(--type-body-size);">Payment Method</div>
+        </div>
+        <div class="phone-body">
+          <div class="payment-step">
+            <div class="payment-step__label">Step 2 of 3 — Payment Method</div>
+            <div class="method-option selected">
+              <div class="method-option__icon">ACH</div>
+              <span class="method-option__text">Bank Account ····6789</span>
+              <div class="method-option__radio"></div>
+            </div>
+            <div class="method-option">
+              <div class="method-option__icon">VISA</div>
+              <span class="method-option__text">Visa ····4242</span>
+              <div class="method-option__radio"></div>
+            </div>
+            <div class="method-option" style="border-style: dashed;">
+              <div class="method-option__icon" style="font-size: 14px;">+</div>
+              <span class="method-option__text" style="color: var(--color-primary-600);">Add payment method</span>
+            </div>
+            <button class="pay-btn">Continue →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="phone-frame phone-frame--narrow">
+        <div class="status-bar"><span class="status-bar__time">9:41</span></div>
+        <div class="app-header" style="padding-bottom: var(--space-4);">
+          <div style="color: rgba(255,255,255,0.7); font-size: var(--type-caption-size);">← Back</div>
+          <div style="flex: 1; text-align: center; font-family: var(--font-heading); font-weight: 700; color: #fff; font-size: var(--type-body-size);">Confirm Payment</div>
+        </div>
+        <div class="phone-body">
+          <div class="payment-step">
+            <div class="payment-step__label">Step 3 of 3 — Confirm</div>
+            <div class="confirm-row"><span class="confirm-row__label">Amount</span><span class="confirm-row__value confirm-row__value--primary">$285.00</span></div>
+            <div class="confirm-row"><span class="confirm-row__label">From</span><span class="confirm-row__value">Bank ····6789</span></div>
+            <div class="confirm-row"><span class="confirm-row__label">For</span><span class="confirm-row__value">April Assessment</span></div>
+            <div class="confirm-row"><span class="confirm-row__label">Posts</span><span class="confirm-row__value">Today, Apr 8</span></div>
+            <button class="pay-btn" style="margin-top: var(--space-5);">Confirm Payment</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Success -->
+      <div class="phone-frame phone-frame--narrow">
+        <div class="status-bar"><span class="status-bar__time">9:41</span></div>
+        <div class="app-header" style="padding-bottom: var(--space-4);">
+          <div style="flex: 1; text-align: center; font-family: var(--font-heading); font-weight: 700; color: #fff; font-size: var(--type-body-size);">Payment Posted</div>
+        </div>
+        <div class="phone-body">
+          <div class="success-state">
+            <div class="success-icon">
+              <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+                <path d="M6 16L13 23L26 10" stroke="var(--color-success-600)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="success-state__title">Payment posted</div>
+            <p class="success-state__text">Thanks — your $285.00 payment posted today. You're all set for April.</p>
+            <button class="pay-btn pay-btn--success" style="margin-top: var(--space-6);">Back to Home</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 3. Request Flow ───────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">3 — Request Flow</h2>
+    <p class="section-desc">Category selection → form (subject, description, photo) → confirmation summary.</p>
+
+    <div class="phones-row" style="gap: var(--space-5);">
+
+      <!-- Step 1: Category -->
+      <div class="phone-frame phone-frame--narrow">
+        <div class="status-bar"><span class="status-bar__time">9:41</span></div>
+        <div class="app-header" style="padding-bottom: var(--space-4);">
+          <div style="color: rgba(255,255,255,0.7); font-size: var(--type-caption-size);">← Back</div>
+          <div style="flex: 1; text-align: center; font-family: var(--font-heading); font-weight: 700; color: #fff; font-size: var(--type-body-size);">New Request</div>
+        </div>
+        <div class="phone-body">
+          <div style="font-size: var(--type-caption-size); color: var(--color-neutral-500); margin-bottom: var(--space-3);">What type of request?</div>
+          <div class="category-grid">
+            <div class="category-tile">
+              <div class="category-tile__icon">🔧</div>
+              <span class="category-tile__label">Maintenance</span>
+            </div>
+            <div class="category-tile" style="border-color: var(--color-primary-400); background: var(--color-primary-50);">
+              <div class="category-tile__icon">🏗️</div>
+              <span class="category-tile__label">Architectural</span>
+            </div>
+            <div class="category-tile">
+              <div class="category-tile__icon">🏊</div>
+              <span class="category-tile__label">Amenity</span>
+            </div>
+            <div class="category-tile">
+              <div class="category-tile__icon">💬</div>
+              <span class="category-tile__label">Other</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Form -->
+      <div class="phone-frame phone-frame--narrow">
+        <div class="status-bar"><span class="status-bar__time">9:41</span></div>
+        <div class="app-header" style="padding-bottom: var(--space-4);">
+          <div style="color: rgba(255,255,255,0.7); font-size: var(--type-caption-size);">← Back</div>
+          <div style="flex: 1; text-align: center; font-family: var(--font-heading); font-weight: 700; color: #fff; font-size: var(--type-body-size);">Architectural Request</div>
+        </div>
+        <div class="phone-body">
+          <div class="req-form-field">
+            <label class="req-form-field__label">Subject</label>
+            <div class="req-input">Deck addition — rear yard</div>
+          </div>
+          <div class="req-form-field">
+            <label class="req-form-field__label">Description</label>
+            <div class="req-textarea">I'd like to add a 10×12 ft wood deck to the rear of unit 101-A…</div>
+          </div>
+          <div class="req-form-field">
+            <label class="req-form-field__label">Photo (optional)</label>
+            <div class="photo-upload">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              Tap to upload photo
+            </div>
+          </div>
+          <button class="pay-btn" style="margin-top: var(--space-1);">Next: Review →</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Confirmation -->
+      <div class="phone-frame phone-frame--narrow">
+        <div class="status-bar"><span class="status-bar__time">9:41</span></div>
+        <div class="app-header" style="padding-bottom: var(--space-4);">
+          <div style="color: rgba(255,255,255,0.7); font-size: var(--type-caption-size);">← Back</div>
+          <div style="flex: 1; text-align: center; font-family: var(--font-heading); font-weight: 700; color: #fff; font-size: var(--type-body-size);">Review Request</div>
+        </div>
+        <div class="phone-body">
+          <div class="req-confirmation">
+            <div class="req-confirmation__label">Architectural Request — Draft</div>
+            <div class="req-confirmation__row"><span>Category</span><strong>Architectural</strong></div>
+            <div class="req-confirmation__row"><span>Subject</span><strong>Deck addition</strong></div>
+            <div class="req-confirmation__row"><span>Unit</span><strong>101-A</strong></div>
+            <div class="req-confirmation__row"><span>Estimated Review</span><strong>5–7 business days</strong></div>
+          </div>
+          <button class="pay-btn" style="margin-top: var(--space-4);">Submit Request</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 4. Detail View ────────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">4 — Detail View</h2>
+    <p class="section-desc">Status hero with large indicator → timeline of updates → action buttons at bottom.</p>
+
+    <div class="phones-row">
+      <div class="phone-frame">
+        <div class="status-bar"><span class="status-bar__time">9:41</span></div>
+
+        <!-- Status Hero -->
+        <div class="status-hero">
+          <div class="status-hero__indicator" style="background: var(--color-success-600);"></div>
+          <div class="status-hero__text">In Progress</div>
+          <div class="status-hero__sub">Work Order #WO-247 · Parking Lot Light</div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="phone-body" style="padding: 0;">
+          <div class="timeline">
+            <div class="timeline-item">
+              <div class="timeline-item__dot-col">
+                <div class="timeline-dot timeline-dot--active"></div>
+                <div class="timeline-line"></div>
+              </div>
+              <div class="timeline-item__content">
+                <div class="timeline-item__title">Crew assigned</div>
+                <div class="timeline-item__body">Maintenance team scheduled for Wednesday morning.</div>
+                <div class="timeline-item__time">Apr 8, 2026 — 10:22 AM</div>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-item__dot-col">
+                <div class="timeline-dot timeline-dot--active"></div>
+                <div class="timeline-line"></div>
+              </div>
+              <div class="timeline-item__content">
+                <div class="timeline-item__title">Request received</div>
+                <div class="timeline-item__body">Your report of the parking lot light outage was logged.</div>
+                <div class="timeline-item__time">Apr 6, 2026 — 8:45 PM</div>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-item__dot-col">
+                <div class="timeline-dot"></div>
+              </div>
+              <div class="timeline-item__content">
+                <div class="timeline-item__title" style="color: var(--color-neutral-400);">Completed</div>
+                <div class="timeline-item__body">Waiting for crew to mark complete.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="detail-actions">
+          <button class="detail-action-btn detail-action-btn--ghost">View Details</button>
+          <button class="detail-action-btn detail-action-btn--primary">Add Comment</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5. Empty States ───────────────────────────────────────── -->
+  <div class="section">
+    <h2 class="section-title">5 — Empty States</h2>
+    <p class="section-desc">Three empty states: payments, pulse, violations. Conversational copy — not system errors. Friendly and contextual.</p>
+
+    <div class="phones-row" style="gap: var(--space-5);">
+
+      <!-- Empty: Payments -->
+      <div class="phone-frame phone-frame--narrow">
+        <div class="status-bar"><span class="status-bar__time">9:41</span></div>
+        <div class="app-header">
+          <div style="flex: 1; text-align: center; font-family: var(--font-heading); font-weight: 700; color: #fff; font-size: var(--type-body-size);">Payments</div>
+        </div>
+        <div class="phone-body">
+          <div class="empty-state-phone">
+            <div class="empty-icon">✅</div>
+            <div class="empty-state-phone__title">All caught up</div>
+            <p class="empty-state-phone__text">You're all caught up — no payments due right now. Your next assessment posts May 1st.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty: Community Pulse -->
+      <div class="phone-frame phone-frame--narrow">
+        <div class="status-bar"><span class="status-bar__time">9:41</span></div>
+        <div class="app-header">
+          <div style="flex: 1; text-align: center; font-family: var(--font-heading); font-weight: 700; color: #fff; font-size: var(--type-body-size);">Community Pulse</div>
+        </div>
+        <div class="phone-body">
+          <div class="empty-state-phone">
+            <div class="empty-icon">🌿</div>
+            <div class="empty-state-phone__title">Quiet neighborhood</div>
+            <p class="empty-state-phone__text">It's quiet in the neighborhood today. Check back soon — announcements will appear here.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty: Violations -->
+      <div class="phone-frame phone-frame--narrow">
+        <div class="status-bar"><span class="status-bar__time">9:41</span></div>
+        <div class="app-header">
+          <div style="flex: 1; text-align: center; font-family: var(--font-heading); font-weight: 700; color: #fff; font-size: var(--type-body-size);">My Record</div>
+        </div>
+        <div class="phone-body">
+          <div class="empty-state-phone">
+            <div class="empty-icon">🏅</div>
+            <div class="empty-state-phone__title">Clean record</div>
+            <p class="empty-state-phone__text">Clean record — no violations on file. Keep it up, Sarah!</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    }
+  </script>
+</body>
+</html>
