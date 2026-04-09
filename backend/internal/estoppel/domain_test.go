@@ -186,3 +186,156 @@ func TestEstoppelRequest_JSONSerialization(t *testing.T) {
 		assert.NotContains(t, result, key, "expected JSON key %q to be omitted when nil", key)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// TestCreateEstoppelRequestDTO_Validate_ValidRequest
+// ---------------------------------------------------------------------------
+
+func TestCreateEstoppelRequestDTO_Validate_ValidRequest(t *testing.T) {
+	dto := estoppel.CreateEstoppelRequestDTO{
+		UnitID:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+		RequestType:     "estoppel_certificate",
+		RequestorType:   "homeowner",
+		RequestorName:   "Jane Smith",
+		RequestorEmail:  "jane@example.com",
+		PropertyAddress: "123 Oak Street",
+		OwnerName:       "Jane Smith",
+	}
+
+	err := dto.Validate()
+	assert.NoError(t, err, "a fully-populated DTO should pass validation")
+}
+
+// ---------------------------------------------------------------------------
+// TestCreateEstoppelRequestDTO_Validate_MissingRequiredFields
+// ---------------------------------------------------------------------------
+
+func TestCreateEstoppelRequestDTO_Validate_MissingRequiredFields(t *testing.T) {
+	validUnitID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+
+	tests := []struct {
+		name        string
+		dto         estoppel.CreateEstoppelRequestDTO
+		wantField   string
+	}{
+		{
+			name: "missing unit_id",
+			dto: estoppel.CreateEstoppelRequestDTO{
+				UnitID:          uuid.Nil,
+				RequestType:     "estoppel_certificate",
+				RequestorType:   "homeowner",
+				RequestorName:   "Jane Smith",
+				RequestorEmail:  "jane@example.com",
+				PropertyAddress: "123 Oak Street",
+				OwnerName:       "Jane Smith",
+			},
+			wantField: "unit_id",
+		},
+		{
+			name: "invalid request_type",
+			dto: estoppel.CreateEstoppelRequestDTO{
+				UnitID:          validUnitID,
+				RequestType:     "invalid_type",
+				RequestorType:   "homeowner",
+				RequestorName:   "Jane Smith",
+				RequestorEmail:  "jane@example.com",
+				PropertyAddress: "123 Oak Street",
+				OwnerName:       "Jane Smith",
+			},
+			wantField: "request_type",
+		},
+		{
+			name: "invalid requestor_type",
+			dto: estoppel.CreateEstoppelRequestDTO{
+				UnitID:          validUnitID,
+				RequestType:     "estoppel_certificate",
+				RequestorType:   "invalid_type",
+				RequestorName:   "Jane Smith",
+				RequestorEmail:  "jane@example.com",
+				PropertyAddress: "123 Oak Street",
+				OwnerName:       "Jane Smith",
+			},
+			wantField: "requestor_type",
+		},
+		{
+			name: "missing requestor_name",
+			dto: estoppel.CreateEstoppelRequestDTO{
+				UnitID:          validUnitID,
+				RequestType:     "estoppel_certificate",
+				RequestorType:   "homeowner",
+				RequestorName:   "",
+				RequestorEmail:  "jane@example.com",
+				PropertyAddress: "123 Oak Street",
+				OwnerName:       "Jane Smith",
+			},
+			wantField: "requestor_name",
+		},
+		{
+			name: "missing requestor_email",
+			dto: estoppel.CreateEstoppelRequestDTO{
+				UnitID:          validUnitID,
+				RequestType:     "estoppel_certificate",
+				RequestorType:   "homeowner",
+				RequestorName:   "Jane Smith",
+				RequestorEmail:  "",
+				PropertyAddress: "123 Oak Street",
+				OwnerName:       "Jane Smith",
+			},
+			wantField: "requestor_email",
+		},
+		{
+			name: "missing property_address",
+			dto: estoppel.CreateEstoppelRequestDTO{
+				UnitID:          validUnitID,
+				RequestType:     "estoppel_certificate",
+				RequestorType:   "homeowner",
+				RequestorName:   "Jane Smith",
+				RequestorEmail:  "jane@example.com",
+				PropertyAddress: "",
+				OwnerName:       "Jane Smith",
+			},
+			wantField: "property_address",
+		},
+		{
+			name: "missing owner_name",
+			dto: estoppel.CreateEstoppelRequestDTO{
+				UnitID:          validUnitID,
+				RequestType:     "estoppel_certificate",
+				RequestorType:   "homeowner",
+				RequestorName:   "Jane Smith",
+				RequestorEmail:  "jane@example.com",
+				PropertyAddress: "123 Oak Street",
+				OwnerName:       "",
+			},
+			wantField: "owner_name",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.dto.Validate()
+			require.Error(t, err, "expected a validation error for %s", tc.name)
+			// Verify the error message mentions the expected field.
+			assert.Contains(t, err.Error(), tc.wantField,
+				"error message should reference field %q", tc.wantField)
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestApproveRequestDTO_Validate
+// ---------------------------------------------------------------------------
+
+func TestApproveRequestDTO_Validate(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		dto := estoppel.ApproveRequestDTO{SignerTitle: "Board President"}
+		assert.NoError(t, dto.Validate())
+	})
+
+	t.Run("missing signer_title", func(t *testing.T) {
+		dto := estoppel.ApproveRequestDTO{SignerTitle: ""}
+		err := dto.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "signer_title")
+	})
+}
