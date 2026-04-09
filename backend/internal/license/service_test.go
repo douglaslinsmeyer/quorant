@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/license"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -229,7 +231,7 @@ func (m *mockLicenseRepo) FindEntitlementFromFirmBundle(_ context.Context, _ uui
 func newTestLicenseService(repo *mockLicenseRepo) *license.LicenseService {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	checker := license.NewPostgresEntitlementChecker(repo)
-	return license.NewLicenseService(repo, checker, logger)
+	return license.NewLicenseService(repo, checker, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 }
 
 // ─── Plan tests ───────────────────────────────────────────────────────────────

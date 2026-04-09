@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/queue"
 )
 
 // EntitlementResult holds the resolution outcome for a single feature key.
@@ -19,14 +21,16 @@ type EntitlementResult struct {
 
 // LicenseService provides business logic for the license domain.
 type LicenseService struct {
-	repo    LicenseRepository
-	checker *PostgresEntitlementChecker
-	logger  *slog.Logger
+	repo      LicenseRepository
+	checker   *PostgresEntitlementChecker
+	auditor   audit.Auditor
+	publisher queue.Publisher
+	logger    *slog.Logger
 }
 
 // NewLicenseService constructs a LicenseService.
-func NewLicenseService(repo LicenseRepository, checker *PostgresEntitlementChecker, logger *slog.Logger) *LicenseService {
-	return &LicenseService{repo: repo, checker: checker, logger: logger}
+func NewLicenseService(repo LicenseRepository, checker *PostgresEntitlementChecker, auditor audit.Auditor, publisher queue.Publisher, logger *slog.Logger) *LicenseService {
+	return &LicenseService{repo: repo, checker: checker, auditor: auditor, publisher: publisher, logger: logger}
 }
 
 // ─── Plan operations ──────────────────────────────────────────────────────────

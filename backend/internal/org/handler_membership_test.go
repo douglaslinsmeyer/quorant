@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/iam"
 	"github.com/quorant/quorant/internal/org"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,7 +34,7 @@ func setupMembershipTestServer(t *testing.T) *membershipTestServer {
 	mockUserRepo := newMockUserRepo()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	service := org.NewOrgService(mockOrgRepo, mockMembershipRepo, mockUnitRepo, mockUserRepo, logger)
+	service := org.NewOrgService(mockOrgRepo, mockMembershipRepo, mockUnitRepo, mockUserRepo, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 	handler := org.NewMembershipHandler(service, logger)
 
 	mux := http.NewServeMux()

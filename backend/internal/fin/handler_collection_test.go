@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/fin"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,6 +40,8 @@ func setupCollectionTestServer(t *testing.T) *collectionTestServer {
 		mockBudgetRepo,
 		mockFundRepo,
 		mockCollectionRepo,
+		audit.NewNoopAuditor(),
+		queue.NewInMemoryPublisher(),
 		logger,
 	)
 	collectionHandler := fin.NewCollectionHandler(service, logger)

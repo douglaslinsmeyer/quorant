@@ -3,15 +3,17 @@ package admin_test
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/admin"
+	"github.com/quorant/quorant/internal/audit"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"log/slog"
-	"os"
 )
 
 // ─── mockAdminRepository ──────────────────────────────────────────────────────
@@ -152,7 +154,7 @@ func newTestService(t *testing.T) (*admin.AdminService, *mockAdminRepository) {
 	t.Helper()
 	repo := newMockAdminRepo()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	svc := admin.NewAdminService(repo, logger)
+	svc := admin.NewAdminService(repo, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 	return svc, repo
 }
 

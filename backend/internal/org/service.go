@@ -6,9 +6,11 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/iam"
 	"github.com/quorant/quorant/internal/platform/api"
 	"github.com/quorant/quorant/internal/platform/auth"
+	"github.com/quorant/quorant/internal/platform/queue"
 )
 
 // OrgService provides business logic for organization operations.
@@ -17,6 +19,8 @@ type OrgService struct {
 	membershipRepo MembershipRepository
 	unitRepo       UnitRepository
 	userRepo       iam.UserRepository
+	auditor        audit.Auditor
+	publisher      queue.Publisher
 	logger         *slog.Logger
 }
 
@@ -26,6 +30,8 @@ func NewOrgService(
 	membershipRepo MembershipRepository,
 	unitRepo UnitRepository,
 	userRepo iam.UserRepository,
+	auditor audit.Auditor,
+	publisher queue.Publisher,
 	logger *slog.Logger,
 ) *OrgService {
 	return &OrgService{
@@ -33,6 +39,8 @@ func NewOrgService(
 		membershipRepo: membershipRepo,
 		unitRepo:       unitRepo,
 		userRepo:       userRepo,
+		auditor:        auditor,
+		publisher:      publisher,
 		logger:         logger,
 	}
 }

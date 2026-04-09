@@ -6,25 +6,31 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/quorant/quorant/internal/platform/storage"
 )
 
 // DocService orchestrates document management operations.
 type DocService struct {
-	repo    DocRepository
-	storage storage.StorageClient
-	bucket  string
-	logger  *slog.Logger
+	repo      DocRepository
+	storage   storage.StorageClient
+	bucket    string
+	auditor   audit.Auditor
+	publisher queue.Publisher
+	logger    *slog.Logger
 }
 
 // NewDocService constructs a DocService with all required dependencies.
-func NewDocService(repo DocRepository, storage storage.StorageClient, bucket string, logger *slog.Logger) *DocService {
+func NewDocService(repo DocRepository, storage storage.StorageClient, bucket string, auditor audit.Auditor, publisher queue.Publisher, logger *slog.Logger) *DocService {
 	return &DocService{
-		repo:    repo,
-		storage: storage,
-		bucket:  bucket,
-		logger:  logger,
+		repo:      repo,
+		storage:   storage,
+		bucket:    bucket,
+		auditor:   auditor,
+		publisher: publisher,
+		logger:    logger,
 	}
 }
 

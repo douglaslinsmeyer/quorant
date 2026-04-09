@@ -9,10 +9,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/iam"
 	"github.com/quorant/quorant/internal/org"
 	"github.com/quorant/quorant/internal/platform/api"
 	"github.com/quorant/quorant/internal/platform/auth"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -468,7 +470,7 @@ func (m *mockUserRepo) FindMembershipsByUserID(_ context.Context, _ uuid.UUID) (
 
 func newTestService(orgRepo *mockOrgRepo, memberRepo *mockMembershipRepo, unitRepo *mockUnitRepo, userRepo *mockUserRepo) *org.OrgService {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	return org.NewOrgService(orgRepo, memberRepo, unitRepo, userRepo, logger)
+	return org.NewOrgService(orgRepo, memberRepo, unitRepo, userRepo, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 }
 
 func newDefaultTestService() (*org.OrgService, *mockOrgRepo, *mockMembershipRepo, *mockUnitRepo, *mockUserRepo) {

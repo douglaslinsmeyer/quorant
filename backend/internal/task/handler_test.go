@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/quorant/quorant/internal/task"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +33,7 @@ func setupTaskTestServer(t *testing.T) *taskTestServer {
 
 	repo := newMockTaskRepo()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	svc := task.NewTaskService(repo, logger)
+	svc := task.NewTaskService(repo, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 	handler := task.NewTaskHandler(svc, logger)
 
 	mux := http.NewServeMux()

@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/queue"
 )
 
 // ComService orchestrates all 7 communication repositories.
@@ -19,6 +21,8 @@ type ComService struct {
 	templates     TemplateRepository
 	directory     DirectoryRepository
 	commLog       CommLogRepository
+	auditor       audit.Auditor
+	publisher     queue.Publisher
 	logger        *slog.Logger
 }
 
@@ -31,6 +35,8 @@ func NewComService(
 	templates TemplateRepository,
 	directory DirectoryRepository,
 	commLog CommLogRepository,
+	auditor audit.Auditor,
+	publisher queue.Publisher,
 	logger *slog.Logger,
 ) *ComService {
 	return &ComService{
@@ -41,6 +47,8 @@ func NewComService(
 		templates:     templates,
 		directory:     directory,
 		commLog:       commLog,
+		auditor:       auditor,
+		publisher:     publisher,
 		logger:        logger,
 	}
 }

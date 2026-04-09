@@ -9,18 +9,22 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/queue"
 )
 
 // WebhookService provides business logic for the webhook domain.
 type WebhookService struct {
-	repo   WebhookRepository
-	logger *slog.Logger
+	repo      WebhookRepository
+	auditor   audit.Auditor
+	publisher queue.Publisher
+	logger    *slog.Logger
 }
 
 // NewWebhookService constructs a WebhookService backed by the given repository.
-func NewWebhookService(repo WebhookRepository, logger *slog.Logger) *WebhookService {
-	return &WebhookService{repo: repo, logger: logger}
+func NewWebhookService(repo WebhookRepository, auditor audit.Auditor, publisher queue.Publisher, logger *slog.Logger) *WebhookService {
+	return &WebhookService{repo: repo, auditor: auditor, publisher: publisher, logger: logger}
 }
 
 // CreateSubscription creates a new webhook subscription with a generated secret.

@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/iam"
 	"github.com/quorant/quorant/internal/org"
 	"github.com/quorant/quorant/internal/platform/auth"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,7 +38,7 @@ func setupOrgTestServer(t *testing.T) *orgTestServer {
 	mockUserRepo := newMockUserRepo()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	service := org.NewOrgService(mockOrgRepo, mockMembershipRepo, mockUnitRepo, mockUserRepo, logger)
+	service := org.NewOrgService(mockOrgRepo, mockMembershipRepo, mockUnitRepo, mockUserRepo, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 	handler := org.NewOrgHandler(service, logger)
 
 	mux := http.NewServeMux()
@@ -110,7 +112,7 @@ func setupOrgTestServerWithUser(t *testing.T) (*orgTestServer, *iam.User) {
 	}
 	mockUserRepo.users["test-subject"] = testUser
 
-	service := org.NewOrgService(mockOrgRepo, mockMembershipRepo, mockUnitRepo, mockUserRepo, logger)
+	service := org.NewOrgService(mockOrgRepo, mockMembershipRepo, mockUnitRepo, mockUserRepo, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 	handler := org.NewOrgHandler(service, logger)
 
 	// Wrap the real mux with a middleware that injects auth claims.

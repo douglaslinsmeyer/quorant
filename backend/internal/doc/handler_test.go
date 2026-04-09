@@ -11,8 +11,10 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/doc"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +32,7 @@ func setupDocTestServer(t *testing.T) *docTestServer {
 	repo := newMockDocRepo()
 	stor := newMockStorageClient()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	svc := doc.NewDocService(repo, stor, "test-bucket", logger)
+	svc := doc.NewDocService(repo, stor, "test-bucket", audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 	handler := doc.NewDocHandler(svc, logger)
 
 	mux := http.NewServeMux()
@@ -322,7 +324,7 @@ func TestListCategories_Handler(t *testing.T) {
 	// Seed categories via service.
 	stor := newMockStorageClient()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	svc := doc.NewDocService(ts.repo, stor, "test-bucket", logger)
+	svc := doc.NewDocService(ts.repo, stor, "test-bucket", audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 
 	_, err := svc.CreateCategory(t.Context(), orgID, doc.CreateCategoryRequest{Name: "Cat 1"})
 	require.NoError(t, err)
@@ -344,7 +346,7 @@ func TestDeleteCategory_Handler(t *testing.T) {
 
 	stor := newMockStorageClient()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	svc := doc.NewDocService(ts.repo, stor, "test-bucket", logger)
+	svc := doc.NewDocService(ts.repo, stor, "test-bucket", audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 
 	cat, err := svc.CreateCategory(t.Context(), orgID, doc.CreateCategoryRequest{Name: "Temp Cat"})
 	require.NoError(t, err)

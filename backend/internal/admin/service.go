@@ -6,17 +6,21 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
+	"github.com/quorant/quorant/internal/platform/queue"
 )
 
 // AdminService provides business logic for admin/platform operations.
 type AdminService struct {
-	repo   AdminRepository
-	logger *slog.Logger
+	repo      AdminRepository
+	auditor   audit.Auditor
+	publisher queue.Publisher
+	logger    *slog.Logger
 }
 
 // NewAdminService constructs an AdminService backed by the given repository.
-func NewAdminService(repo AdminRepository, logger *slog.Logger) *AdminService {
-	return &AdminService{repo: repo, logger: logger}
+func NewAdminService(repo AdminRepository, auditor audit.Auditor, publisher queue.Publisher, logger *slog.Logger) *AdminService {
+	return &AdminService{repo: repo, auditor: auditor, publisher: publisher, logger: logger}
 }
 
 // ─── Feature Flags ────────────────────────────────────────────────────────────

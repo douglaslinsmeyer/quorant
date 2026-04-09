@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/queue"
 )
 
 // UpdateAssessmentScheduleRequest holds the fields that can be updated on an
@@ -32,6 +34,8 @@ type FinService struct {
 	budgets     BudgetRepository
 	funds       FundRepository
 	collections CollectionRepository
+	auditor     audit.Auditor
+	publisher   queue.Publisher
 	logger      *slog.Logger
 }
 
@@ -42,6 +46,8 @@ func NewFinService(
 	budgets BudgetRepository,
 	funds FundRepository,
 	collections CollectionRepository,
+	auditor audit.Auditor,
+	publisher queue.Publisher,
 	logger *slog.Logger,
 ) *FinService {
 	return &FinService{
@@ -50,6 +56,8 @@ func NewFinService(
 		budgets:     budgets,
 		funds:       funds,
 		collections: collections,
+		auditor:     auditor,
+		publisher:   publisher,
 		logger:      logger,
 	}
 }

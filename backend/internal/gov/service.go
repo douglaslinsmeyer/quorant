@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/queue"
 )
 
 // GovService orchestrates violations, ARB requests, ballots, and meetings.
@@ -15,6 +17,8 @@ type GovService struct {
 	arb        ARBRepository
 	ballots    BallotRepository
 	meetings   MeetingRepository
+	auditor    audit.Auditor
+	publisher  queue.Publisher
 	logger     *slog.Logger
 }
 
@@ -24,6 +28,8 @@ func NewGovService(
 	arb ARBRepository,
 	ballots BallotRepository,
 	meetings MeetingRepository,
+	auditor audit.Auditor,
+	publisher queue.Publisher,
 	logger *slog.Logger,
 ) *GovService {
 	return &GovService{
@@ -31,6 +37,8 @@ func NewGovService(
 		arb:        arb,
 		ballots:    ballots,
 		meetings:   meetings,
+		auditor:    auditor,
+		publisher:  publisher,
 		logger:     logger,
 	}
 }

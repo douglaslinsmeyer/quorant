@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/queue"
 )
 
 // validTransitions defines the allowed status transitions for tasks.
@@ -45,13 +47,15 @@ var validTransitions = map[string]map[string]bool{
 
 // TaskService orchestrates task business logic.
 type TaskService struct {
-	repo   TaskRepository
-	logger *slog.Logger
+	repo      TaskRepository
+	auditor   audit.Auditor
+	publisher queue.Publisher
+	logger    *slog.Logger
 }
 
 // NewTaskService constructs a TaskService backed by the given repository.
-func NewTaskService(repo TaskRepository, logger *slog.Logger) *TaskService {
-	return &TaskService{repo: repo, logger: logger}
+func NewTaskService(repo TaskRepository, auditor audit.Auditor, publisher queue.Publisher, logger *slog.Logger) *TaskService {
+	return &TaskService{repo: repo, auditor: auditor, publisher: publisher, logger: logger}
 }
 
 // ---------------------------------------------------------------------------

@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/license"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,7 +31,7 @@ func setupLicenseTestServer(t *testing.T) *licenseTestServer {
 	repo := newMockLicenseRepo()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	checker := license.NewPostgresEntitlementChecker(repo)
-	svc := license.NewLicenseService(repo, checker, logger)
+	svc := license.NewLicenseService(repo, checker, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 	handler := license.NewLicenseHandler(svc, logger)
 
 	mux := http.NewServeMux()

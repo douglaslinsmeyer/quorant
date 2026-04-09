@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/fin"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -702,7 +704,7 @@ func newTestService() (*fin.FinService, *mockAssessmentRepo, *mockPaymentRepo, *
 	funds := &mockFundRepo{}
 	collections := &mockCollectionRepo{}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, logger)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 	return svc, assessments, payments, budgets, funds, collections
 }
 

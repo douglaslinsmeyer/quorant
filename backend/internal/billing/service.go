@@ -6,18 +6,22 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/queue"
 )
 
 // BillingService provides business logic for the billing domain.
 type BillingService struct {
-	repo   BillingRepository
-	logger *slog.Logger
+	repo      BillingRepository
+	auditor   audit.Auditor
+	publisher queue.Publisher
+	logger    *slog.Logger
 }
 
 // NewBillingService constructs a BillingService backed by the given repository.
-func NewBillingService(repo BillingRepository, logger *slog.Logger) *BillingService {
-	return &BillingService{repo: repo, logger: logger}
+func NewBillingService(repo BillingRepository, auditor audit.Auditor, publisher queue.Publisher, logger *slog.Logger) *BillingService {
+	return &BillingService{repo: repo, auditor: auditor, publisher: publisher, logger: logger}
 }
 
 // GetBillingAccount returns the billing account for the given org, or NotFoundError.

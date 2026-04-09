@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/doc"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -203,7 +205,7 @@ func newTestService(t *testing.T) (*doc.DocService, *mockDocRepo, *mockStorageCl
 	repo := newMockDocRepo()
 	stor := newMockStorageClient()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	svc := doc.NewDocService(repo, stor, "test-bucket", logger)
+	svc := doc.NewDocService(repo, stor, "test-bucket", audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 	return svc, repo, stor
 }
 

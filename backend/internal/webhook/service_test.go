@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/quorant/quorant/internal/webhook"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -155,7 +157,7 @@ func (m *mockWebhookRepo) FindPendingDeliveries(_ context.Context) ([]webhook.De
 
 func newTestWebhookService(repo *mockWebhookRepo) *webhook.WebhookService {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return webhook.NewWebhookService(repo, logger)
+	return webhook.NewWebhookService(repo, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), logger)
 }
 
 func seedSubscription(repo *mockWebhookRepo, orgID uuid.UUID) *webhook.Subscription {

@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/com"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -538,6 +540,8 @@ func newTestService(
 		templates,
 		directory,
 		commLog,
+		audit.NewNoopAuditor(),
+		queue.NewInMemoryPublisher(),
 		logger,
 	)
 }
