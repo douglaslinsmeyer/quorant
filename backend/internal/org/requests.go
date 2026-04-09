@@ -86,6 +86,13 @@ func (r CreateMembershipRequest) Validate() error {
 	return nil
 }
 
+// UpdateMembershipRequest is the request body for
+// PATCH /api/v1/organizations/{org_id}/memberships/{membership_id}.
+type UpdateMembershipRequest struct {
+	RoleID *uuid.UUID `json:"role_id,omitempty"`
+	Status *string    `json:"status,omitempty"`
+}
+
 // CreateUnitRequest is the request body for
 // POST /api/v1/organizations/{org_id}/units.
 type CreateUnitRequest struct {

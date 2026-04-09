@@ -298,6 +298,18 @@ func (s *OrgService) UpdateMembership(ctx context.Context, id uuid.UUID, roleID 
 	return updated, nil
 }
 
+// FindMembership returns a membership by ID, or a NotFoundError if it does not exist.
+func (s *OrgService) FindMembership(ctx context.Context, id uuid.UUID) (*iam.Membership, error) {
+	m, err := s.membershipRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("org service: FindMembership: %w", err)
+	}
+	if m == nil {
+		return nil, api.NewNotFoundError(fmt.Sprintf("membership %s not found", id))
+	}
+	return m, nil
+}
+
 // DeleteMembership soft-deletes a membership by ID.
 func (s *OrgService) DeleteMembership(ctx context.Context, id uuid.UUID) error {
 	if err := s.membershipRepo.SoftDelete(ctx, id); err != nil {
