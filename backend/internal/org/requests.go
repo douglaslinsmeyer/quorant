@@ -116,6 +116,62 @@ func (r CreateUnitRequest) Validate() error {
 	return nil
 }
 
+// UpdateUnitRequest is the request body for PATCH /api/v1/organizations/{org_id}/units/{unit_id}.
+type UpdateUnitRequest struct {
+	Label        *string        `json:"label,omitempty"`
+	UnitType     *string        `json:"unit_type,omitempty"`
+	AddressLine1 *string        `json:"address_line1,omitempty"`
+	AddressLine2 *string        `json:"address_line2,omitempty"`
+	City         *string        `json:"city,omitempty"`
+	State        *string        `json:"state,omitempty"`
+	Zip          *string        `json:"zip,omitempty"`
+	LotSizeSqft  *int           `json:"lot_size_sqft,omitempty"`
+	VotingWeight *float64       `json:"voting_weight,omitempty"`
+	Status       *string        `json:"status,omitempty"`
+	Metadata     map[string]any `json:"metadata,omitempty"`
+}
+
+// SetPropertyRequest is the request body for PUT /api/v1/organizations/{org_id}/units/{unit_id}/property.
+type SetPropertyRequest struct {
+	ParcelNumber *string        `json:"parcel_number,omitempty"`
+	SquareFeet   *int           `json:"square_feet,omitempty"`
+	Bedrooms     *int           `json:"bedrooms,omitempty"`
+	Bathrooms    *float64       `json:"bathrooms,omitempty"`
+	YearBuilt    *int           `json:"year_built,omitempty"`
+	Metadata     map[string]any `json:"metadata,omitempty"`
+}
+
+// CreateUnitMembershipRequest is the request body for
+// POST /api/v1/organizations/{org_id}/units/{unit_id}/memberships.
+type CreateUnitMembershipRequest struct {
+	UserID       uuid.UUID `json:"user_id"`
+	Relationship string    `json:"relationship"` // owner, tenant, resident, emergency_contact
+	IsVoter      bool      `json:"is_voter"`
+	Notes        *string   `json:"notes,omitempty"`
+}
+
+// Validate checks that UserID is non-zero and Relationship is valid.
+func (r CreateUnitMembershipRequest) Validate() error {
+	if r.UserID == (uuid.UUID{}) {
+		return api.NewValidationError("user_id is required", "user_id")
+	}
+	switch r.Relationship {
+	case "owner", "tenant", "resident", "emergency_contact":
+		// valid
+	default:
+		return api.NewValidationError(`relationship must be one of: owner, tenant, resident, emergency_contact`, "relationship")
+	}
+	return nil
+}
+
+// UpdateUnitMembershipRequest is the request body for
+// PATCH /api/v1/organizations/{org_id}/units/{unit_id}/memberships/{id}.
+type UpdateUnitMembershipRequest struct {
+	Relationship *string `json:"relationship,omitempty"`
+	IsVoter      *bool   `json:"is_voter,omitempty"`
+	Notes        *string `json:"notes,omitempty"`
+}
+
 // ConnectManagementRequest is the request body for
 // POST /api/v1/organizations/{org_id}/management.
 type ConnectManagementRequest struct {

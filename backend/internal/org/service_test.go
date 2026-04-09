@@ -248,18 +248,20 @@ func (m *mockMembershipRepo) SoftDelete(_ context.Context, id uuid.UUID) error {
 
 // mockUnitRepo is an in-memory UnitRepository for unit tests.
 type mockUnitRepo struct {
-	units      map[uuid.UUID]*org.Unit
-	properties map[uuid.UUID]*org.Property
-	createErr  error
-	findErr    error
-	updateErr  error
-	deleteErr  error
+	units           map[uuid.UUID]*org.Unit
+	properties      map[uuid.UUID]*org.Property
+	unitMemberships map[uuid.UUID]*org.UnitMembership
+	createErr       error
+	findErr         error
+	updateErr       error
+	deleteErr       error
 }
 
 func newMockUnitRepo() *mockUnitRepo {
 	return &mockUnitRepo{
-		units:      make(map[uuid.UUID]*org.Unit),
-		properties: make(map[uuid.UUID]*org.Property),
+		units:           make(map[uuid.UUID]*org.Unit),
+		properties:      make(map[uuid.UUID]*org.Property),
+		unitMemberships: make(map[uuid.UUID]*org.UnitMembership),
 	}
 }
 
@@ -350,18 +352,62 @@ func (m *mockUnitRepo) UpsertProperty(_ context.Context, prop *org.Property) (*o
 }
 
 func (m *mockUnitRepo) CreateUnitMembership(_ context.Context, um *org.UnitMembership) (*org.UnitMembership, error) {
-	return um, nil
+	if m.createErr != nil {
+		return nil, m.createErr
+	}
+	if um.ID == uuid.Nil {
+		um.ID = uuid.New()
+	}
+	um.CreatedAt = time.Now()
+	um.UpdatedAt = time.Now()
+	copy := *um
+	m.unitMemberships[um.ID] = &copy
+	return &copy, nil
 }
 
-func (m *mockUnitRepo) ListUnitMemberships(_ context.Context, _ uuid.UUID) ([]org.UnitMembership, error) {
-	return []org.UnitMembership{}, nil
+func (m *mockUnitRepo) FindUnitMembershipByID(_ context.Context, id uuid.UUID) (*org.UnitMembership, error) {
+	if m.findErr != nil {
+		return nil, m.findErr
+	}
+	um, ok := m.unitMemberships[id]
+	if !ok {
+		return nil, nil
+	}
+	copy := *um
+	return &copy, nil
+}
+
+func (m *mockUnitRepo) ListUnitMemberships(_ context.Context, unitID uuid.UUID) ([]org.UnitMembership, error) {
+	if m.findErr != nil {
+		return nil, m.findErr
+	}
+	result := []org.UnitMembership{}
+	for _, um := range m.unitMemberships {
+		if um.UnitID == unitID && um.EndedAt == nil {
+			result = append(result, *um)
+		}
+	}
+	return result, nil
 }
 
 func (m *mockUnitRepo) UpdateUnitMembership(_ context.Context, um *org.UnitMembership) (*org.UnitMembership, error) {
-	return um, nil
+	if m.updateErr != nil {
+		return nil, m.updateErr
+	}
+	um.UpdatedAt = time.Now()
+	copy := *um
+	m.unitMemberships[um.ID] = &copy
+	return &copy, nil
 }
 
-func (m *mockUnitRepo) EndUnitMembership(_ context.Context, _ uuid.UUID) error {
+func (m *mockUnitRepo) EndUnitMembership(_ context.Context, id uuid.UUID) error {
+	if m.deleteErr != nil {
+		return m.deleteErr
+	}
+	if um, ok := m.unitMemberships[id]; ok {
+		now := time.Now()
+		um.EndedAt = &now
+	}
 	return nil
 }
 

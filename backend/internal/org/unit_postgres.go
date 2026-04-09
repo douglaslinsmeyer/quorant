@@ -324,6 +324,27 @@ func (r *PostgresUnitRepository) CreateUnitMembership(ctx context.Context, m *Un
 	return result, nil
 }
 
+// ─── FindUnitMembershipByID ──────────────────────────────────────────────────
+
+// FindUnitMembershipByID returns a single unit membership by its ID, or nil if not found.
+func (r *PostgresUnitRepository) FindUnitMembershipByID(ctx context.Context, id uuid.UUID) (*UnitMembership, error) {
+	const q = `
+		SELECT id, unit_id, user_id, relationship, is_voter,
+		       started_at, ended_at, notes, created_at, updated_at
+		FROM unit_memberships
+		WHERE id = $1`
+
+	row := r.pool.QueryRow(ctx, q, id)
+	result, err := scanUnitMembership(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("unit: FindUnitMembershipByID: %w", err)
+	}
+	return result, nil
+}
+
 // ─── ListUnitMemberships ─────────────────────────────────────────────────────
 
 // ListUnitMemberships returns all active (ended_at IS NULL) memberships for a unit,

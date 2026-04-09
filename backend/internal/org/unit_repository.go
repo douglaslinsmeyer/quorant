@@ -21,6 +21,7 @@ type UnitRepository interface {
 
 	// Unit Memberships
 	CreateUnitMembership(ctx context.Context, m *UnitMembership) (*UnitMembership, error)
+	FindUnitMembershipByID(ctx context.Context, id uuid.UUID) (*UnitMembership, error)
 	ListUnitMemberships(ctx context.Context, unitID uuid.UUID) ([]UnitMembership, error)
 	UpdateUnitMembership(ctx context.Context, m *UnitMembership) (*UnitMembership, error)
 	EndUnitMembership(ctx context.Context, id uuid.UUID) error // sets ended_at

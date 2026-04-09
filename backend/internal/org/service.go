@@ -465,3 +465,75 @@ func (s *OrgService) SetProperty(ctx context.Context, unitID uuid.UUID, prop *Pr
 	s.logger.InfoContext(ctx, "property set", "unit_id", unitID)
 	return saved, nil
 }
+
+// ─── Unit Membership operations ──────────────────────────────────────────────
+
+// CreateUnitMembership validates the request and creates a new unit membership.
+func (s *OrgService) CreateUnitMembership(ctx context.Context, unitID uuid.UUID, req CreateUnitMembershipRequest) (*UnitMembership, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	um := &UnitMembership{
+		UnitID:       unitID,
+		UserID:       req.UserID,
+		Relationship: req.Relationship,
+		IsVoter:      req.IsVoter,
+		Notes:        req.Notes,
+	}
+
+	created, err := s.unitRepo.CreateUnitMembership(ctx, um)
+	if err != nil {
+		return nil, fmt.Errorf("org service: CreateUnitMembership: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "unit membership created", "unit_id", unitID, "user_id", req.UserID)
+	return created, nil
+}
+
+// ListUnitMemberships returns all memberships for the given unit.
+func (s *OrgService) ListUnitMemberships(ctx context.Context, unitID uuid.UUID) ([]UnitMembership, error) {
+	memberships, err := s.unitRepo.ListUnitMemberships(ctx, unitID)
+	if err != nil {
+		return nil, fmt.Errorf("org service: ListUnitMemberships: %w", err)
+	}
+	return memberships, nil
+}
+
+// UpdateUnitMembership applies partial updates to a unit membership.
+func (s *OrgService) UpdateUnitMembership(ctx context.Context, id uuid.UUID, req UpdateUnitMembershipRequest) (*UnitMembership, error) {
+	um, err := s.unitRepo.FindUnitMembershipByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("org service: UpdateUnitMembership find: %w", err)
+	}
+	if um == nil {
+		return nil, api.NewNotFoundError(fmt.Sprintf("unit membership %s not found", id))
+	}
+
+	if req.Relationship != nil {
+		um.Relationship = *req.Relationship
+	}
+	if req.IsVoter != nil {
+		um.IsVoter = *req.IsVoter
+	}
+	if req.Notes != nil {
+		um.Notes = req.Notes
+	}
+
+	updated, err := s.unitRepo.UpdateUnitMembership(ctx, um)
+	if err != nil {
+		return nil, fmt.Errorf("org service: UpdateUnitMembership: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "unit membership updated", "unit_membership_id", id)
+	return updated, nil
+}
+
+// EndUnitMembership ends a unit membership by setting its ended_at timestamp.
+func (s *OrgService) EndUnitMembership(ctx context.Context, id uuid.UUID) error {
+	if err := s.unitRepo.EndUnitMembership(ctx, id); err != nil {
+		return fmt.Errorf("org service: EndUnitMembership: %w", err)
+	}
+	s.logger.InfoContext(ctx, "unit membership ended", "unit_membership_id", id)
+	return nil
+}
