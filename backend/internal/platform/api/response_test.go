@@ -122,8 +122,8 @@ func TestWriteError(t *testing.T) {
 		if resp.Errors[0].Code != "NOT_FOUND" {
 			t.Errorf("expected error code NOT_FOUND, got %s", resp.Errors[0].Code)
 		}
-		if resp.Errors[0].Message != "resource.not_found" {
-			t.Errorf("expected message 'resource.not_found', got %s", resp.Errors[0].Message)
+		if resp.Errors[0].MessageKey != "resource.not_found" {
+			t.Errorf("expected message_key 'resource.not_found', got %s", resp.Errors[0].MessageKey)
 		}
 	})
 
@@ -145,6 +145,9 @@ func TestWriteError(t *testing.T) {
 		if resp.Errors[0].Code != "INTERNAL_ERROR" {
 			t.Errorf("expected error code INTERNAL_ERROR, got %s", resp.Errors[0].Code)
 		}
+		if resp.Errors[0].MessageKey != "server.internal_error" {
+			t.Errorf("expected message_key 'server.internal_error', got %s", resp.Errors[0].MessageKey)
+		}
 	})
 
 	t.Run("includes field in error when ValidationError has field", func(t *testing.T) {
@@ -162,6 +165,57 @@ func TestWriteError(t *testing.T) {
 		if resp.Errors[0].Field != "email" {
 			t.Errorf("expected field 'email', got %s", resp.Errors[0].Field)
 		}
+		if resp.Errors[0].MessageKey != "validation.required" {
+			t.Errorf("expected message_key 'validation.required', got %s", resp.Errors[0].MessageKey)
+		}
+		if resp.Errors[0].Code != "VALIDATION_ERROR" {
+			t.Errorf("expected code 'VALIDATION_ERROR', got %s", resp.Errors[0].Code)
+		}
+	})
+
+	t.Run("populates params from APIError", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		apiErr := api.NewNotFoundError("resource.not_found", api.P("id", "abc-123"))
+		api.WriteError(w, apiErr)
+
+		var resp api.Response
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if len(resp.Errors) == 0 {
+			t.Fatal("expected errors in response")
+		}
+		if resp.Errors[0].Params == nil {
+			t.Fatal("expected params in error response")
+		}
+		id, ok := resp.Errors[0].Params["id"]
+		if !ok {
+			t.Fatal("expected 'id' key in params")
+		}
+		if id != "abc-123" {
+			t.Errorf("expected params[id] = 'abc-123', got %v", id)
+		}
+	})
+
+	t.Run("omits params when nil", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		api.WriteError(w, errors.New("some error"))
+
+		// Decode raw JSON to check that params key is absent
+		var raw map[string]json.RawMessage
+		if err := json.NewDecoder(w.Body).Decode(&raw); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		var errs []map[string]json.RawMessage
+		if err := json.Unmarshal(raw["errors"], &errs); err != nil {
+			t.Fatalf("failed to unmarshal errors array: %v", err)
+		}
+		if len(errs) == 0 {
+			t.Fatal("expected errors in response")
+		}
+		if _, exists := errs[0]["params"]; exists {
+			t.Error("expected params to be omitted from JSON when nil")
+		}
 	})
 
 	t.Run("response has no data field on error", func(t *testing.T) {
@@ -174,6 +228,29 @@ func TestWriteError(t *testing.T) {
 		}
 		if resp.Data != nil {
 			t.Error("expected no data field in error response")
+		}
+	})
+
+	t.Run("JSON wire format uses message_key not message", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		api.WriteError(w, api.NewForbiddenError("auth.forbidden"))
+
+		var raw map[string]json.RawMessage
+		if err := json.NewDecoder(w.Body).Decode(&raw); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		var errs []map[string]json.RawMessage
+		if err := json.Unmarshal(raw["errors"], &errs); err != nil {
+			t.Fatalf("failed to unmarshal errors array: %v", err)
+		}
+		if len(errs) == 0 {
+			t.Fatal("expected errors in response")
+		}
+		if _, exists := errs[0]["message"]; exists {
+			t.Error("expected 'message' key to NOT exist in JSON, use 'message_key' instead")
+		}
+		if _, exists := errs[0]["message_key"]; !exists {
+			t.Error("expected 'message_key' key to exist in JSON")
 		}
 	})
 }
@@ -209,7 +286,17 @@ func TestReadJSON(t *testing.T) {
 
 		var valErr *api.ValidationError
 		if !errors.As(err, &valErr) {
-			t.Errorf("expected *api.ValidationError, got %T", err)
+			t.Fatalf("expected *api.ValidationError, got %T", err)
+		}
+		if valErr.MsgKey() != "validation.invalid_body" {
+			t.Errorf("expected message key 'validation.invalid_body', got %s", valErr.MsgKey())
+		}
+		params := valErr.MsgParams()
+		if params == nil {
+			t.Fatal("expected params to be non-nil")
+		}
+		if _, ok := params["detail"]; !ok {
+			t.Error("expected 'detail' key in params")
 		}
 	})
 

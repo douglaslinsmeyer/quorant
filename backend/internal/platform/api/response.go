@@ -23,9 +23,10 @@ type Meta struct {
 
 // Error is a single machine-readable error entry inside the errors array.
 type Error struct {
-	Code    string `json:"code"`
-	Field   string `json:"field,omitempty"`
-	Message string `json:"message"`
+	Code       string         `json:"code"`
+	MessageKey string         `json:"message_key"`
+	Field      string         `json:"field,omitempty"`
+	Params     map[string]any `json:"params,omitempty"`
 }
 
 // WriteJSON writes a successful JSON response wrapped in the data envelope.
@@ -48,8 +49,9 @@ func WriteError(w http.ResponseWriter, err error) {
 	}
 
 	entry := Error{
-		Code:    apiErr.ErrorCode(),
-		Message: apiErr.MsgKey(),
+		Code:       apiErr.ErrorCode(),
+		MessageKey: apiErr.MsgKey(),
+		Params:     apiErr.MsgParams(),
 	}
 
 	// Expose the field if this is a ValidationError.
@@ -68,7 +70,7 @@ func ReadJSON(r *http.Request, dst any) error {
 	dec.DisallowUnknownFields()
 
 	if err := dec.Decode(dst); err != nil {
-		return NewValidationError("validation.invalid_request_body", "")
+		return NewValidationError("validation.invalid_body", "", P("detail", err.Error()))
 	}
 	return nil
 }
