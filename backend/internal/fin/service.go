@@ -36,6 +36,7 @@ type FinService struct {
 	budgets     BudgetRepository
 	funds       FundRepository
 	collections CollectionRepository
+	gl          *GLService
 	auditor     audit.Auditor
 	publisher   queue.Publisher
 	policy      ai.PolicyResolver
@@ -50,6 +51,7 @@ func NewFinService(
 	budgets BudgetRepository,
 	funds FundRepository,
 	collections CollectionRepository,
+	gl *GLService,
 	auditor audit.Auditor,
 	publisher queue.Publisher,
 	policy ai.PolicyResolver,
@@ -62,6 +64,7 @@ func NewFinService(
 		budgets:     budgets,
 		funds:       funds,
 		collections: collections,
+		gl:          gl,
 		auditor:     auditor,
 		publisher:   publisher,
 		policy:      policy,
@@ -209,6 +212,23 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 		return nil, err
 	}
 
+	// Post GL journal entry: Debit AR / Credit Revenue.
+	if s.gl != nil {
+		arAccount, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 1100)
+		revenueAccount, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 4010)
+		if arAccount != nil && revenueAccount != nil {
+			sourceType := "assessment"
+			lines := []GLJournalLine{
+				{AccountID: arAccount.ID, DebitCents: created.AmountCents, CreditCents: 0},
+				{AccountID: revenueAccount.ID, DebitCents: 0, CreditCents: created.AmountCents},
+			}
+			memo := fmt.Sprintf("Assessment: %s", created.Description)
+			if _, glErr := s.gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, created.DueDate, memo, &sourceType, &created.ID, &req.UnitID, lines); glErr != nil {
+				s.logger.Error("GL: failed to post assessment journal entry", "assessment_id", created.ID, "error", glErr)
+			}
+		}
+	}
+
 	return created, nil
 }
 
@@ -303,6 +323,26 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 	if _, err := s.assessments.CreateLedgerEntry(ctx, entry); err != nil {
 		s.logger.Error("failed to create ledger entry for payment", "payment_id", created.ID, "error", err)
 		return nil, err
+	}
+
+	// Post GL journal entry: Debit Cash / Credit AR.
+	if s.gl != nil {
+		cashAccount, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 1010)
+		arAccount, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 1100)
+		if cashAccount != nil && arAccount != nil {
+			sourceType := "payment"
+			memo := "Payment received"
+			if req.Description != nil {
+				memo = *req.Description
+			}
+			lines := []GLJournalLine{
+				{AccountID: cashAccount.ID, DebitCents: created.AmountCents, CreditCents: 0},
+				{AccountID: arAccount.ID, DebitCents: 0, CreditCents: created.AmountCents},
+			}
+			if _, glErr := s.gl.PostSystemJournalEntry(ctx, orgID, userID, now, memo, &sourceType, &created.ID, &req.UnitID, lines); glErr != nil {
+				s.logger.Error("GL: failed to post payment journal entry", "payment_id", created.ID, "error", glErr)
+			}
+		}
 	}
 
 	return created, nil
@@ -620,7 +660,41 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 		Description:   req.Description,
 		EffectiveDate: now,
 	}
-	return s.funds.CreateTransfer(ctx, t)
+	created, err := s.funds.CreateTransfer(ctx, t)
+	if err != nil {
+		return nil, err
+	}
+
+	// Post GL journal entry for both sides of the inter-fund transfer.
+	if s.gl != nil {
+		fromFund, _ := s.funds.FindFundByID(ctx, req.FromFundID)
+		toFund, _ := s.funds.FindFundByID(ctx, req.ToFundID)
+		if fromFund != nil && toFund != nil {
+			fromCashNum := cashAccountForFundType(fromFund.FundType)
+			toCashNum := cashAccountForFundType(toFund.FundType)
+
+			fromCash, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, fromCashNum)
+			toCash, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, toCashNum)
+			transferOut, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 3100)
+			transferIn, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 3110)
+
+			if fromCash != nil && toCash != nil && transferOut != nil && transferIn != nil {
+				sourceType := "transfer"
+				memo := fmt.Sprintf("Transfer: %s to %s", fromFund.Name, toFund.Name)
+				lines := []GLJournalLine{
+					{AccountID: transferOut.ID, DebitCents: req.AmountCents, CreditCents: 0},
+					{AccountID: fromCash.ID, DebitCents: 0, CreditCents: req.AmountCents},
+					{AccountID: toCash.ID, DebitCents: req.AmountCents, CreditCents: 0},
+					{AccountID: transferIn.ID, DebitCents: 0, CreditCents: req.AmountCents},
+				}
+				if _, glErr := s.gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, now, memo, &sourceType, &created.ID, nil, lines); glErr != nil {
+					s.logger.Error("GL: failed to post transfer journal entry", "transfer_id", created.ID, "error", glErr)
+				}
+			}
+		}
+	}
+
+	return created, nil
 }
 
 // ListFundTransfers returns all fund transfers for the given org.
@@ -755,4 +829,14 @@ func (s *FinService) CheckReconciliation(ctx context.Context, orgID uuid.UUID) (
 		Discrepancy:     unitTotal - fundTotal,
 		IsReconciled:    unitTotal == fundTotal,
 	}, nil
+}
+
+// cashAccountForFundType returns the standard cash account number for a fund type.
+func cashAccountForFundType(fundType string) int {
+	switch fundType {
+	case "reserve":
+		return 1020
+	default:
+		return 1010 // operating and all others default to operating cash
+	}
 }

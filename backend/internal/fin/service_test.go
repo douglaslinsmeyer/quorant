@@ -717,7 +717,7 @@ func newTestService() (*fin.FinService, *mockAssessmentRepo, *mockPaymentRepo, *
 	funds := &mockFundRepo{}
 	collections := &mockCollectionRepo{}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
 	return svc, assessments, payments, budgets, funds, collections
 }
 
@@ -1042,4 +1042,139 @@ func TestCreateSchedule_SetsOrgID(t *testing.T) {
 	assert.Equal(t, orgID, schedule.OrgID)
 	assert.True(t, schedule.IsActive)
 	assert.Len(t, repo.schedules, 1)
+}
+
+// ── GL Integration Tests ────────────────────────────────────────────────────
+
+// TestCreateAssessment_PostsJournalEntry verifies that creating an assessment
+// posts a GL journal entry debiting AR (1100) and crediting Revenue (4010).
+func TestCreateAssessment_PostsJournalEntry(t *testing.T) {
+	assessments := &mockAssessmentRepo{}
+	payments := &mockPaymentRepo{}
+	budgets := &mockBudgetRepo{}
+	funds := &mockFundRepo{}
+	collections := &mockCollectionRepo{}
+	glRepo := newMockGLRepo()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	glService := fin.NewGLService(glRepo, audit.NewNoopAuditor(), logger)
+
+	orgID := uuid.New()
+	ctx := context.Background()
+
+	// Seed the GL accounts the FinService will look up.
+	arAccount := &fin.GLAccount{
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 1100, Name: "AR-Assessments", AccountType: "asset",
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	revenueAccount := &fin.GLAccount{
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 4010, Name: "Assessment Revenue-Operating", AccountType: "revenue",
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	glRepo.accounts[arAccount.ID] = arAccount
+	glRepo.accounts[revenueAccount.ID] = revenueAccount
+
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
+
+	unitID := uuid.New()
+	req := fin.CreateAssessmentRequest{
+		UnitID:      unitID,
+		Description: "Monthly HOA fee",
+		AmountCents: 15000,
+		DueDate:     time.Now().AddDate(0, 1, 0),
+	}
+
+	assessment, err := svc.CreateAssessment(ctx, orgID, req)
+	require.NoError(t, err)
+	require.NotNil(t, assessment)
+
+	// Verify exactly 1 GL journal entry was posted.
+	require.Len(t, glRepo.entries, 1)
+	for _, entry := range glRepo.entries {
+		require.Len(t, entry.Lines, 2)
+		// Line 0: Debit AR
+		assert.Equal(t, arAccount.ID, entry.Lines[0].AccountID)
+		assert.Equal(t, int64(15000), entry.Lines[0].DebitCents)
+		assert.Equal(t, int64(0), entry.Lines[0].CreditCents)
+		// Line 1: Credit Revenue
+		assert.Equal(t, revenueAccount.ID, entry.Lines[1].AccountID)
+		assert.Equal(t, int64(0), entry.Lines[1].DebitCents)
+		assert.Equal(t, int64(15000), entry.Lines[1].CreditCents)
+	}
+}
+
+// TestRecordPayment_PostsJournalEntry verifies that recording a payment
+// posts a GL journal entry debiting Cash (1010) and crediting AR (1100).
+func TestRecordPayment_PostsJournalEntry(t *testing.T) {
+	assessments := &mockAssessmentRepo{}
+	payments := &mockPaymentRepo{}
+	budgets := &mockBudgetRepo{}
+	funds := &mockFundRepo{}
+	collections := &mockCollectionRepo{}
+	glRepo := newMockGLRepo()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	glService := fin.NewGLService(glRepo, audit.NewNoopAuditor(), logger)
+
+	orgID := uuid.New()
+	ctx := context.Background()
+
+	// Seed the GL accounts the FinService will look up.
+	cashAccount := &fin.GLAccount{
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 1010, Name: "Cash-Operating", AccountType: "asset",
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	arAccount := &fin.GLAccount{
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 1100, Name: "AR-Assessments", AccountType: "asset",
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	glRepo.accounts[cashAccount.ID] = cashAccount
+	glRepo.accounts[arAccount.ID] = arAccount
+
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
+
+	unitID := uuid.New()
+	userID := uuid.New()
+	req := fin.CreatePaymentRequest{
+		UnitID:      unitID,
+		AmountCents: 15000,
+	}
+
+	payment, err := svc.RecordPayment(ctx, orgID, userID, req)
+	require.NoError(t, err)
+	require.NotNil(t, payment)
+
+	// Verify exactly 1 GL journal entry was posted.
+	require.Len(t, glRepo.entries, 1)
+	for _, entry := range glRepo.entries {
+		require.Len(t, entry.Lines, 2)
+		// Line 0: Debit Cash
+		assert.Equal(t, cashAccount.ID, entry.Lines[0].AccountID)
+		assert.Equal(t, int64(15000), entry.Lines[0].DebitCents)
+		assert.Equal(t, int64(0), entry.Lines[0].CreditCents)
+		// Line 1: Credit AR
+		assert.Equal(t, arAccount.ID, entry.Lines[1].AccountID)
+		assert.Equal(t, int64(0), entry.Lines[1].DebitCents)
+		assert.Equal(t, int64(15000), entry.Lines[1].CreditCents)
+	}
+}
+
+// TestCreateAssessment_NilGLService_StillWorks verifies that when GLService is
+// nil, CreateAssessment still succeeds (backward compatibility).
+func TestCreateAssessment_NilGLService_StillWorks(t *testing.T) {
+	svc, _, _, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	unitID := uuid.New()
+
+	req := fin.CreateAssessmentRequest{
+		UnitID:      unitID,
+		Description: "Monthly HOA fee",
+		AmountCents: 15000,
+		DueDate:     time.Now().AddDate(0, 1, 0),
+	}
+
+	assessment, err := svc.CreateAssessment(ctx, orgID, req)
+	require.NoError(t, err)
+	require.NotNil(t, assessment)
+	assert.Equal(t, int64(15000), assessment.AmountCents)
+	assert.Equal(t, unitID, assessment.UnitID)
 }

@@ -43,6 +43,7 @@ func setupBudgetTestServer(t *testing.T) *budgetTestServer {
 		mockBudgetRepo,
 		mockFundRepo,
 		mockCollectionRepo,
+		nil,
 		audit.NewNoopAuditor(),
 		queue.NewInMemoryPublisher(),
 		ai.NewNoopPolicyResolver(),

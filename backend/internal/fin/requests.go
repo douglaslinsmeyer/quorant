@@ -247,3 +247,118 @@ func (r CreatePaymentPlanRequest) Validate() error {
 	}
 	return nil
 }
+
+// ---------------------------------------------------------------------------
+// GL Requests
+// ---------------------------------------------------------------------------
+
+// CreateGLAccountRequest is the request body for creating a new GL account in
+// the chart of accounts.
+type CreateGLAccountRequest struct {
+	ParentID      *uuid.UUID `json:"parent_id,omitempty"`
+	FundID        *uuid.UUID `json:"fund_id,omitempty"`
+	AccountNumber int        `json:"account_number"` // required
+	Name          string     `json:"name"`           // required
+	AccountType   string     `json:"account_type"`   // required: asset|liability|equity|revenue|expense
+	IsHeader      bool       `json:"is_header"`
+	Description   *string    `json:"description,omitempty"`
+}
+
+// Validate checks that all required fields are present and account_number
+// falls within the correct range for the given account_type.
+func (r CreateGLAccountRequest) Validate() error {
+	if r.Name == "" {
+		return api.NewValidationError("name is required", "name")
+	}
+	if r.AccountNumber <= 0 {
+		return api.NewValidationError("account_number must be greater than zero", "account_number")
+	}
+	switch r.AccountType {
+	case "asset":
+		if r.AccountNumber < 1000 || r.AccountNumber > 1999 {
+			return api.NewValidationError("asset account_number must be between 1000 and 1999", "account_number")
+		}
+	case "liability":
+		if r.AccountNumber < 2000 || r.AccountNumber > 2999 {
+			return api.NewValidationError("liability account_number must be between 2000 and 2999", "account_number")
+		}
+	case "equity":
+		if r.AccountNumber < 3000 || r.AccountNumber > 3999 {
+			return api.NewValidationError("equity account_number must be between 3000 and 3999", "account_number")
+		}
+	case "revenue":
+		if r.AccountNumber < 4000 || r.AccountNumber > 4999 {
+			return api.NewValidationError("revenue account_number must be between 4000 and 4999", "account_number")
+		}
+	case "expense":
+		if r.AccountNumber < 5000 || r.AccountNumber > 9999 {
+			return api.NewValidationError("expense account_number must be between 5000 and 9999", "account_number")
+		}
+	case "":
+		return api.NewValidationError("account_type is required", "account_type")
+	default:
+		return api.NewValidationError("account_type must be one of: asset, liability, equity, revenue, expense", "account_type")
+	}
+	return nil
+}
+
+// UpdateGLAccountRequest holds the fields that can be patched on an existing
+// GL account.
+type UpdateGLAccountRequest struct {
+	Name        *string    `json:"name,omitempty"`
+	Description *string    `json:"description,omitempty"`
+	FundID      *uuid.UUID `json:"fund_id,omitempty"`
+}
+
+// JournalEntryLineInput is a single line within a CreateJournalEntryRequest.
+type JournalEntryLineInput struct {
+	AccountID   uuid.UUID `json:"account_id"`   // required
+	DebitCents  int64     `json:"debit_cents"`
+	CreditCents int64     `json:"credit_cents"`
+	Memo        *string   `json:"memo,omitempty"`
+}
+
+// CreateJournalEntryRequest is the request body for posting a new journal
+// entry with balanced debit/credit lines.
+type CreateJournalEntryRequest struct {
+	EntryDate time.Time              `json:"entry_date"` // required
+	Memo      string                 `json:"memo"`       // required
+	Lines     []JournalEntryLineInput `json:"lines"`     // required, min 2
+}
+
+// Validate checks that all required fields are present, lines are balanced,
+// and each line has exactly one of debit_cents or credit_cents set.
+func (r CreateJournalEntryRequest) Validate() error {
+	if r.Memo == "" {
+		return api.NewValidationError("memo is required", "memo")
+	}
+	if r.EntryDate.IsZero() {
+		return api.NewValidationError("entry_date is required", "entry_date")
+	}
+	if len(r.Lines) < 2 {
+		return api.NewValidationError("at least 2 journal lines are required", "lines")
+	}
+
+	var totalDebits, totalCredits int64
+	for i, line := range r.Lines {
+		if line.AccountID == (uuid.UUID{}) {
+			return api.NewValidationError("account_id is required on every line", "lines")
+		}
+		if line.DebitCents < 0 || line.CreditCents < 0 {
+			return api.NewValidationError("debit_cents and credit_cents must not be negative", "lines")
+		}
+		// Exactly one of debit_cents or credit_cents must be > 0.
+		hasDebit := line.DebitCents > 0
+		hasCredit := line.CreditCents > 0
+		if hasDebit == hasCredit {
+			_ = i // suppress unused hint
+			return api.NewValidationError("each line must have exactly one of debit_cents or credit_cents greater than zero", "lines")
+		}
+		totalDebits += line.DebitCents
+		totalCredits += line.CreditCents
+	}
+	if totalDebits != totalCredits {
+		return api.NewValidationError("total debits must equal total credits", "lines")
+	}
+	return nil
+}

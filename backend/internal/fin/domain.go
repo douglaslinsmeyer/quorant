@@ -274,3 +274,66 @@ type PaymentPlan struct {
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 }
+
+// GLAccount represents a single account in the chart of accounts.
+type GLAccount struct {
+	ID            uuid.UUID  `json:"id"`
+	OrgID         uuid.UUID  `json:"org_id"`
+	ParentID      *uuid.UUID `json:"parent_id,omitempty"`
+	FundID        *uuid.UUID `json:"fund_id,omitempty"`
+	AccountNumber int        `json:"account_number"`
+	Name          string     `json:"name"`
+	AccountType   string     `json:"account_type"`
+	IsHeader      bool       `json:"is_header"`
+	IsSystem      bool       `json:"is_system"`
+	Description   *string    `json:"description,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	DeletedAt     *time.Time `json:"deleted_at,omitempty"`
+}
+
+// GLJournalEntry represents a double-entry journal entry header.
+type GLJournalEntry struct {
+	ID          uuid.UUID       `json:"id"`
+	OrgID       uuid.UUID       `json:"org_id"`
+	EntryNumber int             `json:"entry_number"`
+	EntryDate   time.Time       `json:"entry_date"`
+	Memo        string          `json:"memo"`
+	SourceType  *string         `json:"source_type,omitempty"`
+	SourceID    *uuid.UUID      `json:"source_id,omitempty"`
+	UnitID      *uuid.UUID      `json:"unit_id,omitempty"`
+	PostedBy    uuid.UUID       `json:"posted_by"`
+	ReversedBy  *uuid.UUID      `json:"reversed_by,omitempty"`
+	IsReversal  bool            `json:"is_reversal"`
+	CreatedAt   time.Time       `json:"created_at"`
+	Lines       []GLJournalLine `json:"lines,omitempty"`
+}
+
+// GLJournalLine is a single debit or credit line within a journal entry.
+type GLJournalLine struct {
+	ID             uuid.UUID `json:"id"`
+	JournalEntryID uuid.UUID `json:"journal_entry_id"`
+	AccountID      uuid.UUID `json:"account_id"`
+	DebitCents     int64     `json:"debit_cents"`
+	CreditCents    int64     `json:"credit_cents"`
+	Memo           *string   `json:"memo,omitempty"`
+}
+
+// TrialBalanceRow is a single row in a trial balance report.
+type TrialBalanceRow struct {
+	AccountID     uuid.UUID `json:"account_id"`
+	AccountNumber int       `json:"account_number"`
+	AccountName   string    `json:"account_name"`
+	AccountType   string    `json:"account_type"`
+	DebitCents    int64     `json:"debit_cents"`
+	CreditCents   int64     `json:"credit_cents"`
+}
+
+// AccountBalance holds the net balance for a single GL account.
+type AccountBalance struct {
+	AccountID     uuid.UUID `json:"account_id"`
+	AccountNumber int       `json:"account_number"`
+	AccountName   string    `json:"account_name"`
+	AccountType   string    `json:"account_type"`
+	BalanceCents  int64     `json:"balance_cents"`
+}

@@ -776,3 +776,365 @@ func TestCreatePaymentPlanRequest_Validate_MissingNextDueDateReturnsError(t *tes
 		t.Error("expected error when next_due_date is zero, got nil")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// GLAccount JSON serialization
+// ---------------------------------------------------------------------------
+
+func TestGLAccount_JSONSerialization_RequiredFieldsPresent(t *testing.T) {
+	id := uuid.MustParse("00000000-0000-0000-0000-000000000031")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000032")
+	now := time.Now().UTC().Truncate(time.Second)
+
+	a := fin.GLAccount{
+		ID:            id,
+		OrgID:         orgID,
+		AccountNumber: 1000,
+		Name:          "Cash",
+		AccountType:   "asset",
+		IsHeader:      false,
+		IsSystem:      true,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+
+	data, err := json.Marshal(a)
+	if err != nil {
+		t.Fatalf("json.Marshal(GLAccount) error: %v", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("json.Unmarshal error: %v", err)
+	}
+
+	requiredKeys := []string{"id", "org_id", "account_number", "name", "account_type", "is_header", "is_system", "created_at", "updated_at"}
+	for _, key := range requiredKeys {
+		if _, ok := result[key]; !ok {
+			t.Errorf("expected JSON key %q to be present", key)
+		}
+	}
+}
+
+func TestGLAccount_JSONSerialization_OmitsNilOptionalFields(t *testing.T) {
+	now := time.Now().UTC()
+
+	a := fin.GLAccount{
+		ID:            uuid.New(),
+		OrgID:         uuid.New(),
+		AccountNumber: 1000,
+		Name:          "Cash",
+		AccountType:   "asset",
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+
+	data, err := json.Marshal(a)
+	if err != nil {
+		t.Fatalf("json.Marshal error: %v", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("json.Unmarshal error: %v", err)
+	}
+
+	omittedKeys := []string{"parent_id", "fund_id", "description", "deleted_at"}
+	for _, key := range omittedKeys {
+		if _, ok := result[key]; ok {
+			t.Errorf("expected JSON key %q to be omitted when nil", key)
+		}
+	}
+}
+
+func TestGLAccount_JSONSerialization_OptionalFieldsIncludedWhenSet(t *testing.T) {
+	now := time.Now().UTC()
+	parentID := uuid.New()
+	fundID := uuid.New()
+	desc := "Main cash account"
+
+	a := fin.GLAccount{
+		ID:            uuid.New(),
+		OrgID:         uuid.New(),
+		ParentID:      &parentID,
+		FundID:        &fundID,
+		AccountNumber: 1000,
+		Name:          "Cash",
+		AccountType:   "asset",
+		IsHeader:      false,
+		IsSystem:      false,
+		Description:   &desc,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+
+	data, err := json.Marshal(a)
+	if err != nil {
+		t.Fatalf("json.Marshal error: %v", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("json.Unmarshal error: %v", err)
+	}
+
+	presentKeys := []string{"parent_id", "fund_id", "description"}
+	for _, key := range presentKeys {
+		if _, ok := result[key]; !ok {
+			t.Errorf("expected JSON key %q to be present when set", key)
+		}
+	}
+}
+
+func TestGLAccount_JSONSerialization_RoundTrip(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	parentID := uuid.New()
+	desc := "Operating cash"
+
+	original := fin.GLAccount{
+		ID:            uuid.New(),
+		OrgID:         uuid.New(),
+		ParentID:      &parentID,
+		AccountNumber: 1010,
+		Name:          "Operating Cash",
+		AccountType:   "asset",
+		IsHeader:      false,
+		IsSystem:      true,
+		Description:   &desc,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+
+	data, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("json.Marshal error: %v", err)
+	}
+
+	var decoded fin.GLAccount
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal error: %v", err)
+	}
+
+	if decoded.ID != original.ID {
+		t.Errorf("ID: got %v, want %v", decoded.ID, original.ID)
+	}
+	if decoded.OrgID != original.OrgID {
+		t.Errorf("OrgID: got %v, want %v", decoded.OrgID, original.OrgID)
+	}
+	if decoded.ParentID == nil || *decoded.ParentID != parentID {
+		t.Errorf("ParentID: got %v, want %v", decoded.ParentID, parentID)
+	}
+	if decoded.AccountNumber != original.AccountNumber {
+		t.Errorf("AccountNumber: got %d, want %d", decoded.AccountNumber, original.AccountNumber)
+	}
+	if decoded.Name != original.Name {
+		t.Errorf("Name: got %q, want %q", decoded.Name, original.Name)
+	}
+	if decoded.AccountType != original.AccountType {
+		t.Errorf("AccountType: got %q, want %q", decoded.AccountType, original.AccountType)
+	}
+	if decoded.IsSystem != original.IsSystem {
+		t.Errorf("IsSystem: got %v, want %v", decoded.IsSystem, original.IsSystem)
+	}
+	if decoded.Description == nil || *decoded.Description != desc {
+		t.Errorf("Description: got %v, want %q", decoded.Description, desc)
+	}
+	if !decoded.CreatedAt.Equal(original.CreatedAt) {
+		t.Errorf("CreatedAt: got %v, want %v", decoded.CreatedAt, original.CreatedAt)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GLJournalEntry JSON serialization
+// ---------------------------------------------------------------------------
+
+func TestGLJournalEntry_JSONSerialization_RequiredFieldsPresent(t *testing.T) {
+	id := uuid.MustParse("00000000-0000-0000-0000-000000000041")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000042")
+	postedBy := uuid.MustParse("00000000-0000-0000-0000-000000000043")
+	now := time.Now().UTC().Truncate(time.Second)
+
+	je := fin.GLJournalEntry{
+		ID:          id,
+		OrgID:       orgID,
+		EntryNumber: 1,
+		EntryDate:   now,
+		Memo:        "Opening balances",
+		PostedBy:    postedBy,
+		IsReversal:  false,
+		CreatedAt:   now,
+	}
+
+	data, err := json.Marshal(je)
+	if err != nil {
+		t.Fatalf("json.Marshal(GLJournalEntry) error: %v", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("json.Unmarshal error: %v", err)
+	}
+
+	requiredKeys := []string{"id", "org_id", "entry_number", "entry_date", "memo", "posted_by", "is_reversal", "created_at"}
+	for _, key := range requiredKeys {
+		if _, ok := result[key]; !ok {
+			t.Errorf("expected JSON key %q to be present", key)
+		}
+	}
+}
+
+func TestGLJournalEntry_JSONSerialization_OmitsNilOptionalFields(t *testing.T) {
+	now := time.Now().UTC()
+
+	je := fin.GLJournalEntry{
+		ID:          uuid.New(),
+		OrgID:       uuid.New(),
+		EntryNumber: 1,
+		EntryDate:   now,
+		Memo:        "Test entry",
+		PostedBy:    uuid.New(),
+		CreatedAt:   now,
+	}
+
+	data, err := json.Marshal(je)
+	if err != nil {
+		t.Fatalf("json.Marshal error: %v", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("json.Unmarshal error: %v", err)
+	}
+
+	omittedKeys := []string{"source_type", "source_id", "unit_id", "reversed_by", "lines"}
+	for _, key := range omittedKeys {
+		if _, ok := result[key]; ok {
+			t.Errorf("expected JSON key %q to be omitted when nil/empty", key)
+		}
+	}
+}
+
+func TestGLJournalEntry_JSONSerialization_OptionalFieldsIncludedWhenSet(t *testing.T) {
+	now := time.Now().UTC()
+	sourceType := "assessment"
+	sourceID := uuid.New()
+	unitID := uuid.New()
+
+	je := fin.GLJournalEntry{
+		ID:          uuid.New(),
+		OrgID:       uuid.New(),
+		EntryNumber: 5,
+		EntryDate:   now,
+		Memo:        "Assessment charge",
+		SourceType:  &sourceType,
+		SourceID:    &sourceID,
+		UnitID:      &unitID,
+		PostedBy:    uuid.New(),
+		CreatedAt:   now,
+		Lines: []fin.GLJournalLine{
+			{
+				ID:             uuid.New(),
+				JournalEntryID: uuid.New(),
+				AccountID:      uuid.New(),
+				DebitCents:     10000,
+				CreditCents:    0,
+			},
+		},
+	}
+
+	data, err := json.Marshal(je)
+	if err != nil {
+		t.Fatalf("json.Marshal error: %v", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("json.Unmarshal error: %v", err)
+	}
+
+	presentKeys := []string{"source_type", "source_id", "unit_id", "lines"}
+	for _, key := range presentKeys {
+		if _, ok := result[key]; !ok {
+			t.Errorf("expected JSON key %q to be present when set", key)
+		}
+	}
+}
+
+func TestGLJournalEntry_JSONSerialization_RoundTrip(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	sourceType := "expense"
+	sourceID := uuid.New()
+	lineMemo := "Debit office supplies"
+
+	lineID := uuid.New()
+	entryID := uuid.New()
+	accountID := uuid.New()
+
+	original := fin.GLJournalEntry{
+		ID:          entryID,
+		OrgID:       uuid.New(),
+		EntryNumber: 42,
+		EntryDate:   now,
+		Memo:        "Office supplies purchase",
+		SourceType:  &sourceType,
+		SourceID:    &sourceID,
+		PostedBy:    uuid.New(),
+		IsReversal:  false,
+		CreatedAt:   now,
+		Lines: []fin.GLJournalLine{
+			{
+				ID:             lineID,
+				JournalEntryID: entryID,
+				AccountID:      accountID,
+				DebitCents:     5000,
+				CreditCents:    0,
+				Memo:           &lineMemo,
+			},
+			{
+				ID:             uuid.New(),
+				JournalEntryID: entryID,
+				AccountID:      uuid.New(),
+				DebitCents:     0,
+				CreditCents:    5000,
+			},
+		},
+	}
+
+	data, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("json.Marshal error: %v", err)
+	}
+
+	var decoded fin.GLJournalEntry
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal error: %v", err)
+	}
+
+	if decoded.ID != original.ID {
+		t.Errorf("ID: got %v, want %v", decoded.ID, original.ID)
+	}
+	if decoded.EntryNumber != original.EntryNumber {
+		t.Errorf("EntryNumber: got %d, want %d", decoded.EntryNumber, original.EntryNumber)
+	}
+	if decoded.Memo != original.Memo {
+		t.Errorf("Memo: got %q, want %q", decoded.Memo, original.Memo)
+	}
+	if decoded.SourceType == nil || *decoded.SourceType != sourceType {
+		t.Errorf("SourceType: got %v, want %q", decoded.SourceType, sourceType)
+	}
+	if !decoded.EntryDate.Equal(original.EntryDate) {
+		t.Errorf("EntryDate: got %v, want %v", decoded.EntryDate, original.EntryDate)
+	}
+	if len(decoded.Lines) != 2 {
+		t.Fatalf("Lines: got %d, want 2", len(decoded.Lines))
+	}
+	if decoded.Lines[0].DebitCents != 5000 {
+		t.Errorf("Lines[0].DebitCents: got %d, want 5000", decoded.Lines[0].DebitCents)
+	}
+	if decoded.Lines[0].Memo == nil || *decoded.Lines[0].Memo != lineMemo {
+		t.Errorf("Lines[0].Memo: got %v, want %q", decoded.Lines[0].Memo, lineMemo)
+	}
+	if decoded.Lines[1].CreditCents != 5000 {
+		t.Errorf("Lines[1].CreditCents: got %d, want 5000", decoded.Lines[1].CreditCents)
+	}
+}
