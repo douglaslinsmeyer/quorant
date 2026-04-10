@@ -151,6 +151,23 @@ func (r *PostgresPaymentRepository) UpdatePaymentStatus(ctx context.Context, id 
 	return nil
 }
 
+// UpdatePaymentVoid marks the payment as voided, recording who voided it and when.
+func (r *PostgresPaymentRepository) UpdatePaymentVoid(ctx context.Context, id uuid.UUID, voidedBy uuid.UUID, voidedAt time.Time) error {
+	const q = `
+		UPDATE payments
+		SET status     = 'void',
+		    voided_by  = $1,
+		    voided_at  = $2,
+		    updated_at = now()
+		WHERE id = $3`
+
+	_, err := r.pool.Exec(ctx, q, voidedBy, voidedAt, id)
+	if err != nil {
+		return fmt.Errorf("fin: UpdatePaymentVoid: %w", err)
+	}
+	return nil
+}
+
 // ─── Payment Methods ──────────────────────────────────────────────────────────
 
 // CreatePaymentMethod inserts a new payment method and returns the

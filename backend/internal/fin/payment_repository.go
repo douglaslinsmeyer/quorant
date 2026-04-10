@@ -34,6 +34,9 @@ type PaymentRepository interface {
 	// given payment, and sets updated_at to now().
 	UpdatePaymentStatus(ctx context.Context, id uuid.UUID, status PaymentStatus, paidAt *time.Time) error
 
+	// UpdatePaymentVoid marks the payment as voided, recording who voided it and when.
+	UpdatePaymentVoid(ctx context.Context, id uuid.UUID, voidedBy uuid.UUID, voidedAt time.Time) error
+
 	// ── Payment Methods ───────────────────────────────────────────────────────
 
 	// CreatePaymentMethod inserts a new payment method and returns the

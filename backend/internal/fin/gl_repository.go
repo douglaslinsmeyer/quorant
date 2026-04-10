@@ -56,6 +56,14 @@ type GLRepository interface {
 	// slice when none exist.
 	ListJournalEntriesByOrg(ctx context.Context, orgID uuid.UUID) ([]GLJournalEntry, error)
 
+	// FindJournalEntriesBySource returns all journal entries whose source_type
+	// and source_id match the given values. Returns an empty (non-nil) slice
+	// when none exist.
+	FindJournalEntriesBySource(ctx context.Context, sourceType GLSourceType, sourceID uuid.UUID) ([]GLJournalEntry, error)
+
+	// UpdateJournalEntryReversedBy sets the reversed_by field on the given journal entry.
+	UpdateJournalEntryReversedBy(ctx context.Context, entryID, reversalID uuid.UUID) error
+
 	// ── Reporting ────────────────────────────────────────────────────
 
 	// GetTrialBalance returns debit and credit totals for every account

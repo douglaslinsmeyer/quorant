@@ -2,6 +2,7 @@ package fin
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -79,6 +80,22 @@ type AssessmentRepository interface {
 	// GetUnitBalance returns the balance_cents from the most recent ledger
 	// entry for the given unit, or 0 if no entries exist.
 	GetUnitBalance(ctx context.Context, unitID uuid.UUID) (int64, error)
+
+	// FindLedgerEntryByID returns the ledger entry with the given id, or nil, nil if not found.
+	FindLedgerEntryByID(ctx context.Context, id uuid.UUID) (*LedgerEntry, error)
+
+	// FindLedgerEntriesByAssessment returns all ledger entries linked to the given assessment.
+	FindLedgerEntriesByAssessment(ctx context.Context, assessmentID uuid.UUID) ([]LedgerEntry, error)
+
+	// FindLedgerEntryByPaymentRef returns the ledger entry whose reference_type is
+	// "payment" and reference_id matches paymentID, or nil, nil if not found.
+	FindLedgerEntryByPaymentRef(ctx context.Context, paymentID uuid.UUID) (*LedgerEntry, error)
+
+	// UpdateLedgerEntryReversedBy sets the reversed_by_entry_id field on the given entry.
+	UpdateLedgerEntryReversedBy(ctx context.Context, entryID, reversalEntryID uuid.UUID) error
+
+	// UpdateAssessmentStatus updates the status and void metadata on an assessment.
+	UpdateAssessmentStatus(ctx context.Context, id uuid.UUID, status AssessmentStatus, voidedBy *uuid.UUID, voidedAt *time.Time) error
 
 	// WithTx returns a copy of the repository that runs queries against the
 	// given transaction. Used by UnitOfWork to enlist the repo in a shared tx.

@@ -209,6 +209,63 @@ func (m *mockAssessmentRepo) GetUnitBalance(_ context.Context, unitID uuid.UUID)
 	return balance, nil
 }
 
+func (m *mockAssessmentRepo) FindLedgerEntryByID(_ context.Context, id uuid.UUID) (*fin.LedgerEntry, error) {
+	for i := range m.ledger {
+		if m.ledger[i].ID == id {
+			out := m.ledger[i]
+			return &out, nil
+		}
+	}
+	return nil, nil
+}
+
+func (m *mockAssessmentRepo) FindLedgerEntriesByAssessment(_ context.Context, assessmentID uuid.UUID) ([]fin.LedgerEntry, error) {
+	var result []fin.LedgerEntry
+	for _, e := range m.ledger {
+		if e.AssessmentID != nil && *e.AssessmentID == assessmentID {
+			result = append(result, e)
+		}
+	}
+	if result == nil {
+		return []fin.LedgerEntry{}, nil
+	}
+	return result, nil
+}
+
+func (m *mockAssessmentRepo) FindLedgerEntryByPaymentRef(_ context.Context, paymentID uuid.UUID) (*fin.LedgerEntry, error) {
+	for i := range m.ledger {
+		e := &m.ledger[i]
+		if e.ReferenceType != nil && *e.ReferenceType == fin.LedgerRefTypePayment &&
+			e.ReferenceID != nil && *e.ReferenceID == paymentID {
+			out := *e
+			return &out, nil
+		}
+	}
+	return nil, nil
+}
+
+func (m *mockAssessmentRepo) UpdateLedgerEntryReversedBy(_ context.Context, entryID, reversalEntryID uuid.UUID) error {
+	for i := range m.ledger {
+		if m.ledger[i].ID == entryID {
+			m.ledger[i].ReversedByEntryID = &reversalEntryID
+			return nil
+		}
+	}
+	return nil
+}
+
+func (m *mockAssessmentRepo) UpdateAssessmentStatus(_ context.Context, id uuid.UUID, status fin.AssessmentStatus, voidedBy *uuid.UUID, voidedAt *time.Time) error {
+	for i := range m.assessments {
+		if m.assessments[i].ID == id {
+			m.assessments[i].Status = status
+			m.assessments[i].VoidedBy = voidedBy
+			m.assessments[i].VoidedAt = voidedAt
+			return nil
+		}
+	}
+	return nil
+}
+
 func (m *mockAssessmentRepo) WithTx(_ pgx.Tx) fin.AssessmentRepository { return m }
 
 // mockPaymentRepo is an in-memory implementation of PaymentRepository.
@@ -271,6 +328,18 @@ func (m *mockPaymentRepo) UpdatePaymentStatus(_ context.Context, id uuid.UUID, s
 		if m.payments[i].ID == id {
 			m.payments[i].Status = status
 			m.payments[i].PaidAt = paidAt
+			return nil
+		}
+	}
+	return nil
+}
+
+func (m *mockPaymentRepo) UpdatePaymentVoid(_ context.Context, id uuid.UUID, voidedBy uuid.UUID, voidedAt time.Time) error {
+	for i := range m.payments {
+		if m.payments[i].ID == id {
+			m.payments[i].Status = fin.PaymentStatusVoid
+			m.payments[i].VoidedBy = &voidedBy
+			m.payments[i].VoidedAt = &voidedAt
 			return nil
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -538,6 +539,98 @@ func (r *PostgresAssessmentRepository) GetUnitBalance(ctx context.Context, unitI
 		return 0, fmt.Errorf("fin: GetUnitBalance: %w", err)
 	}
 	return balance, nil
+}
+
+// FindLedgerEntryByID returns the ledger entry with the given id, or nil, nil if not found.
+func (r *PostgresAssessmentRepository) FindLedgerEntryByID(ctx context.Context, id uuid.UUID) (*LedgerEntry, error) {
+	const q = `
+		SELECT id, org_id, currency_code, unit_id, assessment_id, entry_type, amount_cents,
+		       balance_cents, description, reference_type, reference_id,
+		       effective_date, created_at
+		FROM ledger_entries
+		WHERE id = $1`
+
+	row := r.pool.QueryRow(ctx, q, id)
+	result, err := scanLedgerEntry(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("fin: FindLedgerEntryByID: %w", err)
+	}
+	return result, nil
+}
+
+// FindLedgerEntriesByAssessment returns all ledger entries linked to the given assessment.
+func (r *PostgresAssessmentRepository) FindLedgerEntriesByAssessment(ctx context.Context, assessmentID uuid.UUID) ([]LedgerEntry, error) {
+	const q = `
+		SELECT id, org_id, currency_code, unit_id, assessment_id, entry_type, amount_cents,
+		       balance_cents, description, reference_type, reference_id,
+		       effective_date, created_at
+		FROM ledger_entries
+		WHERE assessment_id = $1
+		ORDER BY effective_date ASC, created_at ASC`
+
+	rows, err := r.pool.Query(ctx, q, assessmentID)
+	if err != nil {
+		return nil, fmt.Errorf("fin: FindLedgerEntriesByAssessment: %w", err)
+	}
+	defer rows.Close()
+
+	return collectLedgerEntries(rows, "FindLedgerEntriesByAssessment")
+}
+
+// FindLedgerEntryByPaymentRef returns the ledger entry whose reference_type is
+// "payment" and reference_id matches paymentID, or nil, nil if not found.
+func (r *PostgresAssessmentRepository) FindLedgerEntryByPaymentRef(ctx context.Context, paymentID uuid.UUID) (*LedgerEntry, error) {
+	const q = `
+		SELECT id, org_id, currency_code, unit_id, assessment_id, entry_type, amount_cents,
+		       balance_cents, description, reference_type, reference_id,
+		       effective_date, created_at
+		FROM ledger_entries
+		WHERE reference_type = 'payment' AND reference_id = $1
+		LIMIT 1`
+
+	row := r.pool.QueryRow(ctx, q, paymentID)
+	result, err := scanLedgerEntry(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("fin: FindLedgerEntryByPaymentRef: %w", err)
+	}
+	return result, nil
+}
+
+// UpdateLedgerEntryReversedBy sets the reversed_by_entry_id field on the given entry.
+func (r *PostgresAssessmentRepository) UpdateLedgerEntryReversedBy(ctx context.Context, entryID, reversalEntryID uuid.UUID) error {
+	const q = `
+		UPDATE ledger_entries
+		SET reversed_by_entry_id = $1
+		WHERE id = $2`
+
+	_, err := r.pool.Exec(ctx, q, reversalEntryID, entryID)
+	if err != nil {
+		return fmt.Errorf("fin: UpdateLedgerEntryReversedBy: %w", err)
+	}
+	return nil
+}
+
+// UpdateAssessmentStatus updates the status and void metadata on an assessment.
+func (r *PostgresAssessmentRepository) UpdateAssessmentStatus(ctx context.Context, id uuid.UUID, status AssessmentStatus, voidedBy *uuid.UUID, voidedAt *time.Time) error {
+	const q = `
+		UPDATE assessments
+		SET status     = $1,
+		    voided_by  = $2,
+		    voided_at  = $3,
+		    updated_at = now()
+		WHERE id = $4`
+
+	_, err := r.pool.Exec(ctx, q, status, voidedBy, voidedAt, id)
+	if err != nil {
+		return fmt.Errorf("fin: UpdateAssessmentStatus: %w", err)
+	}
+	return nil
 }
 
 // ─── Scan helpers ─────────────────────────────────────────────────────────────

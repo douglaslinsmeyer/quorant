@@ -170,6 +170,31 @@ func (m *mockGLRepo) HasPostedLines(_ context.Context, accountID uuid.UUID) (boo
 	return false, nil
 }
 
+func (m *mockGLRepo) FindJournalEntriesBySource(_ context.Context, sourceType fin.GLSourceType, sourceID uuid.UUID) ([]fin.GLJournalEntry, error) {
+	var result []fin.GLJournalEntry
+	for _, e := range m.entries {
+		if e.SourceType != nil && *e.SourceType == sourceType && e.SourceID != nil && *e.SourceID == sourceID {
+			cp := *e
+			cp.Lines = make([]fin.GLJournalLine, len(e.Lines))
+			copy(cp.Lines, e.Lines)
+			result = append(result, cp)
+		}
+	}
+	if result == nil {
+		return []fin.GLJournalEntry{}, nil
+	}
+	return result, nil
+}
+
+func (m *mockGLRepo) UpdateJournalEntryReversedBy(_ context.Context, entryID, reversalID uuid.UUID) error {
+	e, ok := m.entries[entryID]
+	if !ok {
+		return nil
+	}
+	e.ReversedBy = &reversalID
+	return nil
+}
+
 func (m *mockGLRepo) WithTx(_ pgx.Tx) fin.GLRepository { return m }
 
 // ── Helper ───────────────────────────────────────────────────────────────────

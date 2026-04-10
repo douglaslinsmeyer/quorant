@@ -299,6 +299,39 @@ func (r *PostgresGLRepository) ListJournalEntriesByOrg(ctx context.Context, orgI
 	return collectGLJournalEntries(rows, "ListJournalEntriesByOrg")
 }
 
+// FindJournalEntriesBySource returns all journal entries whose source_type
+// and source_id match the given values. Lines are NOT loaded.
+func (r *PostgresGLRepository) FindJournalEntriesBySource(ctx context.Context, sourceType GLSourceType, sourceID uuid.UUID) ([]GLJournalEntry, error) {
+	const q = `
+		SELECT id, org_id, entry_number, entry_date, memo, source_type,
+		       source_id, unit_id, posted_by, reversed_by, is_reversal, created_at
+		FROM gl_journal_entries
+		WHERE source_type = $1 AND source_id = $2
+		ORDER BY entry_number ASC`
+
+	rows, err := r.pool.Query(ctx, q, sourceType, sourceID)
+	if err != nil {
+		return nil, fmt.Errorf("fin: FindJournalEntriesBySource: %w", err)
+	}
+	defer rows.Close()
+
+	return collectGLJournalEntries(rows, "FindJournalEntriesBySource")
+}
+
+// UpdateJournalEntryReversedBy sets the reversed_by field on the given journal entry.
+func (r *PostgresGLRepository) UpdateJournalEntryReversedBy(ctx context.Context, entryID, reversalID uuid.UUID) error {
+	const q = `
+		UPDATE gl_journal_entries
+		SET reversed_by = $1
+		WHERE id = $2`
+
+	_, err := r.pool.Exec(ctx, q, reversalID, entryID)
+	if err != nil {
+		return fmt.Errorf("fin: UpdateJournalEntryReversedBy: %w", err)
+	}
+	return nil
+}
+
 // ─── Reporting ───────────────────────────────────────────────────────────────
 
 // GetTrialBalance returns debit and credit totals for every account with
