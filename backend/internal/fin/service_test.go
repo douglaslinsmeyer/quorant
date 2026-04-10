@@ -1144,7 +1144,7 @@ func TestCreateAssessment_PostsJournalEntry(t *testing.T) {
 	glRepo.accounts[arAccount.ID] = arAccount
 	glRepo.accounts[revenueAccount.ID] = revenueAccount
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, fin.NewGaapEngine(), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 
 	unitID := uuid.New()
 	req := fin.CreateAssessmentRequest{
@@ -1199,7 +1199,7 @@ func TestCreateAssessment_GLFailureReturnsError(t *testing.T) {
 	glRepo.SetAccounts(arAccount, revenueAccount)
 	glRepo.SetPostError(fmt.Errorf("simulated GL failure"))
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, fin.NewGaapEngine(), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 
 	_, err := svc.CreateAssessment(context.Background(), orgID, fin.CreateAssessmentRequest{
 		UnitID:      uuid.New(),
@@ -1239,7 +1239,7 @@ func TestRecordPayment_PostsJournalEntry(t *testing.T) {
 	glRepo.accounts[cashAccount.ID] = cashAccount
 	glRepo.accounts[arAccount.ID] = arAccount
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, fin.NewGaapEngine(), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 
 	unitID := uuid.New()
 	userID := uuid.New()
@@ -1318,7 +1318,7 @@ func TestRecordPayment_GLFailureReturnsError(t *testing.T) {
 	glRepo.SetAccounts(cashAccount, arAccount)
 	glRepo.SetPostError(fmt.Errorf("simulated GL failure"))
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, fin.NewGaapEngine(), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 
 	desc := "Test payment"
 	_, err := svc.RecordPayment(context.Background(), orgID, userID, fin.CreatePaymentRequest{
@@ -1358,7 +1358,7 @@ func TestCreateFundTransfer_GLFailureReturnsError(t *testing.T) {
 	glRepo.SetAccounts(fromCash, toCash, transferOut, transferIn)
 	glRepo.SetPostError(fmt.Errorf("simulated GL failure"))
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, fin.NewGaapEngine(), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 
 	desc := "Test transfer"
 	_, err := svc.CreateFundTransfer(context.Background(), orgID, fin.CreateFundTransferRequest{

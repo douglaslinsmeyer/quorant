@@ -238,20 +238,24 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 		return nil, fmt.Errorf("fin: CreateAssessment ledger entry: %w", err)
 	}
 
-	// Post GL journal entry: Debit AR / Credit Revenue.
-	if gl != nil {
-		arAccount, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, 1100)
-		revenueAccount, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, 4010)
-		if arAccount != nil && revenueAccount != nil {
-			sourceType := GLSourceTypeAssessment
-			lines := []GLJournalLine{
-				{AccountID: arAccount.ID, DebitCents: created.AmountCents, CreditCents: 0},
-				{AccountID: revenueAccount.ID, DebitCents: 0, CreditCents: created.AmountCents},
-			}
-			memo := fmt.Sprintf("Assessment: %s", created.Description)
-			if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, created.DueDate, memo, &sourceType, &created.ID, &req.UnitID, lines); glErr != nil {
-				return nil, fmt.Errorf("fin: CreateAssessment GL entry: %w", glErr)
-			}
+	// Post GL journal entry via accounting engine.
+	if gl != nil && s.engine != nil {
+		ftx := FinancialTransaction{
+			Type:          TxTypeAssessment,
+			OrgID:         orgID,
+			AmountCents:   created.AmountCents,
+			EffectiveDate: created.DueDate,
+			SourceID:      created.ID,
+			UnitID:        &req.UnitID,
+			Memo:          fmt.Sprintf("Assessment: %s", created.Description),
+		}
+		lines, glErr := s.engine.JournalLines(ctx, gl, ftx)
+		if glErr != nil {
+			return nil, fmt.Errorf("fin: CreateAssessment GL entry: %w", glErr)
+		}
+		sourceType := GLSourceTypeAssessment
+		if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, created.DueDate, ftx.Memo, &sourceType, &created.ID, &req.UnitID, lines); glErr != nil {
+			return nil, fmt.Errorf("fin: CreateAssessment GL entry: %w", glErr)
 		}
 	}
 
@@ -377,23 +381,28 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 		return nil, fmt.Errorf("fin: RecordPayment ledger entry: %w", err)
 	}
 
-	// Post GL journal entry: Debit Cash / Credit AR.
-	if gl != nil {
-		cashAccount, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, 1010)
-		arAccount, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, 1100)
-		if cashAccount != nil && arAccount != nil {
-			sourceType := GLSourceTypePayment
-			memo := "Payment received"
-			if req.Description != nil {
-				memo = *req.Description
-			}
-			lines := []GLJournalLine{
-				{AccountID: cashAccount.ID, DebitCents: created.AmountCents, CreditCents: 0},
-				{AccountID: arAccount.ID, DebitCents: 0, CreditCents: created.AmountCents},
-			}
-			if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, userID, now, memo, &sourceType, &created.ID, &req.UnitID, lines); glErr != nil {
-				return nil, fmt.Errorf("fin: RecordPayment GL entry: %w", glErr)
-			}
+	// Post GL journal entry via accounting engine.
+	if gl != nil && s.engine != nil {
+		memo := "Payment received"
+		if req.Description != nil {
+			memo = *req.Description
+		}
+		ftx := FinancialTransaction{
+			Type:          TxTypePayment,
+			OrgID:         orgID,
+			AmountCents:   created.AmountCents,
+			EffectiveDate: now,
+			SourceID:      created.ID,
+			UnitID:        &req.UnitID,
+			Memo:          memo,
+		}
+		lines, glErr := s.engine.JournalLines(ctx, gl, ftx)
+		if glErr != nil {
+			return nil, fmt.Errorf("fin: RecordPayment GL entry: %w", glErr)
+		}
+		sourceType := GLSourceTypePayment
+		if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, userID, now, ftx.Memo, &sourceType, &created.ID, &req.UnitID, lines); glErr != nil {
+			return nil, fmt.Errorf("fin: RecordPayment GL entry: %w", glErr)
 		}
 	}
 
@@ -811,31 +820,32 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 		return nil, fmt.Errorf("fin: CreateFundTransfer credit destination fund: %w", err)
 	}
 
-	// Post GL journal entry for both sides of the inter-fund transfer.
-	if gl != nil {
+	// Post GL journal entry via accounting engine.
+	if gl != nil && s.engine != nil {
 		fromFund, _ := funds.FindFundByID(ctx, req.FromFundID)
 		toFund, _ := funds.FindFundByID(ctx, req.ToFundID)
 		if fromFund != nil && toFund != nil {
-			fromCashNum := cashAccountForFundType(fromFund.FundType)
-			toCashNum := cashAccountForFundType(toFund.FundType)
-
-			fromCash, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, fromCashNum)
-			toCash, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, toCashNum)
-			transferOut, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, 3100)
-			transferIn, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, 3110)
-
-			if fromCash != nil && toCash != nil && transferOut != nil && transferIn != nil {
-				sourceType := GLSourceTypeTransfer
-				memo := fmt.Sprintf("Transfer: %s to %s", fromFund.Name, toFund.Name)
-				lines := []GLJournalLine{
-					{AccountID: transferOut.ID, DebitCents: req.AmountCents, CreditCents: 0},
-					{AccountID: fromCash.ID, DebitCents: 0, CreditCents: req.AmountCents},
-					{AccountID: toCash.ID, DebitCents: req.AmountCents, CreditCents: 0},
-					{AccountID: transferIn.ID, DebitCents: 0, CreditCents: req.AmountCents},
-				}
-				if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, now, memo, &sourceType, &created.ID, nil, lines); glErr != nil {
-					return nil, fmt.Errorf("fin: CreateFundTransfer GL entry: %w", glErr)
-				}
+			ftx := FinancialTransaction{
+				Type:          TxTypeFundTransfer,
+				OrgID:         orgID,
+				AmountCents:   req.AmountCents,
+				EffectiveDate: now,
+				SourceID:      created.ID,
+				Memo:          fmt.Sprintf("Transfer: %s to %s", fromFund.Name, toFund.Name),
+				Metadata: map[string]any{
+					"from_fund_type": string(fromFund.FundType),
+					"to_fund_type":   string(toFund.FundType),
+					"from_fund_name": fromFund.Name,
+					"to_fund_name":   toFund.Name,
+				},
+			}
+			lines, glErr := s.engine.JournalLines(ctx, gl, ftx)
+			if glErr != nil {
+				return nil, fmt.Errorf("fin: CreateFundTransfer GL entry: %w", glErr)
+			}
+			sourceType := GLSourceTypeTransfer
+			if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, now, ftx.Memo, &sourceType, &created.ID, nil, lines); glErr != nil {
+				return nil, fmt.Errorf("fin: CreateFundTransfer GL entry: %w", glErr)
 			}
 		}
 	}
