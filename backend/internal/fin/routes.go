@@ -52,6 +52,7 @@ func RegisterRoutes(
 	mux.Handle("POST /api/v1/organizations/{org_id}/payments", permMw("fin.payment.create", paymentHandler.RecordPayment))
 	mux.Handle("GET /api/v1/organizations/{org_id}/payments", permMw("fin.payment.read", paymentHandler.ListPayments))
 	mux.Handle("GET /api/v1/organizations/{org_id}/payments/{payment_id}", permMw("fin.payment.read", paymentHandler.GetPayment))
+	mux.Handle("POST /api/v1/organizations/{org_id}/payments/{payment_id}/void", permMw("fin.payment.void", paymentHandler.VoidPayment))
 
 	// Payment Methods
 	mux.Handle("POST /api/v1/organizations/{org_id}/payment-methods", permMw("fin.payment_method.manage", paymentHandler.AddPaymentMethod))

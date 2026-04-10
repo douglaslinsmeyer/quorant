@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // AssessmentHandler handles HTTP requests for assessment schedules, assessments,
@@ -268,8 +269,9 @@ func (h *AssessmentHandler) DeleteAssessment(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := h.service.DeleteAssessment(r.Context(), assessmentID); err != nil {
-		h.logger.Error("DeleteAssessment failed", "assessment_id", assessmentID, "error", err)
+	userID := middleware.UserIDFromContext(r.Context())
+	if err := h.service.VoidAssessment(r.Context(), assessmentID, userID); err != nil {
+		h.logger.Error("VoidAssessment failed", "assessment_id", assessmentID, "error", err)
 		api.WriteError(w, err)
 		return
 	}
