@@ -52,12 +52,21 @@ func (p *OutboxPoller) Start(ctx context.Context) error {
 
 // poll fetches a batch of unpublished events and publishes them.
 func (p *OutboxPoller) poll(ctx context.Context) error {
-	rows, err := p.pool.Query(ctx, `
+	// Use a transaction with FOR UPDATE SKIP LOCKED to prevent duplicate
+	// publishing when multiple worker instances poll concurrently.
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("beginning poll transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	rows, err := tx.Query(ctx, `
 		SELECT event_id, event_type, aggregate_type, aggregate_id, org_id, payload, metadata, occurred_at
 		FROM domain_events
 		WHERE published_at IS NULL
 		ORDER BY occurred_at ASC
 		LIMIT $1
+		FOR UPDATE SKIP LOCKED
 	`, p.batchSize)
 	if err != nil {
 		return fmt.Errorf("querying unpublished events: %w", err)
@@ -94,7 +103,7 @@ func (p *OutboxPoller) poll(ctx context.Context) error {
 			continue
 		}
 
-		_, err := p.pool.Exec(ctx, `
+		_, err := tx.Exec(ctx, `
 			UPDATE domain_events SET published_at = now() WHERE event_id = $1
 		`, event.ID)
 		if err != nil {
@@ -102,6 +111,10 @@ func (p *OutboxPoller) poll(ctx context.Context) error {
 			continue
 		}
 		published++
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("committing poll transaction: %w", err)
 	}
 
 	if published > 0 {

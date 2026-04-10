@@ -154,10 +154,13 @@ func TestDashboard_Handler(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var envelope struct {
-		Data map[string]string `json:"data"`
+		Data map[string]any `json:"data"`
 	}
 	decodeTaskBody(t, resp, &envelope)
-	assert.Equal(t, "dashboard coming soon", envelope.Data["message"])
+	assert.Contains(t, envelope.Data, "total")
+	assert.Contains(t, envelope.Data, "by_status")
+	assert.Contains(t, envelope.Data, "overdue")
+	assert.Contains(t, envelope.Data, "sla_breached")
 }
 
 // ---------------------------------------------------------------------------

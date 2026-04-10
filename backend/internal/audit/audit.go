@@ -19,7 +19,7 @@ type AuditEntry struct {
 	Module         string            `json:"module"` // e.g., "fin"
 	BeforeState    json.RawMessage   `json:"before_state,omitempty"`
 	AfterState     json.RawMessage   `json:"after_state,omitempty"`
-	Metadata       map[string]string `json:"metadata,omitempty"`
+	Metadata       map[string]any `json:"metadata,omitempty"`
 	OccurredAt     time.Time         `json:"occurred_at"`
 }
 

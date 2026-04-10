@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"bytes"
+	"encoding/json"
 	"context"
 	"fmt"
 	"log/slog"
@@ -125,6 +126,11 @@ func (r *Relay) handleMessage(ctx context.Context, msg jetstream.Msg) {
 
 // deliver POSTs the event payload to a subscription's target URL and records the delivery.
 func (r *Relay) deliver(ctx context.Context, sub Subscription, payload []byte, eventType string) {
+	// Extract real event ID from payload if possible.
+	var eventPayload struct {
+		EventID uuid.UUID `json:"event_id"`
+	}
+	_ = json.Unmarshal(payload, &eventPayload) // best-effort; zero UUID if missing
 	// SSRF guard: reject private/reserved IP targets.
 	checker := r.ssrfChecker
 	if checker == nil {
@@ -155,7 +161,7 @@ func (r *Relay) deliver(ctx context.Context, sub Subscription, payload []byte, e
 	delivery := &Delivery{
 		ID:             uuid.New(),
 		SubscriptionID: sub.ID,
-		EventID:        uuid.New(), // placeholder; real event ID extracted by caller if needed
+		EventID:        eventPayload.EventID, // extracted from payload; zero UUID if not present
 		EventType:      eventType,
 		Attempts:       1,
 		LastAttemptAt:  &now,

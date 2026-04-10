@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Config is the root configuration struct for the Quorant backend service.
@@ -228,4 +229,17 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// CORSConfig holds CORS settings.
+// In production, AllowedOrigins should be restricted to known domains.
+func (c Config) CORSAllowedOrigins() []string {
+	origins := getEnv("CORS_ALLOWED_ORIGINS", "")
+	if origins == "" {
+		if c.Server.Environment == "production" {
+			return []string{"https://app.quorant.net", "https://manage.quorant.net"}
+		}
+		return []string{"*"}
+	}
+	return strings.Split(origins, ",")
 }

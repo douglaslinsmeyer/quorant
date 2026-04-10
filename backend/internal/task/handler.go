@@ -2,6 +2,7 @@ package task
 
 import (
 	"log/slog"
+	"time"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -38,9 +39,39 @@ func (h *TaskHandler) ListMyTasks(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, http.StatusOK, tasks)
 }
 
-// Dashboard handles GET /api/v1/tasks/dashboard — placeholder response.
+// Dashboard handles GET /api/v1/tasks/dashboard — aggregated task metrics.
 func (h *TaskHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
-	api.WriteJSON(w, http.StatusOK, map[string]string{"message": "dashboard coming soon"})
+	userID := callerID(r)
+
+	tasks, err := h.service.ListMyTasks(r.Context(), userID)
+	if err != nil {
+		api.WriteError(w, api.NewInternalError(err))
+		return
+	}
+
+	// Aggregate counts by status
+	counts := map[string]int{
+		"open": 0, "assigned": 0, "in_progress": 0, "blocked": 0,
+		"review": 0, "completed": 0, "cancelled": 0,
+	}
+	overdue := 0
+	slaBreach := 0
+	for _, t := range tasks {
+		counts[t.Status]++
+		if t.DueAt != nil && t.DueAt.Before(time.Now()) && t.Status != "completed" && t.Status != "cancelled" {
+			overdue++
+		}
+		if t.SLABreached {
+			slaBreach++
+		}
+	}
+
+	api.WriteJSON(w, http.StatusOK, map[string]any{
+		"total":         len(tasks),
+		"by_status":     counts,
+		"overdue":       overdue,
+		"sla_breached":  slaBreach,
+	})
 }
 
 // ---------------------------------------------------------------------------

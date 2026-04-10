@@ -90,8 +90,8 @@ func (c *Consumer) consume(ctx context.Context, consumer jetstream.Consumer, reg
 		default:
 		}
 
-		// Fetch one message at a time with a short timeout.
-		msgs, err := consumer.Fetch(1, jetstream.FetchMaxWait(1*time.Second))
+		// Fetch a batch of messages for throughput.
+		msgs, err := consumer.Fetch(10, jetstream.FetchMaxWait(2*time.Second))
 		if err != nil {
 			if ctx.Err() != nil {
 				return // context cancelled

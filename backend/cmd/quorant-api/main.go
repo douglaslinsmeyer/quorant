@@ -193,13 +193,16 @@ func run() error {
 	budgetRepo := fin.NewPostgresBudgetRepository(pool)
 	fundRepo := fin.NewPostgresFundRepository(pool)
 	collectionRepo := fin.NewPostgresCollectionRepository(pool)
-	finService := fin.NewFinService(assessmentRepo, paymentRepo, budgetRepo, fundRepo, collectionRepo, auditor, outboxPublisher, policyResolver, logger)
+	glRepo := fin.NewPostgresGLRepository(pool)
+	glService := fin.NewGLService(glRepo, auditor, logger)
+	finService := fin.NewFinService(assessmentRepo, paymentRepo, budgetRepo, fundRepo, collectionRepo, glService, auditor, outboxPublisher, policyResolver, logger)
 	assessmentHandler := fin.NewAssessmentHandler(finService, logger)
 	paymentHandler := fin.NewPaymentHandler(finService, logger)
 	budgetHandler := fin.NewBudgetHandler(finService, logger)
 	fundHandler := fin.NewFundHandler(finService, logger)
 	collectionHandler := fin.NewCollectionHandler(finService, logger)
-	fin.RegisterRoutes(mux, assessmentHandler, paymentHandler, budgetHandler, fundHandler, collectionHandler, tokenValidator, permChecker, resolveUserID)
+	glHandler := fin.NewGLHandler(glService, logger)
+	fin.RegisterRoutes(mux, assessmentHandler, paymentHandler, budgetHandler, fundHandler, collectionHandler, glHandler, tokenValidator, permChecker, resolveUserID)
 
 	// Gov module
 	violationRepo := gov.NewPostgresViolationRepository(pool)
@@ -284,7 +287,7 @@ func run() error {
 	handler = middleware.RequestID(handler)
 	handler = middleware.Metrics(handler)  // after RequestID, before Tracing
 	handler = middleware.Tracing(handler)  // outermost: creates root span before RequestID
-	handler = middleware.CORS([]string{"*"}, handler) // permissive for dev; configured per-env in production
+	handler = middleware.CORS(cfg.CORSAllowedOrigins(), handler) // permissive for dev; configured per-env in production
 
 	// 11. HTTP server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
