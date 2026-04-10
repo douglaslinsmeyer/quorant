@@ -577,10 +577,12 @@ func TestGLService_ReverseJournalEntry_AlreadyReversed(t *testing.T) {
 	_, err = svc.ReverseJournalEntry(ctx, original.ID, uuid.New())
 	require.NoError(t, err)
 
-	// Attempt to reverse again — should fail.
+	// Attempt to reverse again — should fail with a validation error.
 	_, err = svc.ReverseJournalEntry(ctx, original.ID, uuid.New())
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "already reversed")
+	var valErr *api.ValidationError
+	require.ErrorAs(t, err, &valErr)
+	assert.Equal(t, "fin.gl.journal_entry.already_reversed", valErr.MsgKey())
 }
 
 func TestGLService_ReverseJournalEntry_NotFound(t *testing.T) {

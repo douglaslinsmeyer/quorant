@@ -131,6 +131,7 @@ func seedAssessment(t *testing.T, repo *mockAssessmentRepo, orgID, unitID uuid.U
 		ID:          uuid.New(),
 		OrgID:       orgID,
 		UnitID:      unitID,
+		Status:      fin.AssessmentStatusPosted,
 		Description: "Q1 Assessment",
 		AmountCents: 25000,
 		DueDate:     time.Now().Add(30 * 24 * time.Hour),

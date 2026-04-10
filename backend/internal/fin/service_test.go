@@ -334,12 +334,12 @@ func (m *mockPaymentRepo) UpdatePaymentStatus(_ context.Context, id uuid.UUID, s
 	return nil
 }
 
-func (m *mockPaymentRepo) UpdatePaymentVoid(_ context.Context, id uuid.UUID, voidedBy uuid.UUID, voidedAt time.Time) error {
+func (m *mockPaymentRepo) UpdatePaymentVoid(_ context.Context, id uuid.UUID, voidedBy *uuid.UUID, voidedAt *time.Time) error {
 	for i := range m.payments {
 		if m.payments[i].ID == id {
 			m.payments[i].Status = fin.PaymentStatusVoid
-			m.payments[i].VoidedBy = &voidedBy
-			m.payments[i].VoidedAt = &voidedAt
+			m.payments[i].VoidedBy = voidedBy
+			m.payments[i].VoidedAt = voidedAt
 			return nil
 		}
 	}
@@ -1873,10 +1873,12 @@ func TestReverseLedgerEntry_AlreadyReversed(t *testing.T) {
 	_, err = svc.ReverseLedgerEntry(ctx, originalEntry.ID, reversedBy)
 	require.NoError(t, err)
 
-	// Second reversal should fail.
+	// Second reversal should fail with a validation error.
 	_, err = svc.ReverseLedgerEntry(ctx, originalEntry.ID, reversedBy)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "already reversed")
+	var valErr *api.ValidationError
+	require.ErrorAs(t, err, &valErr)
+	assert.Equal(t, "fin.ledger_entry.already_reversed", valErr.MsgKey())
 }
 
 // ── VoidAssessment Tests ────────────────────────────────────────────────────

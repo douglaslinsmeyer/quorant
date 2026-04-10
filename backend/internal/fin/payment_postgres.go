@@ -156,7 +156,8 @@ func (r *PostgresPaymentRepository) UpdatePaymentStatus(ctx context.Context, id 
 }
 
 // UpdatePaymentVoid marks the payment as voided, recording who voided it and when.
-func (r *PostgresPaymentRepository) UpdatePaymentVoid(ctx context.Context, id uuid.UUID, voidedBy uuid.UUID, voidedAt time.Time) error {
+// voidedBy may be nil when the void is triggered by a system operation.
+func (r *PostgresPaymentRepository) UpdatePaymentVoid(ctx context.Context, id uuid.UUID, voidedBy *uuid.UUID, voidedAt *time.Time) error {
 	const q = `
 		UPDATE payments
 		SET status     = 'void',

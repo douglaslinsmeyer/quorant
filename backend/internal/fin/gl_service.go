@@ -197,11 +197,11 @@ func (s *GLService) ReverseJournalEntry(ctx context.Context, entryID, reversedBy
 		return nil, err
 	}
 	if original == nil {
-		return nil, fmt.Errorf("gl: journal entry %s not found", entryID)
+		return nil, api.NewNotFoundError("fin.gl.journal_entry.not_found", api.P("id", entryID.String()))
 	}
 
 	if original.ReversedBy != nil {
-		return nil, fmt.Errorf("gl: journal entry %s already reversed", entryID)
+		return nil, api.NewValidationError("fin.gl.journal_entry.already_reversed", "id", api.P("entry_id", entryID.String()))
 	}
 
 	// Build reversal lines by swapping debits and credits.

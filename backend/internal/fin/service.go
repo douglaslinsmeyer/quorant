@@ -352,7 +352,13 @@ func (s *FinService) VoidAssessment(ctx context.Context, id uuid.UUID, voidedBy 
 
 	// Mark the assessment as void.
 	now := time.Now()
-	return s.assessments.UpdateAssessmentStatus(ctx, id, AssessmentStatusVoid, &voidedBy, &now)
+	var vbPtr *uuid.UUID
+	var vatPtr *time.Time
+	if voidedBy != uuid.Nil {
+		vbPtr = &voidedBy
+		vatPtr = &now
+	}
+	return s.assessments.UpdateAssessmentStatus(ctx, id, AssessmentStatusVoid, vbPtr, vatPtr)
 }
 
 // ── Ledger ────────────────────────────────────────────────────────────────────
@@ -381,7 +387,7 @@ func (s *FinService) ReverseLedgerEntry(ctx context.Context, entryID, reversedBy
 	}
 
 	if original.ReversedByEntryID != nil {
-		return nil, fmt.Errorf("fin: ledger entry %s already reversed", entryID)
+		return nil, api.NewValidationError("fin.ledger_entry.already_reversed", "id", api.P("entry_id", entryID.String()))
 	}
 
 	// Build description from original.
@@ -588,7 +594,13 @@ func (s *FinService) VoidPayment(ctx context.Context, id uuid.UUID, voidedBy uui
 
 	// Mark the payment as void.
 	now := time.Now()
-	return s.payments.UpdatePaymentVoid(ctx, id, voidedBy, now)
+	var vbPtr *uuid.UUID
+	var vatPtr *time.Time
+	if voidedBy != uuid.Nil {
+		vbPtr = &voidedBy
+		vatPtr = &now
+	}
+	return s.payments.UpdatePaymentVoid(ctx, id, vbPtr, vatPtr)
 }
 
 // ── Budgets ───────────────────────────────────────────────────────────────────

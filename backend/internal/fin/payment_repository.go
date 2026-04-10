@@ -35,7 +35,8 @@ type PaymentRepository interface {
 	UpdatePaymentStatus(ctx context.Context, id uuid.UUID, status PaymentStatus, paidAt *time.Time) error
 
 	// UpdatePaymentVoid marks the payment as voided, recording who voided it and when.
-	UpdatePaymentVoid(ctx context.Context, id uuid.UUID, voidedBy uuid.UUID, voidedAt time.Time) error
+	// voidedBy may be nil when the void is triggered by a system operation (e.g. assessment deletion).
+	UpdatePaymentVoid(ctx context.Context, id uuid.UUID, voidedBy *uuid.UUID, voidedAt *time.Time) error
 
 	// ── Payment Methods ───────────────────────────────────────────────────────
 
