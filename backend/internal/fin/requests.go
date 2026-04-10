@@ -25,29 +25,29 @@ type CreateAssessmentScheduleRequest struct {
 // Validate checks that all required fields are present and have valid values.
 func (r CreateAssessmentScheduleRequest) Validate() error {
 	if r.Name == "" {
-		return api.NewValidationError("name is required", "name")
+		return api.NewValidationError("validation.required", "name", api.P("field", "name"))
 	}
 	switch r.Frequency {
 	case "monthly", "quarterly", "annually", "semi_annually":
 		// valid
 	case "":
-		return api.NewValidationError("frequency is required", "frequency")
+		return api.NewValidationError("validation.required", "frequency", api.P("field", "frequency"))
 	default:
-		return api.NewValidationError("frequency must be one of: monthly, quarterly, annually, semi_annually", "frequency")
+		return api.NewValidationError("validation.one_of", "frequency", api.P("field", "frequency"), api.P("values", "monthly, quarterly, annually, semi_annually"))
 	}
 	switch r.AmountStrategy {
 	case "flat", "per_unit_type", "per_sqft", "custom":
 		// valid
 	case "":
-		return api.NewValidationError("amount_strategy is required", "amount_strategy")
+		return api.NewValidationError("validation.required", "amount_strategy", api.P("field", "amount_strategy"))
 	default:
-		return api.NewValidationError("amount_strategy must be one of: flat, per_unit_type, per_sqft, custom", "amount_strategy")
+		return api.NewValidationError("validation.one_of", "amount_strategy", api.P("field", "amount_strategy"), api.P("values", "flat, per_unit_type, per_sqft, custom"))
 	}
 	if r.BaseAmountCents <= 0 {
-		return api.NewValidationError("base_amount_cents is required", "base_amount_cents")
+		return api.NewValidationError("validation.required", "base_amount_cents", api.P("field", "base_amount_cents"))
 	}
 	if r.StartsAt.IsZero() {
-		return api.NewValidationError("starts_at is required", "starts_at")
+		return api.NewValidationError("validation.required", "starts_at", api.P("field", "starts_at"))
 	}
 	return nil
 }
@@ -65,16 +65,16 @@ type CreateAssessmentRequest struct {
 // Validate checks that all required fields are present.
 func (r CreateAssessmentRequest) Validate() error {
 	if r.UnitID == (uuid.UUID{}) {
-		return api.NewValidationError("unit_id is required", "unit_id")
+		return api.NewValidationError("validation.required", "unit_id", api.P("field", "unit_id"))
 	}
 	if r.Description == "" {
-		return api.NewValidationError("description is required", "description")
+		return api.NewValidationError("validation.required", "description", api.P("field", "description"))
 	}
 	if r.AmountCents <= 0 {
-		return api.NewValidationError("amount_cents is required", "amount_cents")
+		return api.NewValidationError("validation.required", "amount_cents", api.P("field", "amount_cents"))
 	}
 	if r.DueDate.IsZero() {
-		return api.NewValidationError("due_date is required", "due_date")
+		return api.NewValidationError("validation.required", "due_date", api.P("field", "due_date"))
 	}
 	return nil
 }
@@ -90,10 +90,10 @@ type CreatePaymentRequest struct {
 // Validate checks that unit_id is set and amount_cents is positive.
 func (r CreatePaymentRequest) Validate() error {
 	if r.UnitID == (uuid.UUID{}) {
-		return api.NewValidationError("unit_id is required", "unit_id")
+		return api.NewValidationError("validation.required", "unit_id", api.P("field", "unit_id"))
 	}
 	if r.AmountCents <= 0 {
-		return api.NewValidationError("amount_cents must be positive", "amount_cents")
+		return api.NewValidationError("validation.constraint", "amount_cents", api.P("field", "amount_cents"), api.P("constraint", "positive"))
 	}
 	return nil
 }
@@ -108,10 +108,10 @@ type CreateBudgetRequest struct {
 // Validate checks that fiscal_year and name are set.
 func (r CreateBudgetRequest) Validate() error {
 	if r.FiscalYear == 0 {
-		return api.NewValidationError("fiscal_year is required", "fiscal_year")
+		return api.NewValidationError("validation.required", "fiscal_year", api.P("field", "fiscal_year"))
 	}
 	if r.Name == "" {
-		return api.NewValidationError("name is required", "name")
+		return api.NewValidationError("validation.required", "name", api.P("field", "name"))
 	}
 	return nil
 }
@@ -131,13 +131,13 @@ type CreateExpenseRequest struct {
 // Validate checks that description, amount_cents, and expense_date are set.
 func (r CreateExpenseRequest) Validate() error {
 	if r.Description == "" {
-		return api.NewValidationError("description is required", "description")
+		return api.NewValidationError("validation.required", "description", api.P("field", "description"))
 	}
 	if r.AmountCents <= 0 {
-		return api.NewValidationError("amount_cents is required", "amount_cents")
+		return api.NewValidationError("validation.required", "amount_cents", api.P("field", "amount_cents"))
 	}
 	if r.ExpenseDate.IsZero() {
-		return api.NewValidationError("expense_date is required", "expense_date")
+		return api.NewValidationError("validation.required", "expense_date", api.P("field", "expense_date"))
 	}
 	return nil
 }
@@ -152,15 +152,15 @@ type CreateFundRequest struct {
 // Validate checks that name and fund_type are present and fund_type is valid.
 func (r CreateFundRequest) Validate() error {
 	if r.Name == "" {
-		return api.NewValidationError("name is required", "name")
+		return api.NewValidationError("validation.required", "name", api.P("field", "name"))
 	}
 	switch r.FundType {
 	case "operating", "reserve", "capital", "special":
 		// valid
 	case "":
-		return api.NewValidationError("fund_type is required", "fund_type")
+		return api.NewValidationError("validation.required", "fund_type", api.P("field", "fund_type"))
 	default:
-		return api.NewValidationError("fund_type must be one of: operating, reserve, capital, special", "fund_type")
+		return api.NewValidationError("validation.one_of", "fund_type", api.P("field", "fund_type"), api.P("values", "operating, reserve, capital, special"))
 	}
 	return nil
 }
@@ -177,13 +177,13 @@ type CreateFundTransferRequest struct {
 // Validate checks that both fund IDs and a positive amount are set.
 func (r CreateFundTransferRequest) Validate() error {
 	if r.FromFundID == (uuid.UUID{}) {
-		return api.NewValidationError("from_fund_id is required", "from_fund_id")
+		return api.NewValidationError("validation.required", "from_fund_id", api.P("field", "from_fund_id"))
 	}
 	if r.ToFundID == (uuid.UUID{}) {
-		return api.NewValidationError("to_fund_id is required", "to_fund_id")
+		return api.NewValidationError("validation.required", "to_fund_id", api.P("field", "to_fund_id"))
 	}
 	if r.AmountCents <= 0 {
-		return api.NewValidationError("amount_cents must be positive", "amount_cents")
+		return api.NewValidationError("validation.constraint", "amount_cents", api.P("field", "amount_cents"), api.P("constraint", "positive"))
 	}
 	return nil
 }
@@ -216,7 +216,7 @@ type CreateCollectionActionRequest struct {
 // Validate checks that action_type is set.
 func (r CreateCollectionActionRequest) Validate() error {
 	if r.ActionType == "" {
-		return api.NewValidationError("action_type is required", "action_type")
+		return api.NewValidationError("validation.required", "action_type", api.P("field", "action_type"))
 	}
 	return nil
 }
@@ -234,16 +234,16 @@ type CreatePaymentPlanRequest struct {
 // Validate checks that all required fields are present.
 func (r CreatePaymentPlanRequest) Validate() error {
 	if r.TotalOwedCents <= 0 {
-		return api.NewValidationError("total_owed_cents is required", "total_owed_cents")
+		return api.NewValidationError("validation.required", "total_owed_cents", api.P("field", "total_owed_cents"))
 	}
 	if r.InstallmentCents <= 0 {
-		return api.NewValidationError("installment_cents is required", "installment_cents")
+		return api.NewValidationError("validation.required", "installment_cents", api.P("field", "installment_cents"))
 	}
 	if r.InstallmentsTotal <= 0 {
-		return api.NewValidationError("installments_total is required", "installments_total")
+		return api.NewValidationError("validation.required", "installments_total", api.P("field", "installments_total"))
 	}
 	if r.NextDueDate.IsZero() {
-		return api.NewValidationError("next_due_date is required", "next_due_date")
+		return api.NewValidationError("validation.required", "next_due_date", api.P("field", "next_due_date"))
 	}
 	return nil
 }

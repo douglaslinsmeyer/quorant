@@ -106,7 +106,7 @@ func (s *FinService) GetSchedule(ctx context.Context, id uuid.UUID) (*Assessment
 		return nil, err
 	}
 	if schedule == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("assessment schedule %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "assessment_schedule"), api.P("id", id.String()))
 	}
 	return schedule, nil
 }
@@ -225,7 +225,7 @@ func (s *FinService) GetAssessment(ctx context.Context, id uuid.UUID) (*Assessme
 		return nil, err
 	}
 	if a == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("assessment %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "assessment"), api.P("id", id.String()))
 	}
 	return a, nil
 }
@@ -321,7 +321,7 @@ func (s *FinService) GetPayment(ctx context.Context, id uuid.UUID) (*Payment, er
 		return nil, err
 	}
 	if p == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("payment %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "payment"), api.P("id", id.String()))
 	}
 	return p, nil
 }
@@ -367,7 +367,7 @@ func (s *FinService) GetBudget(ctx context.Context, id uuid.UUID) (*Budget, erro
 		return nil, err
 	}
 	if b == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("budget %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "budget"), api.P("id", id.String()))
 	}
 	return b, nil
 }
@@ -399,7 +399,7 @@ func (s *FinService) ProposeBudget(ctx context.Context, id uuid.UUID, proposedBy
 		return nil, err
 	}
 	if b.Status != "draft" {
-		return nil, api.NewValidationError(fmt.Sprintf("budget must be in 'draft' status to propose, current status: %s", b.Status), "status")
+		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", "draft"), api.P("action", "propose"), api.P("current", b.Status))
 	}
 	now := time.Now()
 	b.Status = "proposed"
@@ -415,7 +415,7 @@ func (s *FinService) ApproveBudget(ctx context.Context, id uuid.UUID, approvedBy
 		return nil, err
 	}
 	if b.Status != "proposed" {
-		return nil, api.NewValidationError(fmt.Sprintf("budget must be in 'proposed' status to approve, current status: %s", b.Status), "status")
+		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", "proposed"), api.P("action", "approve"), api.P("current", b.Status))
 	}
 	now := time.Now()
 	b.Status = "approved"
@@ -515,7 +515,7 @@ func (s *FinService) GetExpense(ctx context.Context, id uuid.UUID) (*Expense, er
 		return nil, err
 	}
 	if e == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("expense %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "expense"), api.P("id", id.String()))
 	}
 	return e, nil
 }
@@ -532,7 +532,7 @@ func (s *FinService) ApproveExpense(ctx context.Context, id uuid.UUID, approvedB
 		return nil, err
 	}
 	if e.Status != "pending" {
-		return nil, api.NewValidationError(fmt.Sprintf("expense must be in 'pending' status to approve, current status: %s", e.Status), "status")
+		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", "pending"), api.P("action", "approve"), api.P("current", e.Status))
 	}
 	now := time.Now()
 	e.Status = "approved"
@@ -548,7 +548,7 @@ func (s *FinService) PayExpense(ctx context.Context, id uuid.UUID) (*Expense, er
 		return nil, err
 	}
 	if e.Status != "approved" {
-		return nil, api.NewValidationError(fmt.Sprintf("expense must be in 'approved' status to pay, current status: %s", e.Status), "status")
+		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", "approved"), api.P("action", "pay"), api.P("current", e.Status))
 	}
 	now := time.Now()
 	e.Status = "paid"
@@ -580,7 +580,7 @@ func (s *FinService) GetFund(ctx context.Context, id uuid.UUID) (*Fund, error) {
 		return nil, err
 	}
 	if f == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("fund %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "fund"), api.P("id", id.String()))
 	}
 	return f, nil
 }
@@ -642,7 +642,7 @@ func (s *FinService) GetCollection(ctx context.Context, id uuid.UUID) (*Collecti
 		return nil, err
 	}
 	if c == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("collection case %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "collection_case"), api.P("id", id.String()))
 	}
 	return c, nil
 }
@@ -709,7 +709,7 @@ func (s *FinService) GetUnitCollectionStatus(ctx context.Context, unitID uuid.UU
 		return nil, err
 	}
 	if c == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("no active collection case for unit %s", unitID))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "collection_case"), api.P("id", unitID.String()))
 	}
 	return c, nil
 }
