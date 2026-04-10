@@ -548,21 +548,46 @@ func (s *FinService) UpdateExpense(ctx context.Context, id uuid.UUID, e *Expense
 	return s.budgets.UpdateExpense(ctx, e)
 }
 
-// CreateLineItem creates a budget line item.
+// CreateLineItem creates a budget line item and recalculates budget totals.
 func (s *FinService) CreateLineItem(ctx context.Context, budgetID uuid.UUID, item *BudgetLineItem) (*BudgetLineItem, error) {
 	item.BudgetID = budgetID
-	return s.budgets.CreateLineItem(ctx, item)
+	created, err := s.budgets.CreateLineItem(ctx, item)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.budgets.RecalculateBudgetTotals(ctx, budgetID); err != nil {
+		return nil, err
+	}
+	return created, nil
 }
 
-// UpdateLineItem persists changes to an existing budget line item.
+// UpdateLineItem persists changes to an existing budget line item and
+// recalculates budget totals.
 func (s *FinService) UpdateLineItem(ctx context.Context, id uuid.UUID, item *BudgetLineItem) (*BudgetLineItem, error) {
 	item.ID = id
-	return s.budgets.UpdateLineItem(ctx, item)
+	updated, err := s.budgets.UpdateLineItem(ctx, item)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.budgets.RecalculateBudgetTotals(ctx, updated.BudgetID); err != nil {
+		return nil, err
+	}
+	return updated, nil
 }
 
-// DeleteLineItem hard-deletes a budget line item.
+// DeleteLineItem hard-deletes a budget line item and recalculates budget totals.
 func (s *FinService) DeleteLineItem(ctx context.Context, id uuid.UUID) error {
-	return s.budgets.DeleteLineItem(ctx, id)
+	item, err := s.budgets.FindLineItemByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if item == nil {
+		return api.NewNotFoundError("budget.line_item.not_found")
+	}
+	if err := s.budgets.DeleteLineItem(ctx, id); err != nil {
+		return err
+	}
+	return s.budgets.RecalculateBudgetTotals(ctx, item.BudgetID)
 }
 
 // ListCategories returns all budget categories for the given org.

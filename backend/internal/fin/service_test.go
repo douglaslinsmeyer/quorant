@@ -14,6 +14,7 @@ import (
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/fin"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -440,6 +441,7 @@ func (m *mockBudgetRepo) ListLineItemsByBudget(_ context.Context, budgetID uuid.
 func (m *mockBudgetRepo) UpdateLineItem(_ context.Context, item *fin.BudgetLineItem) (*fin.BudgetLineItem, error) {
 	for i := range m.lineItems {
 		if m.lineItems[i].ID == item.ID {
+			item.BudgetID = m.lineItems[i].BudgetID
 			item.UpdatedAt = time.Now()
 			m.lineItems[i] = *item
 			out := m.lineItems[i]
@@ -1577,4 +1579,128 @@ func TestCreateFundTransfer_CreatesFundTransactions(t *testing.T) {
 	assert.Equal(t, fin.FundTxTypeTransferIn, credit.TransactionType)
 	assert.Equal(t, &refType, credit.ReferenceType)
 	assert.Equal(t, &transfer.ID, credit.ReferenceID)
+}
+
+// ── Budget Line Item Recalculation Tests ─────────────────────────────────────
+
+func TestCreateLineItem_RecalculatesTotals(t *testing.T) {
+	budgetRepo := &mockBudgetRepo{}
+	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
+
+	ctx := context.Background()
+	orgID := testutil.TestOrgID()
+	userID := testutil.TestUserID()
+
+	// Create an income category.
+	incomeCat, err := budgetRepo.CreateCategory(ctx, &fin.BudgetCategory{
+		OrgID:        orgID,
+		Name:         "Assessment Income",
+		CategoryType: fin.BudgetCategoryTypeIncome,
+	})
+	require.NoError(t, err)
+
+	// Create a budget.
+	budget, err := svc.CreateBudget(ctx, orgID, userID, fin.CreateBudgetRequest{
+		FiscalYear: 2026,
+		Name:       "FY2026 Budget",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), budget.TotalIncomeCents)
+
+	// Create a line item — totals should recalculate.
+	_, err = svc.CreateLineItem(ctx, budget.ID, &fin.BudgetLineItem{
+		CategoryID:   incomeCat.ID,
+		PlannedCents: 100000,
+	})
+	require.NoError(t, err)
+
+	// Fetch the budget and verify totals were updated.
+	updated, err := svc.GetBudget(ctx, budget.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(100000), updated.TotalIncomeCents)
+	assert.Equal(t, int64(0), updated.TotalExpenseCents)
+	assert.Equal(t, int64(100000), updated.NetCents)
+}
+
+func TestUpdateLineItem_RecalculatesTotals(t *testing.T) {
+	budgetRepo := &mockBudgetRepo{}
+	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
+
+	ctx := context.Background()
+	orgID := testutil.TestOrgID()
+	userID := testutil.TestUserID()
+
+	expenseCat, err := budgetRepo.CreateCategory(ctx, &fin.BudgetCategory{
+		OrgID:        orgID,
+		Name:         "Maintenance",
+		CategoryType: fin.BudgetCategoryTypeExpense,
+	})
+	require.NoError(t, err)
+
+	budget, err := svc.CreateBudget(ctx, orgID, userID, fin.CreateBudgetRequest{
+		FiscalYear: 2026,
+		Name:       "FY2026 Budget",
+	})
+	require.NoError(t, err)
+
+	item, err := svc.CreateLineItem(ctx, budget.ID, &fin.BudgetLineItem{
+		CategoryID:   expenseCat.ID,
+		PlannedCents: 50000,
+	})
+	require.NoError(t, err)
+
+	// Update planned amount from 500.00 to 750.00
+	_, err = svc.UpdateLineItem(ctx, item.ID, &fin.BudgetLineItem{
+		CategoryID:   expenseCat.ID,
+		PlannedCents: 75000,
+	})
+	require.NoError(t, err)
+
+	updated, err := svc.GetBudget(ctx, budget.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(75000), updated.TotalExpenseCents)
+	assert.Equal(t, int64(-75000), updated.NetCents)
+}
+
+func TestDeleteLineItem_RecalculatesTotals(t *testing.T) {
+	budgetRepo := &mockBudgetRepo{}
+	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
+
+	ctx := context.Background()
+	orgID := testutil.TestOrgID()
+	userID := testutil.TestUserID()
+
+	expenseCat, err := budgetRepo.CreateCategory(ctx, &fin.BudgetCategory{
+		OrgID:        orgID,
+		Name:         "Maintenance",
+		CategoryType: fin.BudgetCategoryTypeExpense,
+	})
+	require.NoError(t, err)
+
+	budget, err := svc.CreateBudget(ctx, orgID, userID, fin.CreateBudgetRequest{
+		FiscalYear: 2026,
+		Name:       "FY2026 Budget",
+	})
+	require.NoError(t, err)
+
+	item, err := svc.CreateLineItem(ctx, budget.ID, &fin.BudgetLineItem{
+		CategoryID:   expenseCat.ID,
+		PlannedCents: 50000,
+	})
+	require.NoError(t, err)
+
+	// Verify the total was set after create.
+	b, err := svc.GetBudget(ctx, budget.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(50000), b.TotalExpenseCents)
+
+	// Delete the line item — totals should zero out.
+	err = svc.DeleteLineItem(ctx, item.ID)
+	require.NoError(t, err)
+
+	updated, err := svc.GetBudget(ctx, budget.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), updated.TotalExpenseCents)
+	assert.Equal(t, int64(0), updated.TotalIncomeCents)
+	assert.Equal(t, int64(0), updated.NetCents)
 }
