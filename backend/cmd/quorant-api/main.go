@@ -18,6 +18,7 @@ import (
 	"github.com/quorant/quorant/internal/ai"
 	platformai "github.com/quorant/quorant/internal/platform/ai"
 	"github.com/quorant/quorant/internal/platform/cfgstore"
+	"github.com/quorant/quorant/internal/platform/policy"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/billing"
 	"github.com/quorant/quorant/internal/com"
@@ -264,6 +265,11 @@ func run() error {
 	jurisdictionAdminHandler := ai.NewJurisdictionAdminHandler(jurisdictionRuleRepo, outboxPublisher, logger)
 	ai.RegisterJurisdictionAdminRoutes(mux, jurisdictionAdminHandler, tokenValidator, permChecker, resolveUserID)
 
+	// Policy engine
+	policyRecordRepo := policy.NewPostgresPolicyRecordRepository(pool)
+	policyResolutionRepo := policy.NewPostgresResolutionRepository(pool)
+	policyRegistry := policy.NewRegistry(policyRecordRepo, policyResolutionRepo, policyResolver, nil, logger)
+
 	// Fin module
 	assessmentRepo := fin.NewPostgresAssessmentRepository(pool)
 	paymentRepo := fin.NewPostgresPaymentRepository(pool)
@@ -273,7 +279,7 @@ func run() error {
 	glRepo := fin.NewPostgresGLRepository(pool)
 	glService := fin.NewGLService(glRepo, auditor, logger)
 	uowFactory := db.NewUnitOfWorkFactory(pool)
-	finService := fin.NewFinService(assessmentRepo, paymentRepo, budgetRepo, fundRepo, collectionRepo, glService, policyResolver, complianceService, nil, logger, uowFactory)
+	finService := fin.NewFinService(assessmentRepo, paymentRepo, budgetRepo, fundRepo, collectionRepo, glService, policyResolver, complianceService, policyRegistry, logger, uowFactory)
 	auditedFinService := fin.NewAuditedFinService(finService, auditor, outboxPublisher, logger)
 	assessmentHandler := fin.NewAssessmentHandler(auditedFinService, logger)
 	paymentHandler := fin.NewPaymentHandler(auditedFinService, logger)
