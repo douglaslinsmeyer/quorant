@@ -23,6 +23,8 @@ func (e *GaapEngine) JournalLines(ctx context.Context, gl *GLService, tx Financi
 	switch tx.Type {
 	case TxTypeAssessment:
 		return e.assessmentLines(ctx, gl, tx)
+	case TxTypePayment:
+		return e.paymentLines(ctx, gl, tx)
 	default:
 		return nil, fmt.Errorf("gaap: unsupported transaction type %q", tx.Type)
 	}
@@ -52,6 +54,29 @@ func (e *GaapEngine) assessmentLines(ctx context.Context, gl *GLService, tx Fina
 	return []GLJournalLine{
 		{AccountID: ar.ID, DebitCents: tx.AmountCents, CreditCents: 0},
 		{AccountID: revenue.ID, DebitCents: 0, CreditCents: tx.AmountCents},
+	}, nil
+}
+
+func (e *GaapEngine) paymentLines(ctx context.Context, gl *GLService, tx FinancialTransaction) ([]GLJournalLine, error) {
+	cash, err := gl.FindAccountByOrgAndNumber(ctx, tx.OrgID, 1010)
+	if err != nil {
+		return nil, fmt.Errorf("gaap: lookup account 1010: %w", err)
+	}
+	if cash == nil {
+		return nil, fmt.Errorf("gaap: account 1010 (Cash-Operating) not found for org %s", tx.OrgID)
+	}
+
+	ar, err := gl.FindAccountByOrgAndNumber(ctx, tx.OrgID, 1100)
+	if err != nil {
+		return nil, fmt.Errorf("gaap: lookup account 1100: %w", err)
+	}
+	if ar == nil {
+		return nil, fmt.Errorf("gaap: account 1100 (AR-Assessments) not found for org %s", tx.OrgID)
+	}
+
+	return []GLJournalLine{
+		{AccountID: cash.ID, DebitCents: tx.AmountCents, CreditCents: 0},
+		{AccountID: ar.ID, DebitCents: 0, CreditCents: tx.AmountCents},
 	}, nil
 }
 
