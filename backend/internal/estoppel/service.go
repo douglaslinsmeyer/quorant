@@ -14,21 +14,21 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-
 // EstoppelService orchestrates all business logic for the Estoppel module:
 // request intake, data aggregation, manager review, PDF generation, and delivery.
 type EstoppelService struct {
-	repo         EstoppelRepository
-	financial    FinancialDataProvider
-	compliance   ComplianceDataProvider
-	property     PropertyDataProvider
-	narrative    NarrativeGenerator
-	generator    CertificateGenerator
-	docUploader  DocumentUploader
-	docDownloader DocumentDownloader
-	auditor      audit.Auditor
-	publisher    queue.Publisher
-	logger       *slog.Logger
+	repo              EstoppelRepository
+	financial         FinancialDataProvider
+	compliance        ComplianceDataProvider
+	property          PropertyDataProvider
+	jurisdictionRules JurisdictionRulesRepository
+	narrative         NarrativeGenerator
+	generator         CertificateGenerator
+	docUploader       DocumentUploader
+	docDownloader     DocumentDownloader
+	auditor           audit.Auditor
+	publisher         queue.Publisher
+	logger            *slog.Logger
 }
 
 // NewEstoppelService creates a new EstoppelService wired to all required
@@ -39,6 +39,7 @@ func NewEstoppelService(
 	financial FinancialDataProvider,
 	compliance ComplianceDataProvider,
 	property PropertyDataProvider,
+	jurisdictionRules JurisdictionRulesRepository,
 	narrative NarrativeGenerator,
 	generator CertificateGenerator,
 	docUploader DocumentUploader,
@@ -48,18 +49,54 @@ func NewEstoppelService(
 	logger *slog.Logger,
 ) *EstoppelService {
 	return &EstoppelService{
-		repo:          repo,
-		financial:     financial,
-		compliance:    compliance,
-		property:      property,
-		narrative:     narrative,
-		generator:     generator,
-		docUploader:   docUploader,
-		docDownloader: docDownloader,
-		auditor:       auditor,
-		publisher:     publisher,
-		logger:        logger,
+		repo:              repo,
+		financial:         financial,
+		compliance:        compliance,
+		property:          property,
+		jurisdictionRules: jurisdictionRules,
+		narrative:         narrative,
+		generator:         generator,
+		docUploader:       docUploader,
+		docDownloader:     docDownloader,
+		auditor:           auditor,
+		publisher:         publisher,
+		logger:            logger,
 	}
+}
+
+// ResolveRules fetches the property snapshot to obtain the org's state, then
+// queries the jurisdiction_rules table for the active estoppel rule set.
+// Returns an error if the state is empty or no rules are found.
+func (s *EstoppelService) ResolveRules(ctx context.Context, orgID, unitID uuid.UUID) (*EstoppelRules, error) {
+	prop, err := s.property.GetPropertySnapshot(ctx, orgID, unitID)
+	if err != nil {
+		return nil, fmt.Errorf("resolving jurisdiction for estoppel rules: %w", err)
+	}
+
+	orgState := ""
+	if prop != nil {
+		orgState = prop.OrgState
+	}
+
+	if orgState == "" {
+		return nil, api.NewValidationError(
+			"organization state is required for estoppel rules lookup; ensure the organization's state is set",
+			"org_state",
+		)
+	}
+
+	rules, err := s.jurisdictionRules.GetEstoppelRules(ctx, orgState)
+	if err != nil {
+		return nil, fmt.Errorf("fetching estoppel rules for jurisdiction %q: %w", orgState, err)
+	}
+	if rules == nil {
+		return nil, api.NewValidationError(
+			fmt.Sprintf("no estoppel rules found for jurisdiction %q; contact platform support", orgState),
+			"jurisdiction",
+		)
+	}
+
+	return rules, nil
 }
 
 // CreateRequest validates the DTO, checks delinquency, computes fees and

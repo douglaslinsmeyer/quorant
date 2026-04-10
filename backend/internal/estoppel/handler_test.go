@@ -29,7 +29,8 @@ func newTestHandler() (*estoppel.Handler, *mockRepo) {
 		repo,
 		&mockFinancialProvider{snapshot: &estoppel.FinancialSnapshot{}},
 		&mockComplianceProvider{snapshot: &estoppel.ComplianceSnapshot{}},
-		&mockPropertyProvider{snapshot: &estoppel.PropertySnapshot{UnitNumber: "1A"}},
+		&mockPropertyProvider{snapshot: &estoppel.PropertySnapshot{UnitNumber: "1A", OrgState: "FL"}},
+		flJurisdictionRulesRepo(),
 		estoppel.NewNoopNarrativeGenerator(),
 		&mockCertificateGenerator{},
 		nil, // docUploader

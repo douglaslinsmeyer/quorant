@@ -20,14 +20,6 @@ func NewHandler(service *EstoppelService, logger *slog.Logger) *Handler {
 	return &Handler{service: service, logger: logger}
 }
 
-// defaultRules returns a minimal EstoppelRules until PolicyResolver is wired in.
-func defaultEstoppelRules() *EstoppelRules {
-	return &EstoppelRules{
-		StandardFeeCents:               29900,
-		StandardTurnaroundBusinessDays: 10,
-	}
-}
-
 // CreateRequest handles POST /organizations/{org_id}/estoppel/requests.
 func (h *Handler) CreateRequest(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseEstoppelPathUUID(r, "org_id")
@@ -48,7 +40,13 @@ func (h *Handler) CreateRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rules := defaultEstoppelRules()
+	rules, err := h.service.ResolveRules(r.Context(), orgID, dto.UnitID)
+	if err != nil {
+		h.logger.Error("ResolveRules failed", "org_id", orgID, "unit_id", dto.UnitID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
 	created, err := h.service.CreateRequest(r.Context(), orgID, dto, rules, userID)
 	if err != nil {
 		h.logger.Error("CreateRequest failed", "org_id", orgID, "error", err)

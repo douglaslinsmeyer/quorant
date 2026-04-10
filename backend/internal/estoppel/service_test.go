@@ -159,6 +159,26 @@ func (g *mockCertificateGenerator) GenerateLenderQuestionnaire(_ *estoppel.Aggre
 // Test helper: newTestService
 // ---------------------------------------------------------------------------
 
+func flJurisdictionRulesRepo() *estoppel.MockJurisdictionRulesRepo {
+	rushDays := 3
+	effectiveDays := 30
+	return estoppel.NewMockJurisdictionRulesRepo(map[string]*estoppel.EstoppelRules{
+		"FL": {
+			StandardTurnaroundBusinessDays: 10,
+			StandardFeeCents:               29900,
+			RushTurnaroundBusinessDays:     &rushDays,
+			RushFeeCents:                   11900,
+			DelinquentSurchargeCents:       17900,
+			EffectivePeriodDays:            &effectiveDays,
+			ElectronicDeliveryRequired:     true,
+			StatutoryFormRequired:          true,
+			StatutoryFormID:                "fl_720_30851",
+			FreeAmendmentOnError:           true,
+			StatuteRef:                     "§720.30851/§718.116(8)",
+		},
+	})
+}
+
 func newTestService() *estoppel.EstoppelService {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	return estoppel.NewEstoppelService(
@@ -177,12 +197,38 @@ func newTestService() *estoppel.EstoppelService {
 			snapshot: &estoppel.PropertySnapshot{
 				UnitNumber: "1A",
 				Address:    "1 Test Ave",
+				OrgState:   "FL",
 			},
 		},
+		flJurisdictionRulesRepo(),
 		estoppel.NewNoopNarrativeGenerator(),
 		&mockCertificateGenerator{},
 		nil, // docUploader — not needed for most tests
 		nil, // docDownloader — not needed for most tests
+		audit.NewNoopAuditor(),
+		queue.NewInMemoryPublisher(),
+		logger,
+	)
+}
+
+// newTestServiceWithJurisdiction creates an EstoppelService with a property
+// provider that returns the given orgState and a jurisdiction repo passed
+// by the caller.
+func newTestServiceWithJurisdiction(repo estoppel.JurisdictionRulesRepository, orgState string) *estoppel.EstoppelService {
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	return estoppel.NewEstoppelService(
+		newMockRepo(),
+		&mockFinancialProvider{snapshot: &estoppel.FinancialSnapshot{}},
+		&mockComplianceProvider{snapshot: &estoppel.ComplianceSnapshot{}},
+		&mockPropertyProvider{snapshot: &estoppel.PropertySnapshot{
+			UnitNumber: "1A",
+			OrgState:   orgState,
+		}},
+		repo,
+		estoppel.NewNoopNarrativeGenerator(),
+		&mockCertificateGenerator{},
+		nil, // docUploader
+		nil, // docDownloader
 		audit.NewNoopAuditor(),
 		queue.NewInMemoryPublisher(),
 		logger,
@@ -336,7 +382,8 @@ func TestCreateRequest_WithDelinquency(t *testing.T) {
 			},
 		},
 		&mockComplianceProvider{snapshot: &estoppel.ComplianceSnapshot{}},
-		&mockPropertyProvider{snapshot: &estoppel.PropertySnapshot{UnitNumber: "1A"}},
+		&mockPropertyProvider{snapshot: &estoppel.PropertySnapshot{UnitNumber: "1A", OrgState: "FL"}},
+		flJurisdictionRulesRepo(),
 		estoppel.NewNoopNarrativeGenerator(),
 		&mockCertificateGenerator{},
 		nil, // docUploader
@@ -395,7 +442,8 @@ func TestApproveRequest_Success(t *testing.T) {
 		repo,
 		&mockFinancialProvider{snapshot: &estoppel.FinancialSnapshot{}},
 		&mockComplianceProvider{snapshot: &estoppel.ComplianceSnapshot{}},
-		&mockPropertyProvider{snapshot: &estoppel.PropertySnapshot{UnitNumber: "1A"}},
+		&mockPropertyProvider{snapshot: &estoppel.PropertySnapshot{UnitNumber: "1A", OrgState: "FL"}},
+		flJurisdictionRulesRepo(),
 		estoppel.NewNoopNarrativeGenerator(),
 		&mockCertificateGenerator{},
 		nil, // docUploader
@@ -504,7 +552,8 @@ func TestGenerateCertificate_UploadsDocument(t *testing.T) {
 			AssessmentFrequency:    "monthly",
 		}},
 		&mockComplianceProvider{snapshot: &estoppel.ComplianceSnapshot{}},
-		&mockPropertyProvider{snapshot: &estoppel.PropertySnapshot{UnitNumber: "1A", Address: "1 Test Ave"}},
+		&mockPropertyProvider{snapshot: &estoppel.PropertySnapshot{UnitNumber: "1A", Address: "1 Test Ave", OrgState: "FL"}},
+		flJurisdictionRulesRepo(),
 		estoppel.NewNoopNarrativeGenerator(),
 		&mockCertificateGenerator{},
 		uploader,

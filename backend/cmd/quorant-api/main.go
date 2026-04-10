@@ -300,6 +300,7 @@ func run() error {
 	financialProvider := fin.NewEstoppelFinancialAdapter(finService)
 	complianceProvider := gov.NewEstoppelComplianceAdapter(govService)
 	propertyProvider := org.NewEstoppelPropertyAdapter(orgService)
+	jurisdictionRulesRepo := estoppel.NewPostgresJurisdictionRulesRepository(pool)
 	narrativeGen := estoppel.NewNoopNarrativeGenerator()
 	pdfGen := estoppel.NewMarotoGenerator()
 	estoppelDocAdapter := doc.NewEstoppelDocumentAdapter(docService)
@@ -308,6 +309,7 @@ func run() error {
 		financialProvider,
 		complianceProvider,
 		propertyProvider,
+		jurisdictionRulesRepo,
 		narrativeGen,
 		pdfGen,
 		estoppelDocAdapter,
