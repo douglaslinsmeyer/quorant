@@ -40,13 +40,15 @@ func (s ExpenseStatus) IsValid() bool {
 type PaymentStatus string
 
 const (
+	PaymentStatusPending   PaymentStatus = "pending"
 	PaymentStatusCompleted PaymentStatus = "completed"
+	PaymentStatusFailed    PaymentStatus = "failed"
 )
 
 // IsValid returns true if the PaymentStatus value is one of the defined constants.
 func (s PaymentStatus) IsValid() bool {
 	switch s {
-	case PaymentStatusCompleted:
+	case PaymentStatusPending, PaymentStatusCompleted, PaymentStatusFailed:
 		return true
 	}
 	return false

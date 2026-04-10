@@ -84,7 +84,7 @@ func minimalPayment(orgID, unitID, userID uuid.UUID) *fin.Payment {
 		UnitID:      unitID,
 		UserID:      userID,
 		AmountCents: 15000,
-		Status:      fin.PaymentStatus("pending"),
+		Status:      fin.PaymentStatusPending,
 	}
 }
 
@@ -115,7 +115,7 @@ func TestCreatePayment(t *testing.T) {
 	assert.Equal(t, f.unitID, got.UnitID)
 	assert.Equal(t, f.userID, got.UserID)
 	assert.Equal(t, int64(15000), got.AmountCents)
-	assert.Equal(t, fin.PaymentStatus("pending"), got.Status)
+	assert.Equal(t, fin.PaymentStatusPending, got.Status)
 	assert.Nil(t, got.PaidAt)
 	assert.False(t, got.CreatedAt.IsZero())
 	assert.False(t, got.UpdatedAt.IsZero())
@@ -135,7 +135,7 @@ func TestFindPaymentByID(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	assert.Equal(t, created.ID, found.ID)
-	assert.Equal(t, fin.PaymentStatus("pending"), found.Status)
+	assert.Equal(t, fin.PaymentStatusPending, found.Status)
 }
 
 func TestFindPaymentByID_NilWhenNotFound(t *testing.T) {
@@ -234,10 +234,10 @@ func TestUpdatePaymentStatus(t *testing.T) {
 
 	created, err := f.repo.CreatePayment(ctx, minimalPayment(f.orgID, f.unitID, f.userID))
 	require.NoError(t, err)
-	require.Equal(t, fin.PaymentStatus("pending"), created.Status)
+	require.Equal(t, fin.PaymentStatusPending, created.Status)
 
 	paidAt := time.Now().UTC().Truncate(time.Millisecond)
-	err = f.repo.UpdatePaymentStatus(ctx, created.ID, "completed", &paidAt)
+	err = f.repo.UpdatePaymentStatus(ctx, created.ID, fin.PaymentStatusCompleted, &paidAt)
 	require.NoError(t, err)
 
 	updated, err := f.repo.FindPaymentByID(ctx, created.ID)
@@ -257,13 +257,13 @@ func TestUpdatePaymentStatus_NilPaidAt(t *testing.T) {
 	created, err := f.repo.CreatePayment(ctx, minimalPayment(f.orgID, f.unitID, f.userID))
 	require.NoError(t, err)
 
-	err = f.repo.UpdatePaymentStatus(ctx, created.ID, "failed", nil)
+	err = f.repo.UpdatePaymentStatus(ctx, created.ID, fin.PaymentStatusFailed, nil)
 	require.NoError(t, err)
 
 	updated, err := f.repo.FindPaymentByID(ctx, created.ID)
 	require.NoError(t, err)
 	require.NotNil(t, updated)
-	assert.Equal(t, fin.PaymentStatus("failed"), updated.Status)
+	assert.Equal(t, fin.PaymentStatusFailed, updated.Status)
 	assert.Nil(t, updated.PaidAt)
 }
 

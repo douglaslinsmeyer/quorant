@@ -174,7 +174,7 @@ func TestPayment_JSONSerialization_OmitsNilOptionalFields(t *testing.T) {
 		UnitID:      uuid.New(),
 		UserID:      uuid.New(),
 		AmountCents: 15000,
-		Status:      fin.PaymentStatus("pending"),
+		Status:      fin.PaymentStatusPending,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}

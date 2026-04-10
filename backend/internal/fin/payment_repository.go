@@ -31,7 +31,7 @@ type PaymentRepository interface {
 
 	// UpdatePaymentStatus updates the status and optionally paid_at for the
 	// given payment, and sets updated_at to now().
-	UpdatePaymentStatus(ctx context.Context, id uuid.UUID, status string, paidAt *time.Time) error
+	UpdatePaymentStatus(ctx context.Context, id uuid.UUID, status PaymentStatus, paidAt *time.Time) error
 
 	// ── Payment Methods ───────────────────────────────────────────────────────
 

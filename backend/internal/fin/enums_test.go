@@ -33,7 +33,7 @@ func TestExpenseStatus_IsValid(t *testing.T) {
 }
 
 func TestPaymentStatus_IsValid(t *testing.T) {
-	valid := []PaymentStatus{PaymentStatusCompleted}
+	valid := []PaymentStatus{PaymentStatusPending, PaymentStatusCompleted, PaymentStatusFailed}
 	for _, v := range valid {
 		if !v.IsValid() {
 			t.Errorf("expected %q to be valid", v)

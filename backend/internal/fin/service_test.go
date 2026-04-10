@@ -262,10 +262,10 @@ func (m *mockPaymentRepo) ListPaymentsByUnit(_ context.Context, unitID uuid.UUID
 	return result, nil
 }
 
-func (m *mockPaymentRepo) UpdatePaymentStatus(_ context.Context, id uuid.UUID, status string, paidAt *time.Time) error {
+func (m *mockPaymentRepo) UpdatePaymentStatus(_ context.Context, id uuid.UUID, status fin.PaymentStatus, paidAt *time.Time) error {
 	for i := range m.payments {
 		if m.payments[i].ID == id {
-			m.payments[i].Status = fin.PaymentStatus(status)
+			m.payments[i].Status = status
 			m.payments[i].PaidAt = paidAt
 			return nil
 		}
