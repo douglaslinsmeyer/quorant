@@ -376,6 +376,44 @@ func (r *PostgresBudgetRepository) DeleteLineItem(ctx context.Context, id uuid.U
 	return nil
 }
 
+// RecalculateBudgetTotals recomputes the budget's total_income_cents,
+// total_expense_cents, and net_cents from its line items.
+func (r *PostgresBudgetRepository) RecalculateBudgetTotals(ctx context.Context, budgetID uuid.UUID) error {
+	const q = `
+		UPDATE budgets SET
+			total_income_cents = COALESCE((
+				SELECT SUM(li.planned_cents)
+				FROM budget_line_items li
+				JOIN budget_categories bc ON bc.id = li.category_id
+				WHERE li.budget_id = $1 AND bc.category_type = 'income'
+			), 0),
+			total_expense_cents = COALESCE((
+				SELECT SUM(li.planned_cents)
+				FROM budget_line_items li
+				JOIN budget_categories bc ON bc.id = li.category_id
+				WHERE li.budget_id = $1 AND bc.category_type = 'expense'
+			), 0),
+			net_cents = COALESCE((
+				SELECT SUM(li.planned_cents)
+				FROM budget_line_items li
+				JOIN budget_categories bc ON bc.id = li.category_id
+				WHERE li.budget_id = $1 AND bc.category_type = 'income'
+			), 0) - COALESCE((
+				SELECT SUM(li.planned_cents)
+				FROM budget_line_items li
+				JOIN budget_categories bc ON bc.id = li.category_id
+				WHERE li.budget_id = $1 AND bc.category_type = 'expense'
+			), 0),
+			updated_at = now()
+		WHERE id = $1`
+
+	_, err := r.db.Exec(ctx, q, budgetID)
+	if err != nil {
+		return fmt.Errorf("fin: RecalculateBudgetTotals: %w", err)
+	}
+	return nil
+}
+
 // ─── Expenses ─────────────────────────────────────────────────────────────────
 
 // CreateExpense inserts a new expense record and returns the fully-populated

@@ -67,6 +67,10 @@ type BudgetRepository interface {
 	// CASCADE from budgets, this is a real DELETE rather than a soft delete.
 	DeleteLineItem(ctx context.Context, id uuid.UUID) error
 
+	// RecalculateBudgetTotals recomputes TotalIncomeCents, TotalExpenseCents,
+	// and NetCents from the budget's line items joined to their categories.
+	RecalculateBudgetTotals(ctx context.Context, budgetID uuid.UUID) error
+
 	// ── Expenses ──────────────────────────────────────────────────────────────
 
 	// CreateExpense inserts a new expense record and returns the

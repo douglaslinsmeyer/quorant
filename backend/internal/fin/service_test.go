@@ -469,6 +469,36 @@ func (m *mockBudgetRepo) FindLineItemByID(_ context.Context, id uuid.UUID) (*fin
 	return nil, nil
 }
 
+func (m *mockBudgetRepo) RecalculateBudgetTotals(_ context.Context, budgetID uuid.UUID) error {
+	var totalIncome, totalExpense int64
+	for _, item := range m.lineItems {
+		if item.BudgetID != budgetID {
+			continue
+		}
+		// Look up the category to determine type.
+		for _, cat := range m.categories {
+			if cat.ID == item.CategoryID {
+				switch cat.CategoryType {
+				case fin.BudgetCategoryTypeIncome:
+					totalIncome += item.PlannedCents
+				case fin.BudgetCategoryTypeExpense:
+					totalExpense += item.PlannedCents
+				}
+				break
+			}
+		}
+	}
+	for i := range m.budgets {
+		if m.budgets[i].ID == budgetID {
+			m.budgets[i].TotalIncomeCents = totalIncome
+			m.budgets[i].TotalExpenseCents = totalExpense
+			m.budgets[i].NetCents = totalIncome - totalExpense
+			return nil
+		}
+	}
+	return nil
+}
+
 func (m *mockBudgetRepo) CreateExpense(_ context.Context, e *fin.Expense) (*fin.Expense, error) {
 	e.ID = uuid.New()
 	e.CreatedAt = time.Now()

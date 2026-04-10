@@ -380,6 +380,73 @@ func TestFindLineItemByID_ReturnsNilWhenNotFound(t *testing.T) {
 	assert.Nil(t, found, "should return nil for non-existent line item")
 }
 
+// ─── TestRecalculateBudgetTotals ────────────────────────────────────────────
+
+func TestRecalculateBudgetTotals_MixedIncomeExpense(t *testing.T) {
+	f := setupBudgetFixture(t)
+	ctx := context.Background()
+
+	expenseCat, err := f.repo.CreateCategory(ctx, minimalCategory(f.orgID))
+	require.NoError(t, err)
+
+	incomeCat := &fin.BudgetCategory{
+		OrgID:        f.orgID,
+		Name:         "Assessment Income",
+		CategoryType: fin.BudgetCategoryTypeIncome,
+		SortOrder:    0,
+	}
+	incomeCat, err = f.repo.CreateCategory(ctx, incomeCat)
+	require.NoError(t, err)
+
+	budget, err := f.repo.CreateBudget(ctx, minimalBudget(f.orgID, f.userID))
+	require.NoError(t, err)
+
+	// Two expense line items: 500_00 + 300_00 = 800_00
+	item1 := minimalLineItem(budget.ID, expenseCat.ID)
+	item1.PlannedCents = 50000
+	_, err = f.repo.CreateLineItem(ctx, item1)
+	require.NoError(t, err)
+
+	item2 := minimalLineItem(budget.ID, expenseCat.ID)
+	item2.PlannedCents = 30000
+	_, err = f.repo.CreateLineItem(ctx, item2)
+	require.NoError(t, err)
+
+	// One income line item: 1200_00
+	item3 := minimalLineItem(budget.ID, incomeCat.ID)
+	item3.PlannedCents = 120000
+	_, err = f.repo.CreateLineItem(ctx, item3)
+	require.NoError(t, err)
+
+	err = f.repo.RecalculateBudgetTotals(ctx, budget.ID)
+	require.NoError(t, err)
+
+	updated, err := f.repo.FindBudgetByID(ctx, budget.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	assert.Equal(t, int64(120000), updated.TotalIncomeCents, "income should be 1200.00")
+	assert.Equal(t, int64(80000), updated.TotalExpenseCents, "expenses should be 800.00")
+	assert.Equal(t, int64(40000), updated.NetCents, "net should be income - expense = 400.00")
+}
+
+func TestRecalculateBudgetTotals_NoLineItems(t *testing.T) {
+	f := setupBudgetFixture(t)
+	ctx := context.Background()
+
+	budget, err := f.repo.CreateBudget(ctx, minimalBudget(f.orgID, f.userID))
+	require.NoError(t, err)
+
+	err = f.repo.RecalculateBudgetTotals(ctx, budget.ID)
+	require.NoError(t, err)
+
+	updated, err := f.repo.FindBudgetByID(ctx, budget.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	assert.Equal(t, int64(0), updated.TotalIncomeCents)
+	assert.Equal(t, int64(0), updated.TotalExpenseCents)
+	assert.Equal(t, int64(0), updated.NetCents)
+}
+
 // ─── TestCreateExpense + FindExpenseByID ─────────────────────────────────────
 
 func TestCreateExpense(t *testing.T) {
