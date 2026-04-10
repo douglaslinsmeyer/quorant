@@ -22,13 +22,13 @@ type CreateSubscriptionRequest struct {
 // Validate ensures required fields are present and the target URL is valid.
 func (r CreateSubscriptionRequest) Validate() error {
 	if strings.TrimSpace(r.Name) == "" {
-		return api.NewValidationError("name is required", "name")
+		return api.NewValidationError("validation.required", "name", api.P("field", "name"))
 	}
 	if len(r.EventPatterns) == 0 {
-		return api.NewValidationError("event_patterns must contain at least one pattern", "event_patterns")
+		return api.NewValidationError("validation.constraint", "event_patterns", api.P("field", "event_patterns"), api.P("constraint", "at least one pattern"))
 	}
 	if strings.TrimSpace(r.TargetURL) == "" {
-		return api.NewValidationError("target_url is required", "target_url")
+		return api.NewValidationError("validation.required", "target_url", api.P("field", "target_url"))
 	}
 	if err := validateTargetURL(r.TargetURL); err != nil {
 		return err
@@ -54,7 +54,7 @@ type UpdateSubscriptionRequest struct {
 // Validate ensures at least one field is provided and any supplied URL is valid.
 func (r UpdateSubscriptionRequest) Validate() error {
 	if r.Name == nil && len(r.EventPatterns) == 0 && r.TargetURL == nil && r.IsActive == nil && r.Headers == nil {
-		return api.NewValidationError("at least one field must be provided", "")
+		return api.NewValidationError("validation.at_least_one", "")
 	}
 	if r.TargetURL != nil {
 		if err := validateTargetURL(*r.TargetURL); err != nil {
@@ -73,18 +73,18 @@ type TestEventRequest struct{}
 func validateTargetURL(rawURL string) error {
 	u, err := url.ParseRequestURI(rawURL)
 	if err != nil {
-		return api.NewValidationError("target_url must be a valid URL", "target_url")
+		return api.NewValidationError("validation.invalid", "target_url", api.P("field", "target_url"))
 	}
 	if u.Scheme != "https" && u.Scheme != "http" {
-		return api.NewValidationError("target_url must use http or https scheme", "target_url")
+		return api.NewValidationError("validation.constraint", "target_url", api.P("field", "target_url"), api.P("constraint", "http or https scheme"))
 	}
 	if u.Host == "" {
-		return api.NewValidationError("target_url must include a host", "target_url")
+		return api.NewValidationError("validation.constraint", "target_url", api.P("field", "target_url"), api.P("constraint", "must include a host"))
 	}
 	// Strip port before IP check.
 	hostname := u.Hostname()
 	if isPrivateHost(hostname) {
-		return api.NewValidationError("target_url must not point to a private or reserved address", "target_url")
+		return api.NewValidationError("validation.constraint", "target_url", api.P("field", "target_url"), api.P("constraint", "must not point to a private or reserved address"))
 	}
 	return nil
 }
@@ -130,13 +130,13 @@ func isPrivateHost(hostname string) bool {
 // validateRetryPolicy checks MaxRetries bounds and that BackoffSeconds covers all retries.
 func validateRetryPolicy(p *RetryPolicy) error {
 	if p.MaxRetries < 0 {
-		return api.NewValidationError("retry_policy.max_retries must be non-negative", "retry_policy.max_retries")
+		return api.NewValidationError("validation.constraint", "retry_policy.max_retries", api.P("field", "retry_policy.max_retries"), api.P("constraint", "non-negative"))
 	}
 	if p.MaxRetries > maxRetries {
-		return api.NewValidationError("retry_policy.max_retries must not exceed 10", "retry_policy.max_retries")
+		return api.NewValidationError("validation.constraint", "retry_policy.max_retries", api.P("field", "retry_policy.max_retries"), api.P("constraint", "must not exceed 10"))
 	}
 	if len(p.BackoffSeconds) < p.MaxRetries {
-		return api.NewValidationError("retry_policy.backoff_seconds must have at least max_retries entries", "retry_policy.backoff_seconds")
+		return api.NewValidationError("validation.constraint", "retry_policy.backoff_seconds", api.P("field", "retry_policy.backoff_seconds"), api.P("constraint", "at least max_retries entries"))
 	}
 	return nil
 }

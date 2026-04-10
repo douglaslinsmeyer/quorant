@@ -190,7 +190,7 @@ func (s *AdminService) StartImpersonation(ctx context.Context, targetUserID uuid
 		Module:       "admin",
 		OccurredAt:   time.Now().UTC(),
 	})
-	return nil, api.NewUnprocessableError("impersonation requires Zitadel API integration (not yet implemented)")
+	return nil, api.NewUnprocessableError("unprocessable.not_implemented", api.P("feature", "impersonation"), api.P("dependency", "Zitadel API"))
 }
 
 // StopImpersonation records an audit attempt and returns an error because
@@ -205,7 +205,7 @@ func (s *AdminService) StopImpersonation(ctx context.Context) (map[string]any, e
 		Module:       "admin",
 		OccurredAt:   time.Now().UTC(),
 	})
-	return nil, api.NewUnprocessableError("impersonation requires Zitadel API integration (not yet implemented)")
+	return nil, api.NewUnprocessableError("unprocessable.not_implemented", api.P("feature", "impersonation"), api.P("dependency", "Zitadel API"))
 }
 
 // SearchUsers searches users by email or display name.
@@ -228,7 +228,7 @@ func (s *AdminService) ResetPassword(ctx context.Context, userID uuid.UUID) (map
 		Module:       "admin",
 		OccurredAt:   time.Now().UTC(),
 	})
-	return nil, api.NewUnprocessableError("password reset requires Zitadel admin API integration (not yet implemented)")
+	return nil, api.NewUnprocessableError("unprocessable.not_implemented", api.P("feature", "password reset"), api.P("dependency", "Zitadel admin API"))
 }
 
 // UnlockAccount re-activates a user account and records an audit entry.

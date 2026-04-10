@@ -382,7 +382,7 @@ func TestAssignTaskRequest_Validate_BothNil(t *testing.T) {
 	req := task.AssignTaskRequest{}
 	err := req.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "assigned_to")
+	assert.Contains(t, err.Error(), "validation.at_least_one")
 }
 
 func TestAssignTaskRequest_Validate_AssignedToSet(t *testing.T) {

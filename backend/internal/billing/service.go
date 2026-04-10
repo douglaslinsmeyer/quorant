@@ -31,7 +31,7 @@ func (s *BillingService) GetBillingAccount(ctx context.Context, orgID uuid.UUID)
 		return nil, fmt.Errorf("billing service: GetBillingAccount: %w", err)
 	}
 	if acct == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("billing account for org %s not found", orgID))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "billing_account"), api.P("id", orgID.String()))
 	}
 	return acct, nil
 }
@@ -82,7 +82,7 @@ func (s *BillingService) GetInvoice(ctx context.Context, id uuid.UUID) (*Invoice
 		return nil, fmt.Errorf("billing service: GetInvoice: %w", err)
 	}
 	if inv == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("invoice %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "invoice"), api.P("id", id.String()))
 	}
 	return inv, nil
 }

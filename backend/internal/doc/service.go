@@ -71,7 +71,7 @@ func (s *DocService) GetDocument(ctx context.Context, id uuid.UUID) (*Document, 
 		return nil, err
 	}
 	if doc == nil {
-		return nil, api.NewNotFoundError("document not found")
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "document"), api.P("id", id.String()))
 	}
 	return doc, nil
 }

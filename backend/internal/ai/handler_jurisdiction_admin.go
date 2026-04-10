@@ -50,13 +50,13 @@ func (h *JurisdictionAdminHandler) CreateRule(w http.ResponseWriter, r *http.Req
 	}
 
 	if err := req.Validate(); err != nil {
-		api.WriteError(w, api.NewValidationError(err.Error(), ""))
+		api.WriteError(w, api.NewValidationError("validation.invalid", "", api.P("field", "request")))
 		return
 	}
 
 	effectiveDate, err := time.Parse("2006-01-02", req.EffectiveDate)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("effective_date must be YYYY-MM-DD", "effective_date"))
+		api.WriteError(w, api.NewValidationError("validation.constraint", "effective_date", api.P("field", "effective_date"), api.P("constraint", "YYYY-MM-DD format")))
 		return
 	}
 
@@ -74,7 +74,7 @@ func (h *JurisdictionAdminHandler) CreateRule(w http.ResponseWriter, r *http.Req
 	if req.SourceDocID != "" {
 		sourceID, err := uuid.Parse(req.SourceDocID)
 		if err != nil {
-			api.WriteError(w, api.NewValidationError("source_doc_id must be a valid UUID", "source_doc_id"))
+			api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "source_doc_id", api.P("field", "source_doc_id")))
 			return
 		}
 		rule.SourceDocID = &sourceID
@@ -100,7 +100,7 @@ func (h *JurisdictionAdminHandler) CreateRule(w http.ResponseWriter, r *http.Req
 func (h *JurisdictionAdminHandler) ListRules(w http.ResponseWriter, r *http.Request) {
 	jurisdiction := r.URL.Query().Get("jurisdiction")
 	if jurisdiction == "" {
-		api.WriteError(w, api.NewValidationError("jurisdiction query parameter is required", "jurisdiction"))
+		api.WriteError(w, api.NewValidationError("validation.required", "jurisdiction", api.P("field", "jurisdiction")))
 		return
 	}
 
@@ -108,7 +108,7 @@ func (h *JurisdictionAdminHandler) ListRules(w http.ResponseWriter, r *http.Requ
 
 	afterID, err := parseComplianceCursorID(page.Cursor)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_cursor", "cursor"))
 		return
 	}
 
@@ -135,7 +135,7 @@ func (h *JurisdictionAdminHandler) ListRules(w http.ResponseWriter, r *http.Requ
 func (h *JurisdictionAdminHandler) GetRule(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("id must be a valid UUID", "id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "id", api.P("field", "id")))
 		return
 	}
 
@@ -146,7 +146,7 @@ func (h *JurisdictionAdminHandler) GetRule(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if rule == nil {
-		api.WriteError(w, api.NewNotFoundError("jurisdiction rule not found"))
+		api.WriteError(w, api.NewNotFoundError("resource.not_found", api.P("resource", "jurisdiction_rule")))
 		return
 	}
 
@@ -158,7 +158,7 @@ func (h *JurisdictionAdminHandler) GetRule(w http.ResponseWriter, r *http.Reques
 func (h *JurisdictionAdminHandler) UpdateRule(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("id must be a valid UUID", "id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "id", api.P("field", "id")))
 		return
 	}
 
@@ -169,7 +169,7 @@ func (h *JurisdictionAdminHandler) UpdateRule(w http.ResponseWriter, r *http.Req
 	}
 
 	if err := req.Validate(); err != nil {
-		api.WriteError(w, api.NewValidationError(err.Error(), ""))
+		api.WriteError(w, api.NewValidationError("validation.invalid", "", api.P("field", "request")))
 		return
 	}
 
@@ -180,7 +180,7 @@ func (h *JurisdictionAdminHandler) UpdateRule(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if existing == nil {
-		api.WriteError(w, api.NewNotFoundError("jurisdiction rule not found"))
+		api.WriteError(w, api.NewNotFoundError("resource.not_found", api.P("resource", "jurisdiction_rule")))
 		return
 	}
 
@@ -195,7 +195,7 @@ func (h *JurisdictionAdminHandler) UpdateRule(w http.ResponseWriter, r *http.Req
 
 	effectiveDate, err := time.Parse("2006-01-02", req.EffectiveDate)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("effective_date must be YYYY-MM-DD", "effective_date"))
+		api.WriteError(w, api.NewValidationError("validation.constraint", "effective_date", api.P("field", "effective_date"), api.P("constraint", "YYYY-MM-DD format")))
 		return
 	}
 
@@ -233,7 +233,7 @@ func (h *JurisdictionAdminHandler) UpdateRule(w http.ResponseWriter, r *http.Req
 func (h *JurisdictionAdminHandler) ExpireRule(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("id must be a valid UUID", "id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "id", api.P("field", "id")))
 		return
 	}
 
@@ -244,7 +244,7 @@ func (h *JurisdictionAdminHandler) ExpireRule(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if rule == nil {
-		api.WriteError(w, api.NewNotFoundError("jurisdiction rule not found"))
+		api.WriteError(w, api.NewNotFoundError("resource.not_found", api.P("resource", "jurisdiction_rule")))
 		return
 	}
 

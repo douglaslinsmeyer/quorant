@@ -216,11 +216,11 @@ func (h *LicenseHandler) GetUsage(w http.ResponseWriter, r *http.Request) {
 func parsePlanID(r *http.Request) (uuid.UUID, error) {
 	raw := r.PathValue("plan_id")
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError("plan_id is required", "plan_id")
+		return uuid.Nil, api.NewValidationError("validation.required", "plan_id", api.P("field", "plan_id"))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError("plan_id must be a valid UUID", "plan_id")
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", "plan_id", api.P("field", "plan_id"))
 	}
 	return id, nil
 }
@@ -228,11 +228,11 @@ func parsePlanID(r *http.Request) (uuid.UUID, error) {
 func parseOrgID(r *http.Request) (uuid.UUID, error) {
 	raw := r.PathValue("org_id")
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError("org_id is required", "org_id")
+		return uuid.Nil, api.NewValidationError("validation.required", "org_id", api.P("field", "org_id"))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError("org_id must be a valid UUID", "org_id")
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id"))
 	}
 	return id, nil
 }

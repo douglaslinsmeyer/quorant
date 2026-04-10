@@ -13,7 +13,7 @@ type CreateBillingAccountRequest struct {
 // Validate ensures required fields are present and valid.
 func (r CreateBillingAccountRequest) Validate() error {
 	if r.BillingEmail == "" {
-		return api.NewValidationError("billing_email is required", "billing_email")
+		return api.NewValidationError("validation.required", "billing_email", api.P("field", "billing_email"))
 	}
 	return nil
 }
@@ -29,7 +29,7 @@ type UpdateBillingAccountRequest struct {
 // Validate ensures at least one field is present.
 func (r UpdateBillingAccountRequest) Validate() error {
 	if r.BillingEmail == nil && r.BillingName == nil && r.StripeCustomerID == nil {
-		return api.NewValidationError("at least one field must be provided", "")
+		return api.NewValidationError("validation.at_least_one", "")
 	}
 	return nil
 }

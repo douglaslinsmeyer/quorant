@@ -317,7 +317,7 @@ func TestUpdateSubscriptionRequest_Validate_NoFieldsIsError(t *testing.T) {
 	req := webhook.UpdateSubscriptionRequest{}
 	err := req.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "at least one field")
+	assert.Contains(t, err.Error(), "validation.at_least_one")
 }
 
 func TestUpdateSubscriptionRequest_Validate_NameOnly(t *testing.T) {

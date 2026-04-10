@@ -24,7 +24,7 @@ func NewHandler(auditor *PostgresAuditor, logger *slog.Logger) *Handler {
 func (h *Handler) ListAuditLog(w http.ResponseWriter, r *http.Request) {
 	orgID, err := uuid.Parse(r.PathValue("org_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid org_id", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
@@ -44,7 +44,7 @@ func (h *Handler) ListAuditLog(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetAuditEntry(w http.ResponseWriter, r *http.Request) {
 	eventID, err := uuid.Parse(r.PathValue("event_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid event_id", "event_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "event_id", api.P("field", "event_id")))
 		return
 	}
 
@@ -66,5 +66,5 @@ func (h *Handler) GetAuditEntry(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	api.WriteError(w, api.NewNotFoundError("audit entry not found"))
+	api.WriteError(w, api.NewNotFoundError("resource.not_found", api.P("resource", "audit_entry")))
 }

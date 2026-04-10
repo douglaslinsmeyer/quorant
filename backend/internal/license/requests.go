@@ -18,13 +18,13 @@ type CreatePlanRequest struct {
 // Validate ensures required fields are present.
 func (r CreatePlanRequest) Validate() error {
 	if r.Name == "" {
-		return api.NewValidationError("name is required", "name")
+		return api.NewValidationError("validation.required", "name", api.P("field", "name"))
 	}
 	switch r.PlanType {
 	case "firm", "hoa", "firm_bundle":
 		// valid
 	default:
-		return api.NewValidationError(`plan_type must be one of: firm, hoa, firm_bundle`, "plan_type")
+		return api.NewValidationError("validation.one_of", "plan_type", api.P("field", "plan_type"), api.P("values", "firm, hoa, firm_bundle"))
 	}
 	return nil
 }
@@ -38,10 +38,10 @@ type CreateSubscriptionRequest struct {
 // Validate ensures OrgID and PlanID are non-zero.
 func (r CreateSubscriptionRequest) Validate() error {
 	if r.OrgID == (uuid.UUID{}) {
-		return api.NewValidationError("org_id is required", "org_id")
+		return api.NewValidationError("validation.required", "org_id", api.P("field", "org_id"))
 	}
 	if r.PlanID == (uuid.UUID{}) {
-		return api.NewValidationError("plan_id is required", "plan_id")
+		return api.NewValidationError("validation.required", "plan_id", api.P("field", "plan_id"))
 	}
 	return nil
 }
@@ -59,10 +59,10 @@ type UpsertOverrideRequest struct {
 // Validate ensures OrgID and FeatureKey are present.
 func (r UpsertOverrideRequest) Validate() error {
 	if r.OrgID == (uuid.UUID{}) {
-		return api.NewValidationError("org_id is required", "org_id")
+		return api.NewValidationError("validation.required", "org_id", api.P("field", "org_id"))
 	}
 	if r.FeatureKey == "" {
-		return api.NewValidationError("feature_key is required", "feature_key")
+		return api.NewValidationError("validation.required", "feature_key", api.P("field", "feature_key"))
 	}
 	return nil
 }

@@ -45,7 +45,7 @@ func parseOrgID(r *http.Request) (uuid.UUID, error) {
 func (h *AIHandler) RegisterGoverningDoc(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseOrgID(r)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("org_id must be a valid UUID", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
@@ -68,7 +68,7 @@ func (h *AIHandler) RegisterGoverningDoc(w http.ResponseWriter, r *http.Request)
 func (h *AIHandler) ListGoverningDocs(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseOrgID(r)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("org_id must be a valid UUID", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
@@ -85,7 +85,7 @@ func (h *AIHandler) ListGoverningDocs(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) GetGoverningDoc(w http.ResponseWriter, r *http.Request) {
 	docID, err := uuid.Parse(r.PathValue("doc_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("doc_id must be a valid UUID", "doc_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "doc_id", api.P("field", "doc_id")))
 		return
 	}
 
@@ -104,7 +104,7 @@ func (h *AIHandler) GetGoverningDoc(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) RemoveGoverningDoc(w http.ResponseWriter, r *http.Request) {
 	docID, err := uuid.Parse(r.PathValue("doc_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("doc_id must be a valid UUID", "doc_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "doc_id", api.P("field", "doc_id")))
 		return
 	}
 
@@ -130,7 +130,7 @@ func (h *AIHandler) RemoveGoverningDoc(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) ReindexGoverningDoc(w http.ResponseWriter, r *http.Request) {
 	docID, err := uuid.Parse(r.PathValue("doc_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("doc_id must be a valid UUID", "doc_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "doc_id", api.P("field", "doc_id")))
 		return
 	}
 
@@ -149,7 +149,7 @@ func (h *AIHandler) ReindexGoverningDoc(w http.ResponseWriter, r *http.Request) 
 func (h *AIHandler) ListExtractions(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseOrgID(r)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("org_id must be a valid UUID", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
@@ -166,7 +166,7 @@ func (h *AIHandler) ListExtractions(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) GetExtraction(w http.ResponseWriter, r *http.Request) {
 	extractionID, err := uuid.Parse(r.PathValue("extraction_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("extraction_id must be a valid UUID", "extraction_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "extraction_id", api.P("field", "extraction_id")))
 		return
 	}
 
@@ -183,7 +183,7 @@ func (h *AIHandler) GetExtraction(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) ApproveExtraction(w http.ResponseWriter, r *http.Request) {
 	extractionID, err := uuid.Parse(r.PathValue("extraction_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("extraction_id must be a valid UUID", "extraction_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "extraction_id", api.P("field", "extraction_id")))
 		return
 	}
 
@@ -200,7 +200,7 @@ func (h *AIHandler) ApproveExtraction(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) RejectExtraction(w http.ResponseWriter, r *http.Request) {
 	extractionID, err := uuid.Parse(r.PathValue("extraction_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("extraction_id must be a valid UUID", "extraction_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "extraction_id", api.P("field", "extraction_id")))
 		return
 	}
 
@@ -217,7 +217,7 @@ func (h *AIHandler) RejectExtraction(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) ModifyExtraction(w http.ResponseWriter, r *http.Request) {
 	extractionID, err := uuid.Parse(r.PathValue("extraction_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("extraction_id must be a valid UUID", "extraction_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "extraction_id", api.P("field", "extraction_id")))
 		return
 	}
 
@@ -242,13 +242,13 @@ func (h *AIHandler) ModifyExtraction(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) GetActivePolicy(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseOrgID(r)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("org_id must be a valid UUID", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
 	policyKey := r.PathValue("policy_key")
 	if policyKey == "" {
-		api.WriteError(w, api.NewValidationError("policy_key is required", "policy_key"))
+		api.WriteError(w, api.NewValidationError("validation.required", "policy_key", api.P("field", "policy_key")))
 		return
 	}
 
@@ -258,7 +258,7 @@ func (h *AIHandler) GetActivePolicy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if result == nil {
-		api.WriteError(w, api.NewNotFoundError("no active policy found for key: "+policyKey))
+		api.WriteError(w, api.NewNotFoundError("resource.not_found", api.P("resource", "policy"), api.P("id", policyKey)))
 		return
 	}
 
@@ -269,7 +269,7 @@ func (h *AIHandler) GetActivePolicy(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) ListActivePolicies(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseOrgID(r)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("org_id must be a valid UUID", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
@@ -286,7 +286,7 @@ func (h *AIHandler) ListActivePolicies(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) QueryPolicy(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseOrgID(r)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("org_id must be a valid UUID", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
@@ -299,7 +299,7 @@ func (h *AIHandler) QueryPolicy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Query == "" {
-		api.WriteError(w, api.NewValidationError("query is required", "query"))
+		api.WriteError(w, api.NewValidationError("validation.required", "query", api.P("field", "query")))
 		return
 	}
 
@@ -319,7 +319,7 @@ func (h *AIHandler) QueryPolicy(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) ListResolutions(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseOrgID(r)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("org_id must be a valid UUID", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
@@ -336,7 +336,7 @@ func (h *AIHandler) ListResolutions(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) GetResolution(w http.ResponseWriter, r *http.Request) {
 	resolutionID, err := uuid.Parse(r.PathValue("resolution_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("resolution_id must be a valid UUID", "resolution_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "resolution_id", api.P("field", "resolution_id")))
 		return
 	}
 
@@ -353,7 +353,7 @@ func (h *AIHandler) GetResolution(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) DecideResolution(w http.ResponseWriter, r *http.Request) {
 	resolutionID, err := uuid.Parse(r.PathValue("resolution_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("resolution_id must be a valid UUID", "resolution_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "resolution_id", api.P("field", "resolution_id")))
 		return
 	}
 
@@ -379,7 +379,7 @@ func (h *AIHandler) DecideResolution(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) GetAIConfig(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseOrgID(r)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("org_id must be a valid UUID", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
@@ -402,7 +402,7 @@ func (h *AIHandler) GetAIConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if o == nil {
-		api.WriteError(w, api.NewNotFoundError("organization not found"))
+		api.WriteError(w, api.NewNotFoundError("resource.not_found", api.P("resource", "organization")))
 		return
 	}
 
@@ -414,7 +414,7 @@ func (h *AIHandler) GetAIConfig(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) UpdateAIConfig(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseOrgID(r)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("org_id must be a valid UUID", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
@@ -430,7 +430,7 @@ func (h *AIHandler) UpdateAIConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if o == nil {
-		api.WriteError(w, api.NewNotFoundError("organization not found"))
+		api.WriteError(w, api.NewNotFoundError("resource.not_found", api.P("resource", "organization")))
 		return
 	}
 

@@ -82,7 +82,7 @@ func (s *TaskService) CreateTaskType(ctx context.Context, orgID uuid.UUID, req C
 	if req.WorkflowStages != nil {
 		b, err := json.Marshal(req.WorkflowStages)
 		if err != nil {
-			return nil, api.NewValidationError("invalid workflow_stages", "workflow_stages")
+			return nil, api.NewValidationError("validation.invalid", "workflow_stages", api.P("field", "workflow_stages"))
 		}
 		workflowStages = json.RawMessage(b)
 	}
@@ -91,7 +91,7 @@ func (s *TaskService) CreateTaskType(ctx context.Context, orgID uuid.UUID, req C
 	if req.ChecklistTemplate != nil {
 		b, err := json.Marshal(req.ChecklistTemplate)
 		if err != nil {
-			return nil, api.NewValidationError("invalid checklist_template", "checklist_template")
+			return nil, api.NewValidationError("validation.invalid", "checklist_template", api.P("field", "checklist_template"))
 		}
 		checklistTemplate = json.RawMessage(b)
 	}
@@ -204,7 +204,7 @@ func (s *TaskService) GetTask(ctx context.Context, id uuid.UUID) (*Task, error) 
 		return nil, err
 	}
 	if t == nil {
-		return nil, api.NewNotFoundError("task not found")
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "task"), api.P("id", id.String()))
 	}
 	return t, nil
 }
@@ -266,7 +266,8 @@ func (s *TaskService) TransitionTask(ctx context.Context, taskID uuid.UUID, req 
 	allowed, ok := validTransitions[t.Status]
 	if !ok || !allowed[req.Status] {
 		return nil, api.NewValidationError(
-			"invalid transition from "+t.Status+" to "+req.Status, "status",
+			"validation.constraint", "status",
+			api.P("field", "status"), api.P("constraint", "valid transition from "+t.Status+" to "+req.Status),
 		)
 	}
 
@@ -360,7 +361,7 @@ func (s *TaskService) ToggleChecklistItem(ctx context.Context, taskID uuid.UUID,
 	var checklist []map[string]any
 	if len(t.Checklist) > 0 {
 		if err := json.Unmarshal(t.Checklist, &checklist); err != nil {
-			return nil, api.NewValidationError("invalid checklist format", "checklist")
+			return nil, api.NewValidationError("validation.invalid", "checklist", api.P("field", "checklist"))
 		}
 	}
 
@@ -376,12 +377,12 @@ func (s *TaskService) ToggleChecklistItem(ctx context.Context, taskID uuid.UUID,
 	}
 
 	if !found {
-		return nil, api.NewNotFoundError("checklist item not found")
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "checklist_item"))
 	}
 
 	b, err := json.Marshal(checklist)
 	if err != nil {
-		return nil, api.NewValidationError("failed to serialize checklist", "checklist")
+		return nil, api.NewValidationError("validation.invalid", "checklist", api.P("field", "checklist"))
 	}
 	t.Checklist = json.RawMessage(b)
 	t.UpdatedAt = time.Now().UTC()

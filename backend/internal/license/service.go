@@ -78,7 +78,7 @@ func (s *LicenseService) GetPlan(ctx context.Context, id uuid.UUID) (*Plan, erro
 		return nil, fmt.Errorf("license service: GetPlan: %w", err)
 	}
 	if p == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("plan %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "plan"), api.P("id", id.String()))
 	}
 	return p, nil
 }
@@ -138,7 +138,7 @@ func (s *LicenseService) GetSubscription(ctx context.Context, orgID uuid.UUID) (
 		return nil, fmt.Errorf("license service: GetSubscription: %w", err)
 	}
 	if sub == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("no active subscription for org %s", orgID))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "subscription"), api.P("id", orgID.String()))
 	}
 	return sub, nil
 }
@@ -228,7 +228,7 @@ func (s *LicenseService) SetOverride(ctx context.Context, orgID uuid.UUID, req U
 	if req.ExpiresAt != nil {
 		t, err := time.Parse(time.RFC3339, *req.ExpiresAt)
 		if err != nil {
-			return nil, api.NewValidationError("expires_at must be in RFC3339 format", "expires_at")
+			return nil, api.NewValidationError("validation.constraint", "expires_at", api.P("field", "expires_at"), api.P("constraint", "RFC3339 format"))
 		}
 		o.ExpiresAt = &t
 	}
