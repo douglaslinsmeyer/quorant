@@ -1385,15 +1385,15 @@ func TestCreateFundTransfer_CreatesFundTransactions(t *testing.T) {
 	debit := fundRepo.transactions[0]
 	assert.Equal(t, from.ID, debit.FundID)
 	assert.Equal(t, int64(-20_000), debit.AmountCents, "debit should be negative")
-	assert.Equal(t, "transfer_out", debit.TransactionType)
-	refType := "fund_transfer"
+	assert.Equal(t, fin.FundTxTypeTransferOut, debit.TransactionType)
+	refType := fin.FundTxRefTypeTransfer
 	assert.Equal(t, &refType, debit.ReferenceType)
 	assert.Equal(t, &transfer.ID, debit.ReferenceID)
 
 	credit := fundRepo.transactions[1]
 	assert.Equal(t, to.ID, credit.FundID)
 	assert.Equal(t, int64(20_000), credit.AmountCents, "credit should be positive")
-	assert.Equal(t, "transfer_in", credit.TransactionType)
+	assert.Equal(t, fin.FundTxTypeTransferIn, credit.TransactionType)
 	assert.Equal(t, &refType, credit.ReferenceType)
 	assert.Equal(t, &transfer.ID, credit.ReferenceID)
 }

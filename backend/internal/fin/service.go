@@ -673,13 +673,13 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 	}
 
 	// Debit the source fund.
-	refType := "fund_transfer"
+	refType := FundTxRefTypeTransfer
 	debitDesc := "Transfer out"
 	if _, err := s.funds.CreateTransaction(ctx, &FundTransaction{
 		FundID:          req.FromFundID,
 		OrgID:           orgID,
 		CurrencyCode:    "USD",
-		TransactionType: "transfer_out",
+		TransactionType: FundTxTypeTransferOut,
 		AmountCents:     -req.AmountCents,
 		Description:     &debitDesc,
 		ReferenceType:   &refType,
@@ -695,7 +695,7 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 		FundID:          req.ToFundID,
 		OrgID:           orgID,
 		CurrencyCode:    "USD",
-		TransactionType: "transfer_in",
+		TransactionType: FundTxTypeTransferIn,
 		AmountCents:     req.AmountCents,
 		Description:     &creditDesc,
 		ReferenceType:   &refType,
