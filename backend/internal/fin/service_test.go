@@ -1227,6 +1227,87 @@ func TestCreateAssessment_NilGLService_StillWorks(t *testing.T) {
 
 // ── CurrencyCode Tests ──────────────────────────────────────────────────────
 
+// TestRecordPayment_GLFailureReturnsError verifies that a GL posting error
+// propagates to the caller instead of being silently swallowed.
+func TestRecordPayment_GLFailureReturnsError(t *testing.T) {
+	assessments := &mockAssessmentRepo{}
+	payments := &mockPaymentRepo{}
+	budgets := &mockBudgetRepo{}
+	funds := &mockFundRepo{}
+	collections := &mockCollectionRepo{}
+
+	glRepo := newMockGLRepo()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	glService := fin.NewGLService(glRepo, audit.NewNoopAuditor(), logger)
+
+	orgID := uuid.New()
+	userID := uuid.New()
+
+	cashAccount := &fin.GLAccount{
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 1010, Name: "Cash",
+		AccountType: fin.GLAccountTypeAsset, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	arAccount := &fin.GLAccount{
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 1100, Name: "AR",
+		AccountType: fin.GLAccountTypeAsset, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	glRepo.SetAccounts(cashAccount, arAccount)
+	glRepo.SetPostError(fmt.Errorf("simulated GL failure"))
+
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger, nil)
+
+	desc := "Test payment"
+	_, err := svc.RecordPayment(context.Background(), orgID, userID, fin.CreatePaymentRequest{
+		UnitID:      uuid.New(),
+		AmountCents: 5000,
+		Description: &desc,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "simulated GL failure")
+}
+
+// TestCreateFundTransfer_GLFailureReturnsError verifies that a GL posting error
+// propagates to the caller instead of being silently swallowed.
+func TestCreateFundTransfer_GLFailureReturnsError(t *testing.T) {
+	assessments := &mockAssessmentRepo{}
+	payments := &mockPaymentRepo{}
+	budgets := &mockBudgetRepo{}
+	funds := &mockFundRepo{}
+	collections := &mockCollectionRepo{}
+
+	glRepo := newMockGLRepo()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	glService := fin.NewGLService(glRepo, audit.NewNoopAuditor(), logger)
+
+	orgID := uuid.New()
+
+	fromFund := &fin.Fund{OrgID: orgID, CurrencyCode: "USD", Name: "Operating", FundType: "operating", BalanceCents: 100000}
+	toFund := &fin.Fund{OrgID: orgID, CurrencyCode: "USD", Name: "Reserve", FundType: "reserve", BalanceCents: 0}
+	fromFund, _ = funds.CreateFund(context.Background(), fromFund)
+	toFund, _ = funds.CreateFund(context.Background(), toFund)
+
+	fromCash := &fin.GLAccount{ID: uuid.New(), OrgID: orgID, AccountNumber: 1010, Name: "Cash-Operating", AccountType: fin.GLAccountTypeAsset, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	toCash := &fin.GLAccount{ID: uuid.New(), OrgID: orgID, AccountNumber: 1020, Name: "Cash-Reserve", AccountType: fin.GLAccountTypeAsset, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	transferOut := &fin.GLAccount{ID: uuid.New(), OrgID: orgID, AccountNumber: 3100, Name: "Transfer Out", AccountType: fin.GLAccountTypeEquity, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	transferIn := &fin.GLAccount{ID: uuid.New(), OrgID: orgID, AccountNumber: 3110, Name: "Transfer In", AccountType: fin.GLAccountTypeEquity, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	glRepo.SetAccounts(fromCash, toCash, transferOut, transferIn)
+	glRepo.SetPostError(fmt.Errorf("simulated GL failure"))
+
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger, nil)
+
+	desc := "Test transfer"
+	_, err := svc.CreateFundTransfer(context.Background(), orgID, fin.CreateFundTransferRequest{
+		FromFundID:  fromFund.ID,
+		ToFundID:    toFund.ID,
+		AmountCents: 5000,
+		Description: &desc,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "simulated GL failure")
+}
+
 // TestCreateSchedule_SetsCurrencyCode verifies that CurrencyCode is explicitly
 // set to "USD" when creating a schedule.
 func TestCreateSchedule_SetsCurrencyCode(t *testing.T) {
