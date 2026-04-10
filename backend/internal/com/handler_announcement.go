@@ -55,7 +55,7 @@ func (h *AnnouncementHandler) List(w http.ResponseWriter, r *http.Request) {
 	page := api.ParsePageRequest(r)
 	afterID, err := parseComCursorID(page.Cursor)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_cursor", "cursor"))
 		return
 	}
 
@@ -162,11 +162,11 @@ func parseComCursorID(cursor string) (*uuid.UUID, error) {
 func parseComOrgID(r *http.Request) (uuid.UUID, error) {
 	raw := r.PathValue("org_id")
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError("org_id is required", "org_id")
+		return uuid.Nil, api.NewValidationError("validation.required", "org_id", api.P("field", "org_id"))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError("org_id must be a valid UUID", "org_id")
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id"))
 	}
 	return id, nil
 }
@@ -176,11 +176,11 @@ func parseComOrgID(r *http.Request) (uuid.UUID, error) {
 func parseComPathUUID(r *http.Request, param string) (uuid.UUID, error) {
 	raw := r.PathValue(param)
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError(param+" is required", param)
+		return uuid.Nil, api.NewValidationError("validation.required", param, api.P("field", param))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError(param+" must be a valid UUID", param)
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", param, api.P("field", param))
 	}
 	return id, nil
 }

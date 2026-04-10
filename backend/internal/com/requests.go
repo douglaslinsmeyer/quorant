@@ -19,10 +19,10 @@ type CreateAnnouncementRequest struct {
 // Validate checks that Title and Body are present.
 func (r CreateAnnouncementRequest) Validate() error {
 	if r.Title == "" {
-		return api.NewValidationError("title is required", "title")
+		return api.NewValidationError("validation.required", "title", api.P("field", "title"))
 	}
 	if r.Body == "" {
-		return api.NewValidationError("body is required", "body")
+		return api.NewValidationError("validation.required", "body", api.P("field", "body"))
 	}
 	return nil
 }
@@ -36,7 +36,7 @@ type CreateThreadRequest struct {
 // Validate checks that Subject is present.
 func (r CreateThreadRequest) Validate() error {
 	if r.Subject == "" {
-		return api.NewValidationError("subject is required", "subject")
+		return api.NewValidationError("validation.required", "subject", api.P("field", "subject"))
 	}
 	return nil
 }
@@ -49,7 +49,7 @@ type SendMessageRequest struct {
 // Validate checks that Body is present.
 func (r SendMessageRequest) Validate() error {
 	if r.Body == "" {
-		return api.NewValidationError("body is required", "body")
+		return api.NewValidationError("validation.required", "body", api.P("field", "body"))
 	}
 	return nil
 }
@@ -69,13 +69,13 @@ type CreateCalendarEventRequest struct {
 // Validate checks that Title, EventType, and StartsAt are present.
 func (r CreateCalendarEventRequest) Validate() error {
 	if r.Title == "" {
-		return api.NewValidationError("title is required", "title")
+		return api.NewValidationError("validation.required", "title", api.P("field", "title"))
 	}
 	if r.EventType == "" {
-		return api.NewValidationError("event_type is required", "event_type")
+		return api.NewValidationError("validation.required", "event_type", api.P("field", "event_type"))
 	}
 	if r.StartsAt.IsZero() {
-		return api.NewValidationError("starts_at is required", "starts_at")
+		return api.NewValidationError("validation.required", "starts_at", api.P("field", "starts_at"))
 	}
 	return nil
 }
@@ -92,7 +92,7 @@ func (r RSVPRequest) Validate() error {
 	case "attending", "maybe", "declined":
 		// valid
 	default:
-		return api.NewValidationError(`status must be one of: attending, maybe, declined`, "status")
+		return api.NewValidationError("validation.one_of", "status", api.P("field", "status"), api.P("values", "attending, maybe, declined"))
 	}
 	return nil
 }
@@ -110,13 +110,13 @@ type CreateTemplateRequest struct {
 // If Locale is empty it defaults to "en_US".
 func (r *CreateTemplateRequest) Validate() error {
 	if r.TemplateKey == "" {
-		return api.NewValidationError("template_key is required", "template_key")
+		return api.NewValidationError("validation.required", "template_key", api.P("field", "template_key"))
 	}
 	if r.Channel == "" {
-		return api.NewValidationError("channel is required", "channel")
+		return api.NewValidationError("validation.required", "channel", api.P("field", "channel"))
 	}
 	if r.Body == "" {
-		return api.NewValidationError("body is required", "body")
+		return api.NewValidationError("validation.required", "body", api.P("field", "body"))
 	}
 	if r.Locale == "" {
 		r.Locale = "en_US"
@@ -136,7 +136,7 @@ type UpdateDirectoryPreferenceRequest struct {
 // Validate checks that at least one field is provided.
 func (r UpdateDirectoryPreferenceRequest) Validate() error {
 	if r.OptIn == nil && r.ShowEmail == nil && r.ShowPhone == nil && r.ShowUnit == nil {
-		return api.NewValidationError("at least one field must be provided", "")
+		return api.NewValidationError("validation.at_least_one", "")
 	}
 	return nil
 }
@@ -154,13 +154,13 @@ type LogCommunicationRequest struct {
 // Validate checks that Direction, Channel, and at least one contact identifier are present.
 func (r LogCommunicationRequest) Validate() error {
 	if r.Direction == "" {
-		return api.NewValidationError("direction is required", "direction")
+		return api.NewValidationError("validation.required", "direction", api.P("field", "direction"))
 	}
 	if r.Channel == "" {
-		return api.NewValidationError("channel is required", "channel")
+		return api.NewValidationError("validation.required", "channel", api.P("field", "channel"))
 	}
 	if r.ContactUserID == nil && r.ContactName == nil {
-		return api.NewValidationError("contact_name or contact_user_id is required", "contact_name")
+		return api.NewValidationError("validation.required", "contact_name", api.P("field", "contact_name or contact_user_id"))
 	}
 	return nil
 }

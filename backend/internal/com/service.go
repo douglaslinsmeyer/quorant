@@ -103,7 +103,7 @@ func (s *ComService) GetAnnouncement(ctx context.Context, id uuid.UUID) (*Announ
 		return nil, fmt.Errorf("com service: GetAnnouncement: %w", err)
 	}
 	if a == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("announcement %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "announcement"))
 	}
 	return a, nil
 }
@@ -168,7 +168,7 @@ func (s *ComService) GetThread(ctx context.Context, id uuid.UUID) (*Thread, erro
 		return nil, fmt.Errorf("com service: GetThread: %w", err)
 	}
 	if t == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("thread %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "thread"))
 	}
 	return t, nil
 }
@@ -316,7 +316,7 @@ func (s *ComService) GetCalendarEvent(ctx context.Context, id uuid.UUID) (*Calen
 		return nil, fmt.Errorf("com service: GetCalendarEvent: %w", err)
 	}
 	if e == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("calendar event %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "calendar event"))
 	}
 	return e, nil
 }
@@ -527,7 +527,7 @@ func (s *ComService) GetCommunication(ctx context.Context, id uuid.UUID) (*Commu
 		return nil, fmt.Errorf("com service: GetCommunication: %w", err)
 	}
 	if entry == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("communication %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "communication"))
 	}
 	return entry, nil
 }
