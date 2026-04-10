@@ -17,7 +17,10 @@ import (
 	"github.com/quorant/quorant/internal/platform/queue"
 
 	"github.com/quorant/quorant/internal/ai"
+	"github.com/quorant/quorant/internal/audit"
+	"github.com/quorant/quorant/internal/org"
 	"github.com/quorant/quorant/internal/platform/scheduler"
+	"github.com/quorant/quorant/internal/task"
 	"github.com/quorant/quorant/internal/webhook"
 )
 
@@ -84,7 +87,26 @@ func run() error {
 	ingestionWorker := ai.NewIngestionWorker(contextChunkRepo, ingestionEmbedFn, logger)
 	ingestionWorker.RegisterHandlers(consumer)
 
-	logger.Info("registered event handlers", "count", 5)
+	// Compliance worker — re-evaluates orgs on rule/org/unit/document changes
+	jurisdictionRuleRepo := ai.NewPostgresJurisdictionRuleRepository(pool)
+	complianceCheckRepo := ai.NewPostgresComplianceCheckRepository(pool)
+	orgRepo := org.NewPostgresOrgRepository(pool)
+	complianceService := ai.NewComplianceService(jurisdictionRuleRepo, complianceCheckRepo, orgRepo, logger)
+	complianceService.RegisterEvaluator("meeting_notice", ai.EvaluateMeetingNotice)
+	complianceService.RegisterEvaluator("fine_limits", ai.EvaluateFineLimits)
+	complianceService.RegisterEvaluator("reserve_study", ai.EvaluateReserveStudy)
+	complianceService.RegisterEvaluator("website_requirements", ai.EvaluateWebsiteRequirements)
+	complianceService.RegisterEvaluator("record_retention", ai.EvaluateRecordRetention)
+	complianceService.RegisterEvaluator("voting_rules", ai.EvaluateVotingRules)
+	complianceService.RegisterEvaluator("estoppel", ai.EvaluateEstoppel)
+
+	taskRepo := task.NewPostgresTaskRepository(pool)
+	taskService := task.NewTaskService(taskRepo, audit.NewNoopAuditor(), natsPublisher, logger)
+
+	complianceWorker := ai.NewComplianceWorker(complianceService, jurisdictionRuleRepo, complianceCheckRepo, orgRepo, taskService, natsPublisher, logger)
+	complianceWorker.RegisterHandlers(consumer)
+
+	logger.Info("registered event handlers", "count", 12)
 
 	// 9. Start consumer
 	if err := consumer.Start(ctx); err != nil {
@@ -124,6 +146,8 @@ func run() error {
 	sched.Register(scheduler.NewSLABreachMonitorJob(pool, logger), 5*time.Minute)
 	sched.Register(scheduler.NewAnnouncementPublisherJob(pool, logger), 1*time.Minute)
 	sched.Register(scheduler.NewNotificationDispatchJob(pool, logger), 30*time.Second)
+	complianceAlertJob := ai.NewComplianceAlertJob(jurisdictionRuleRepo, complianceCheckRepo, orgRepo, complianceService, taskService, natsPublisher, logger)
+	sched.Register(complianceAlertJob, 24*time.Hour)
 	go sched.Start(ctx)
 
 	logger.Info("worker started")
