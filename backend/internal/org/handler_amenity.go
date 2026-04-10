@@ -58,7 +58,7 @@ func (h *AmenityHandler) ListAmenities(w http.ResponseWriter, r *http.Request) {
 
 	afterID, err := parseCursorID(page.Cursor)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_cursor", "cursor"))
 		return
 	}
 
@@ -258,11 +258,11 @@ func (h *AmenityHandler) UpdateReservation(w http.ResponseWriter, r *http.Reques
 func parseAmenityID(r *http.Request) (uuid.UUID, error) {
 	raw := r.PathValue("amenity_id")
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError("amenity_id is required", "amenity_id")
+		return uuid.Nil, api.NewValidationError("validation.required", "amenity_id", api.P("field", "amenity_id"))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError("amenity_id must be a valid UUID", "amenity_id")
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", "amenity_id", api.P("field", "amenity_id"))
 	}
 	return id, nil
 }
@@ -271,11 +271,11 @@ func parseAmenityID(r *http.Request) (uuid.UUID, error) {
 func parseReservationID(r *http.Request) (uuid.UUID, error) {
 	raw := r.PathValue("reservation_id")
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError("reservation_id is required", "reservation_id")
+		return uuid.Nil, api.NewValidationError("validation.required", "reservation_id", api.P("field", "reservation_id"))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError("reservation_id must be a valid UUID", "reservation_id")
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", "reservation_id", api.P("field", "reservation_id"))
 	}
 	return id, nil
 }

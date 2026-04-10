@@ -51,16 +51,16 @@ type UploadDocumentRequest struct {
 // Validate checks that the UploadDocumentRequest has all required fields.
 func (r UploadDocumentRequest) Validate() *api.ValidationError {
 	if r.Title == "" {
-		return api.NewValidationError("title is required", "title")
+		return api.NewValidationError("validation.required", "title", api.P("field", "title"))
 	}
 	if r.FileName == "" {
-		return api.NewValidationError("file_name is required", "file_name")
+		return api.NewValidationError("validation.required", "file_name", api.P("field", "file_name"))
 	}
 	if r.ContentType == "" {
-		return api.NewValidationError("content_type is required", "content_type")
+		return api.NewValidationError("validation.required", "content_type", api.P("field", "content_type"))
 	}
 	if r.SizeBytes <= 0 {
-		return api.NewValidationError("size_bytes must be a positive number", "size_bytes")
+		return api.NewValidationError("validation.constraint", "size_bytes", api.P("field", "size_bytes"), api.P("constraint", "positive number"))
 	}
 	return nil
 }
@@ -74,7 +74,7 @@ type CreateCategoryRequest struct {
 // Validate checks that the CreateCategoryRequest has all required fields.
 func (r CreateCategoryRequest) Validate() *api.ValidationError {
 	if r.Name == "" {
-		return api.NewValidationError("name is required", "name")
+		return api.NewValidationError("validation.required", "name", api.P("field", "name"))
 	}
 	return nil
 }

@@ -85,7 +85,7 @@ func (s *WebhookService) GetSubscription(ctx context.Context, id uuid.UUID) (*Su
 		return nil, fmt.Errorf("webhook service: GetSubscription: %w", err)
 	}
 	if sub == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("webhook subscription %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "webhook_subscription"), api.P("id", id.String()))
 	}
 	return sub, nil
 }

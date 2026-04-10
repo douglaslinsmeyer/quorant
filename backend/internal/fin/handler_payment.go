@@ -56,7 +56,7 @@ func (h *PaymentHandler) ListPayments(w http.ResponseWriter, r *http.Request) {
 	page := api.ParsePageRequest(r)
 	afterID, err := parseFinCursorID(page.Cursor)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_cursor", "cursor"))
 		return
 	}
 

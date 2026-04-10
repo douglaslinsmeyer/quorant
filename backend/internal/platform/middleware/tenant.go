@@ -32,7 +32,7 @@ func TenantContext(next http.Handler) http.Handler {
 
 		orgID, err := uuid.Parse(orgIDStr)
 		if err != nil {
-			api.WriteError(w, api.NewValidationError("invalid organization ID", "org_id"))
+			api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 			return
 		}
 

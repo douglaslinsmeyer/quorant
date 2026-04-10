@@ -32,8 +32,10 @@ func (c *claimsCapture) Handler() http.Handler {
 // returned by WriteError.
 type errorResponseBody struct {
 	Errors []struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
+		Code       string         `json:"code"`
+		MessageKey string         `json:"message_key"`
+		Field      string         `json:"field,omitempty"`
+		Params     map[string]any `json:"params,omitempty"`
 	} `json:"errors"`
 }
 

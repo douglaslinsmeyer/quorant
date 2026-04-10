@@ -110,7 +110,7 @@ func (h *BillingHandler) StripeWebhook(w http.ResponseWriter, r *http.Request) {
 
 	sigHeader := r.Header.Get("Stripe-Signature")
 	if sigHeader == "" {
-		api.WriteError(w, api.NewUnauthenticatedError("missing Stripe-Signature header"))
+		api.WriteError(w, api.NewUnauthenticatedError("auth.missing_header", api.P("header", "Stripe-Signature")))
 		return
 	}
 
@@ -129,11 +129,11 @@ func (h *BillingHandler) StripeWebhook(w http.ResponseWriter, r *http.Request) {
 func parseOrgID(r *http.Request) (uuid.UUID, error) {
 	raw := r.PathValue("org_id")
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError("org_id is required", "org_id")
+		return uuid.Nil, api.NewValidationError("validation.required", "org_id", api.P("field", "org_id"))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError("org_id must be a valid UUID", "org_id")
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id"))
 	}
 	return id, nil
 }
@@ -141,11 +141,11 @@ func parseOrgID(r *http.Request) (uuid.UUID, error) {
 func parseInvoiceID(r *http.Request) (uuid.UUID, error) {
 	raw := r.PathValue("invoice_id")
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError("invoice_id is required", "invoice_id")
+		return uuid.Nil, api.NewValidationError("validation.required", "invoice_id", api.P("field", "invoice_id"))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError("invoice_id must be a valid UUID", "invoice_id")
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", "invoice_id", api.P("field", "invoice_id"))
 	}
 	return id, nil
 }

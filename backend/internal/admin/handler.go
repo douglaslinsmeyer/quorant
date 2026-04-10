@@ -36,7 +36,7 @@ func (h *AdminHandler) ListTenants(w http.ResponseWriter, r *http.Request) {
 func (h *AdminHandler) GetTenantDashboard(w http.ResponseWriter, r *http.Request) {
 	orgID, err := uuid.Parse(r.PathValue("org_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid org_id", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
@@ -53,7 +53,7 @@ func (h *AdminHandler) GetTenantDashboard(w http.ResponseWriter, r *http.Request
 func (h *AdminHandler) SuspendTenant(w http.ResponseWriter, r *http.Request) {
 	orgID, err := uuid.Parse(r.PathValue("org_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid org_id", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
@@ -70,7 +70,7 @@ func (h *AdminHandler) SuspendTenant(w http.ResponseWriter, r *http.Request) {
 func (h *AdminHandler) ReactivateTenant(w http.ResponseWriter, r *http.Request) {
 	orgID, err := uuid.Parse(r.PathValue("org_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid org_id", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
@@ -95,12 +95,12 @@ func (h *AdminHandler) StartImpersonation(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if body.TargetUserID == "" {
-		api.WriteError(w, api.NewValidationError("target_user_id is required", "target_user_id"))
+		api.WriteError(w, api.NewValidationError("validation.required", "target_user_id", api.P("field", "target_user_id")))
 		return
 	}
 	targetUserID, err := uuid.Parse(body.TargetUserID)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid target_user_id", "target_user_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "target_user_id", api.P("field", "target_user_id")))
 		return
 	}
 
@@ -142,7 +142,7 @@ func (h *AdminHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 func (h *AdminHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	userID, err := uuid.Parse(r.PathValue("user_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid user_id", "user_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "user_id", api.P("field", "user_id")))
 		return
 	}
 
@@ -159,7 +159,7 @@ func (h *AdminHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 func (h *AdminHandler) UnlockAccount(w http.ResponseWriter, r *http.Request) {
 	userID, err := uuid.Parse(r.PathValue("user_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid user_id", "user_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "user_id", api.P("field", "user_id")))
 		return
 	}
 
@@ -193,7 +193,7 @@ func (h *AdminHandler) CreateFlag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := req.Validate(); err != nil {
-		api.WriteError(w, api.NewValidationError(err.Error(), "key"))
+		api.WriteError(w, api.NewValidationError("validation.invalid", "key", api.P("field", "key")))
 		return
 	}
 
@@ -210,7 +210,7 @@ func (h *AdminHandler) CreateFlag(w http.ResponseWriter, r *http.Request) {
 func (h *AdminHandler) UpdateFlag(w http.ResponseWriter, r *http.Request) {
 	flagID, err := uuid.Parse(r.PathValue("flag_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid flag_id", "flag_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "flag_id", api.P("field", "flag_id")))
 		return
 	}
 
@@ -220,7 +220,7 @@ func (h *AdminHandler) UpdateFlag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := req.Validate(); err != nil {
-		api.WriteError(w, api.NewValidationError(err.Error(), ""))
+		api.WriteError(w, api.NewValidationError("validation.invalid", "", api.P("field", "request")))
 		return
 	}
 
@@ -231,7 +231,7 @@ func (h *AdminHandler) UpdateFlag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if flag == nil {
-		api.WriteError(w, api.NewNotFoundError("feature flag not found"))
+		api.WriteError(w, api.NewNotFoundError("resource.not_found", api.P("resource", "feature_flag")))
 		return
 	}
 	api.WriteJSON(w, http.StatusOK, flag)
@@ -241,7 +241,7 @@ func (h *AdminHandler) UpdateFlag(w http.ResponseWriter, r *http.Request) {
 func (h *AdminHandler) SetOverride(w http.ResponseWriter, r *http.Request) {
 	flagID, err := uuid.Parse(r.PathValue("flag_id"))
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid flag_id", "flag_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "flag_id", api.P("field", "flag_id")))
 		return
 	}
 
@@ -251,7 +251,7 @@ func (h *AdminHandler) SetOverride(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := req.Validate(); err != nil {
-		api.WriteError(w, api.NewValidationError(err.Error(), "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid", "org_id", api.P("field", "org_id")))
 		return
 	}
 

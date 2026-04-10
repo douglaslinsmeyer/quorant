@@ -62,15 +62,21 @@ func (r *PostgresOrgRepository) Create(ctx context.Context, org *Organization) (
 		INSERT INTO organizations (
 			parent_id, type, name, slug, path,
 			address_line1, address_line2, city, state, zip,
-			phone, email, website, logo_url, settings
+			phone, email, website, logo_url,
+			locale, timezone, currency_code, country,
+			settings
 		) VALUES (
 			$1, $2, $3, $4, $5,
 			$6, $7, $8, $9, $10,
-			$11, $12, $13, $14, $15
+			$11, $12, $13, $14,
+			$15, $16, $17, $18,
+			$19
 		)
 		RETURNING id, parent_id, type, name, slug, path,
 		          address_line1, address_line2, city, state, zip,
-		          phone, email, website, logo_url, settings,
+		          phone, email, website, logo_url,
+		          locale, timezone, currency_code, country,
+		          settings,
 		          created_at, updated_at, deleted_at`
 
 	row := r.pool.QueryRow(ctx, q,
@@ -88,6 +94,10 @@ func (r *PostgresOrgRepository) Create(ctx context.Context, org *Organization) (
 		org.Email,
 		org.Website,
 		org.LogoURL,
+		org.Locale,
+		org.Timezone,
+		org.CurrencyCode,
+		org.Country,
 		settingsJSON,
 	)
 
@@ -105,7 +115,9 @@ func (r *PostgresOrgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Or
 	const q = `
 		SELECT id, parent_id, type, name, slug, path,
 		       address_line1, address_line2, city, state, zip,
-		       phone, email, website, logo_url, settings,
+		       phone, email, website, logo_url,
+		       locale, timezone, currency_code, country,
+		       settings,
 		       created_at, updated_at, deleted_at
 		FROM organizations
 		WHERE id = $1 AND deleted_at IS NULL`
@@ -128,7 +140,9 @@ func (r *PostgresOrgRepository) FindBySlug(ctx context.Context, slug string) (*O
 	const q = `
 		SELECT id, parent_id, type, name, slug, path,
 		       address_line1, address_line2, city, state, zip,
-		       phone, email, website, logo_url, settings,
+		       phone, email, website, logo_url,
+		       locale, timezone, currency_code, country,
+		       settings,
 		       created_at, updated_at, deleted_at
 		FROM organizations
 		WHERE slug = $1 AND deleted_at IS NULL`
@@ -153,7 +167,9 @@ func (r *PostgresOrgRepository) ListByUserAccess(ctx context.Context, userID uui
 	const q = `
 		SELECT DISTINCT o.id, o.parent_id, o.type, o.name, o.slug, o.path,
 		                o.address_line1, o.address_line2, o.city, o.state, o.zip,
-		                o.phone, o.email, o.website, o.logo_url, o.settings,
+		                o.phone, o.email, o.website, o.logo_url,
+		                o.locale, o.timezone, o.currency_code, o.country,
+		                o.settings,
 		                o.created_at, o.updated_at, o.deleted_at
 		FROM organizations o
 		JOIN memberships m ON m.org_id = o.id
@@ -204,12 +220,18 @@ func (r *PostgresOrgRepository) Update(ctx context.Context, org *Organization) (
 			email         = $8,
 			website       = $9,
 			logo_url      = $10,
-			settings      = $11,
+			locale        = $11,
+			timezone      = $12,
+			currency_code = $13,
+			country       = $14,
+			settings      = $15,
 			updated_at    = now()
-		WHERE id = $12 AND deleted_at IS NULL
+		WHERE id = $16 AND deleted_at IS NULL
 		RETURNING id, parent_id, type, name, slug, path,
 		          address_line1, address_line2, city, state, zip,
-		          phone, email, website, logo_url, settings,
+		          phone, email, website, logo_url,
+		          locale, timezone, currency_code, country,
+		          settings,
 		          created_at, updated_at, deleted_at`
 
 	row := r.pool.QueryRow(ctx, q,
@@ -223,6 +245,10 @@ func (r *PostgresOrgRepository) Update(ctx context.Context, org *Organization) (
 		org.Email,
 		org.Website,
 		org.LogoURL,
+		org.Locale,
+		org.Timezone,
+		org.CurrencyCode,
+		org.Country,
 		settingsJSON,
 		org.ID,
 	)
@@ -256,7 +282,9 @@ func (r *PostgresOrgRepository) ListChildren(ctx context.Context, parentID uuid.
 	const q = `
 		SELECT id, parent_id, type, name, slug, path,
 		       address_line1, address_line2, city, state, zip,
-		       phone, email, website, logo_url, settings,
+		       phone, email, website, logo_url,
+		       locale, timezone, currency_code, country,
+		       settings,
 		       created_at, updated_at, deleted_at
 		FROM organizations
 		WHERE parent_id = $1 AND deleted_at IS NULL
@@ -424,6 +452,10 @@ func scanOrg(row pgx.Row) (*Organization, error) {
 		&o.Email,
 		&o.Website,
 		&o.LogoURL,
+		&o.Locale,
+		&o.Timezone,
+		&o.CurrencyCode,
+		&o.Country,
 		&settingsRaw,
 		&o.CreatedAt,
 		&o.UpdatedAt,
@@ -465,6 +497,10 @@ func collectOrgs(rows pgx.Rows, op string) ([]Organization, error) {
 			&o.Email,
 			&o.Website,
 			&o.LogoURL,
+			&o.Locale,
+			&o.Timezone,
+			&o.CurrencyCode,
+			&o.Country,
 			&settingsRaw,
 			&o.CreatedAt,
 			&o.UpdatedAt,

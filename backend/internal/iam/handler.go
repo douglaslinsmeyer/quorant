@@ -48,7 +48,7 @@ func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := req.Validate(); err != nil {
-		api.WriteError(w, api.NewValidationError(err.Error(), ""))
+		api.WriteError(w, api.NewValidationError("validation.invalid", "", api.P("field", "request")))
 		return
 	}
 
@@ -72,7 +72,7 @@ func (h *Handler) ZitadelWebhook(w http.ResponseWriter, r *http.Request) {
 
 	signature := r.Header.Get("X-Zitadel-Signature")
 	if signature == "" {
-		api.WriteError(w, api.NewUnauthenticatedError("missing webhook signature"))
+		api.WriteError(w, api.NewUnauthenticatedError("auth.missing_header", api.P("header", "X-Zitadel-Signature")))
 		return
 	}
 
@@ -87,12 +87,12 @@ func (h *Handler) ZitadelWebhook(w http.ResponseWriter, r *http.Request) {
 		Event  string `json:"event"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
-		api.WriteError(w, api.NewValidationError("invalid JSON payload", ""))
+		api.WriteError(w, api.NewValidationError("validation.invalid", "", api.P("field", "JSON payload")))
 		return
 	}
 
 	if payload.UserID == "" || payload.Email == "" {
-		api.WriteError(w, api.NewValidationError("user_id and email are required", ""))
+		api.WriteError(w, api.NewValidationError("validation.required", "", api.P("field", "user_id, email")))
 		return
 	}
 

@@ -27,15 +27,16 @@ func NewPostgresFundRepository(pool *pgxpool.Pool) *PostgresFundRepository {
 func (r *PostgresFundRepository) CreateFund(ctx context.Context, f *Fund) (*Fund, error) {
 	const q = `
 		INSERT INTO funds (
-			org_id, name, fund_type, balance_cents, target_balance_cents, is_default
+			org_id, currency_code, name, fund_type, balance_cents, target_balance_cents, is_default
 		) VALUES (
-			$1, $2, $3, $4, $5, $6
+			$1, $2, $3, $4, $5, $6, $7
 		)
-		RETURNING id, org_id, name, fund_type, balance_cents, target_balance_cents,
+		RETURNING id, org_id, currency_code, name, fund_type, balance_cents, target_balance_cents,
 		          is_default, created_at, updated_at, deleted_at`
 
 	row := r.pool.QueryRow(ctx, q,
 		f.OrgID,
+		f.CurrencyCode,
 		f.Name,
 		f.FundType,
 		f.BalanceCents,
@@ -54,7 +55,7 @@ func (r *PostgresFundRepository) CreateFund(ctx context.Context, f *Fund) (*Fund
 // soft-deleted.
 func (r *PostgresFundRepository) FindFundByID(ctx context.Context, id uuid.UUID) (*Fund, error) {
 	const q = `
-		SELECT id, org_id, name, fund_type, balance_cents, target_balance_cents,
+		SELECT id, org_id, currency_code, name, fund_type, balance_cents, target_balance_cents,
 		       is_default, created_at, updated_at, deleted_at
 		FROM funds
 		WHERE id = $1 AND deleted_at IS NULL`
@@ -74,7 +75,7 @@ func (r *PostgresFundRepository) FindFundByID(ctx context.Context, id uuid.UUID)
 // created_at. Returns an empty (non-nil) slice when none exist.
 func (r *PostgresFundRepository) ListFundsByOrg(ctx context.Context, orgID uuid.UUID) ([]Fund, error) {
 	const q = `
-		SELECT id, org_id, name, fund_type, balance_cents, target_balance_cents,
+		SELECT id, org_id, currency_code, name, fund_type, balance_cents, target_balance_cents,
 		       is_default, created_at, updated_at, deleted_at
 		FROM funds
 		WHERE org_id = $1 AND deleted_at IS NULL
@@ -93,17 +94,19 @@ func (r *PostgresFundRepository) ListFundsByOrg(ctx context.Context, orgID uuid.
 func (r *PostgresFundRepository) UpdateFund(ctx context.Context, f *Fund) (*Fund, error) {
 	const q = `
 		UPDATE funds SET
-			name                 = $1,
-			fund_type            = $2,
-			balance_cents        = $3,
-			target_balance_cents = $4,
-			is_default           = $5,
+			currency_code        = $1,
+			name                 = $2,
+			fund_type            = $3,
+			balance_cents        = $4,
+			target_balance_cents = $5,
+			is_default           = $6,
 			updated_at           = now()
-		WHERE id = $6 AND deleted_at IS NULL
-		RETURNING id, org_id, name, fund_type, balance_cents, target_balance_cents,
+		WHERE id = $7 AND deleted_at IS NULL
+		RETURNING id, org_id, currency_code, name, fund_type, balance_cents, target_balance_cents,
 		          is_default, created_at, updated_at, deleted_at`
 
 	row := r.pool.QueryRow(ctx, q,
+		f.CurrencyCode,
 		f.Name,
 		f.FundType,
 		f.BalanceCents,
@@ -152,19 +155,20 @@ func (r *PostgresFundRepository) CreateTransaction(ctx context.Context, t *FundT
 
 	const q = `
 		INSERT INTO fund_transactions (
-			fund_id, org_id, transaction_type, amount_cents, balance_after_cents,
+			fund_id, org_id, currency_code, transaction_type, amount_cents, balance_after_cents,
 			description, reference_type, reference_id, effective_date
 		) VALUES (
-			$1, $2, $3, $4, $5,
-			$6, $7, $8, $9
+			$1, $2, $3, $4, $5, $6,
+			$7, $8, $9, $10
 		)
-		RETURNING id, fund_id, org_id, transaction_type, amount_cents,
+		RETURNING id, fund_id, org_id, currency_code, transaction_type, amount_cents,
 		          balance_after_cents, description, reference_type, reference_id,
 		          effective_date, created_at`
 
 	row := tx.QueryRow(ctx, q,
 		t.FundID,
 		t.OrgID,
+		t.CurrencyCode,
 		t.TransactionType,
 		t.AmountCents,
 		newBalance,
@@ -189,7 +193,7 @@ func (r *PostgresFundRepository) CreateTransaction(ctx context.Context, t *FundT
 // effective_date DESC. Returns an empty (non-nil) slice when none exist.
 func (r *PostgresFundRepository) ListTransactionsByFund(ctx context.Context, fundID uuid.UUID) ([]FundTransaction, error) {
 	const q = `
-		SELECT id, fund_id, org_id, transaction_type, amount_cents,
+		SELECT id, fund_id, org_id, currency_code, transaction_type, amount_cents,
 		       balance_after_cents, description, reference_type, reference_id,
 		       effective_date, created_at
 		FROM fund_transactions
@@ -212,17 +216,18 @@ func (r *PostgresFundRepository) ListTransactionsByFund(ctx context.Context, fun
 func (r *PostgresFundRepository) CreateTransfer(ctx context.Context, t *FundTransfer) (*FundTransfer, error) {
 	const q = `
 		INSERT INTO fund_transfers (
-			org_id, from_fund_id, to_fund_id, amount_cents,
+			org_id, currency_code, from_fund_id, to_fund_id, amount_cents,
 			description, approved_by, approved_at, effective_date
 		) VALUES (
-			$1, $2, $3, $4,
-			$5, $6, $7, $8
+			$1, $2, $3, $4, $5,
+			$6, $7, $8, $9
 		)
-		RETURNING id, org_id, from_fund_id, to_fund_id, amount_cents,
+		RETURNING id, org_id, currency_code, from_fund_id, to_fund_id, amount_cents,
 		          description, approved_by, approved_at, effective_date, created_at`
 
 	row := r.pool.QueryRow(ctx, q,
 		t.OrgID,
+		t.CurrencyCode,
 		t.FromFundID,
 		t.ToFundID,
 		t.AmountCents,
@@ -243,7 +248,7 @@ func (r *PostgresFundRepository) CreateTransfer(ctx context.Context, t *FundTran
 // effective_date DESC. Returns an empty (non-nil) slice when none exist.
 func (r *PostgresFundRepository) ListTransfersByOrg(ctx context.Context, orgID uuid.UUID) ([]FundTransfer, error) {
 	const q = `
-		SELECT id, org_id, from_fund_id, to_fund_id, amount_cents,
+		SELECT id, org_id, currency_code, from_fund_id, to_fund_id, amount_cents,
 		       description, approved_by, approved_at, effective_date, created_at
 		FROM fund_transfers
 		WHERE org_id = $1
@@ -266,6 +271,7 @@ func scanFund(row pgx.Row) (*Fund, error) {
 	err := row.Scan(
 		&f.ID,
 		&f.OrgID,
+		&f.CurrencyCode,
 		&f.Name,
 		&f.FundType,
 		&f.BalanceCents,
@@ -289,6 +295,7 @@ func collectFunds(rows pgx.Rows, op string) ([]Fund, error) {
 		if err := rows.Scan(
 			&f.ID,
 			&f.OrgID,
+			&f.CurrencyCode,
 			&f.Name,
 			&f.FundType,
 			&f.BalanceCents,
@@ -315,6 +322,7 @@ func scanFundTransaction(row pgx.Row) (*FundTransaction, error) {
 		&t.ID,
 		&t.FundID,
 		&t.OrgID,
+		&t.CurrencyCode,
 		&t.TransactionType,
 		&t.AmountCents,
 		&t.BalanceAfterCents,
@@ -340,6 +348,7 @@ func collectFundTransactions(rows pgx.Rows, op string) ([]FundTransaction, error
 			&t.ID,
 			&t.FundID,
 			&t.OrgID,
+			&t.CurrencyCode,
 			&t.TransactionType,
 			&t.AmountCents,
 			&t.BalanceAfterCents,
@@ -365,6 +374,7 @@ func scanFundTransfer(row pgx.Row) (*FundTransfer, error) {
 	err := row.Scan(
 		&t.ID,
 		&t.OrgID,
+		&t.CurrencyCode,
 		&t.FromFundID,
 		&t.ToFundID,
 		&t.AmountCents,
@@ -388,6 +398,7 @@ func collectFundTransfers(rows pgx.Rows, op string) ([]FundTransfer, error) {
 		if err := rows.Scan(
 			&t.ID,
 			&t.OrgID,
+			&t.CurrencyCode,
 			&t.FromFundID,
 			&t.ToFundID,
 			&t.AmountCents,

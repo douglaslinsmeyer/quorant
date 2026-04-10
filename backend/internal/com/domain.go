@@ -122,6 +122,7 @@ type MessageTemplate struct {
 	OrgID       *uuid.UUID `json:"org_id,omitempty"`
 	TemplateKey string     `json:"template_key"`
 	Channel     string     `json:"channel"` // notification_channel enum
+	Locale      string     `json:"locale"`
 	Subject     *string    `json:"subject,omitempty"`
 	Body        string     `json:"body"`
 	IsActive    bool       `json:"is_active"`

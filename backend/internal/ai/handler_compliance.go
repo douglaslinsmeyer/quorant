@@ -24,7 +24,7 @@ func NewComplianceHandler(service *ComplianceService, checks ComplianceCheckRepo
 func (h *ComplianceHandler) GetComplianceReport(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseOrgID(r)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("org_id must be a valid UUID", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
@@ -43,13 +43,13 @@ func (h *ComplianceHandler) GetComplianceReport(w http.ResponseWriter, r *http.R
 func (h *ComplianceHandler) CheckCategory(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseOrgID(r)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("org_id must be a valid UUID", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
 	category := r.PathValue("category")
 	if !IsValidRuleCategory(category) {
-		api.WriteError(w, api.NewValidationError("invalid compliance category: "+category, "category"))
+		api.WriteError(w, api.NewValidationError("validation.invalid", "category", api.P("field", "category")))
 		return
 	}
 
@@ -68,7 +68,7 @@ func (h *ComplianceHandler) CheckCategory(w http.ResponseWriter, r *http.Request
 func (h *ComplianceHandler) GetComplianceHistory(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseOrgID(r)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("org_id must be a valid UUID", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
@@ -76,7 +76,7 @@ func (h *ComplianceHandler) GetComplianceHistory(w http.ResponseWriter, r *http.
 
 	afterID, err := parseComplianceCursorID(page.Cursor)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_cursor", "cursor"))
 		return
 	}
 
@@ -104,7 +104,7 @@ func (h *ComplianceHandler) GetComplianceHistory(w http.ResponseWriter, r *http.
 func (h *ComplianceHandler) ListJurisdictionRulesForOrg(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseOrgID(r)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("org_id must be a valid UUID", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
@@ -115,11 +115,11 @@ func (h *ComplianceHandler) ListJurisdictionRulesForOrg(w http.ResponseWriter, r
 		return
 	}
 	if o == nil {
-		api.WriteError(w, api.NewNotFoundError("organization not found"))
+		api.WriteError(w, api.NewNotFoundError("resource.not_found", api.P("resource", "organization")))
 		return
 	}
 	if o.State == nil {
-		api.WriteError(w, api.NewValidationError("organization has no state/jurisdiction configured", "state"))
+		api.WriteError(w, api.NewValidationError("validation.required", "state", api.P("field", "state")))
 		return
 	}
 
@@ -138,13 +138,13 @@ func (h *ComplianceHandler) ListJurisdictionRulesForOrg(w http.ResponseWriter, r
 func (h *ComplianceHandler) ListJurisdictionRulesByCategory(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseOrgID(r)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("org_id must be a valid UUID", "org_id"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_uuid", "org_id", api.P("field", "org_id")))
 		return
 	}
 
 	category := r.PathValue("category")
 	if !IsValidRuleCategory(category) {
-		api.WriteError(w, api.NewValidationError("invalid compliance category: "+category, "category"))
+		api.WriteError(w, api.NewValidationError("validation.invalid", "category", api.P("field", "category")))
 		return
 	}
 
@@ -155,11 +155,11 @@ func (h *ComplianceHandler) ListJurisdictionRulesByCategory(w http.ResponseWrite
 		return
 	}
 	if o == nil {
-		api.WriteError(w, api.NewNotFoundError("organization not found"))
+		api.WriteError(w, api.NewNotFoundError("resource.not_found", api.P("resource", "organization")))
 		return
 	}
 	if o.State == nil {
-		api.WriteError(w, api.NewValidationError("organization has no state/jurisdiction configured", "state"))
+		api.WriteError(w, api.NewValidationError("validation.required", "state", api.P("field", "state")))
 		return
 	}
 

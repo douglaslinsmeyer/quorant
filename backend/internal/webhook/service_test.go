@@ -338,7 +338,7 @@ func TestUpdateSubscription_ValidationError(t *testing.T) {
 
 	_, err := svc.UpdateSubscription(context.Background(), uuid.New(), webhook.UpdateSubscriptionRequest{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "at least one field")
+	assert.Contains(t, err.Error(), "validation.at_least_one")
 }
 
 // ─── DeleteSubscription tests ─────────────────────────────────────────────────

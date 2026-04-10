@@ -41,19 +41,19 @@ type CreateTaskRequest struct {
 // Validate checks required fields and any optional enum values.
 func (r CreateTaskRequest) Validate() error {
 	if r.TaskTypeID == uuid.Nil {
-		return api.NewValidationError("task_type_id is required", "task_type_id")
+		return api.NewValidationError("validation.required", "task_type_id", api.P("field", "task_type_id"))
 	}
 	if r.Title == "" {
-		return api.NewValidationError("title is required", "title")
+		return api.NewValidationError("validation.required", "title", api.P("field", "title"))
 	}
 	if r.ResourceType == "" {
-		return api.NewValidationError("resource_type is required", "resource_type")
+		return api.NewValidationError("validation.required", "resource_type", api.P("field", "resource_type"))
 	}
 	if r.ResourceID == uuid.Nil {
-		return api.NewValidationError("resource_id is required", "resource_id")
+		return api.NewValidationError("validation.required", "resource_id", api.P("field", "resource_id"))
 	}
 	if r.Priority != nil && !validTaskPriorities[*r.Priority] {
-		return api.NewValidationError("priority must be one of: low, normal, high, urgent", "priority")
+		return api.NewValidationError("validation.one_of", "priority", api.P("field", "priority"), api.P("values", "low, normal, high, urgent"))
 	}
 	return nil
 }
@@ -73,16 +73,16 @@ type CreateTaskTypeRequest struct {
 // Validate checks that required fields are present.
 func (r CreateTaskTypeRequest) Validate() error {
 	if r.Key == "" {
-		return api.NewValidationError("key is required", "key")
+		return api.NewValidationError("validation.required", "key", api.P("field", "key"))
 	}
 	if r.Name == "" {
-		return api.NewValidationError("name is required", "name")
+		return api.NewValidationError("validation.required", "name", api.P("field", "name"))
 	}
 	if r.SourceModule == "" {
-		return api.NewValidationError("source_module is required", "source_module")
+		return api.NewValidationError("validation.required", "source_module", api.P("field", "source_module"))
 	}
 	if r.DefaultPriority != nil && !validTaskPriorities[*r.DefaultPriority] {
-		return api.NewValidationError("default_priority must be one of: low, normal, high, urgent", "default_priority")
+		return api.NewValidationError("validation.one_of", "default_priority", api.P("field", "default_priority"), api.P("values", "low, normal, high, urgent"))
 	}
 	return nil
 }
@@ -97,7 +97,7 @@ type AssignTaskRequest struct {
 // Validate checks that at least one of assigned_to or assigned_role is set.
 func (r AssignTaskRequest) Validate() error {
 	if r.AssignedTo == nil && r.AssignedRole == nil {
-		return api.NewValidationError("at least one of assigned_to or assigned_role is required", "")
+		return api.NewValidationError("validation.at_least_one", "")
 	}
 	return nil
 }
@@ -112,10 +112,10 @@ type TransitionTaskRequest struct {
 // Validate checks that the status is present and valid.
 func (r TransitionTaskRequest) Validate() error {
 	if r.Status == "" {
-		return api.NewValidationError("status is required", "status")
+		return api.NewValidationError("validation.required", "status", api.P("field", "status"))
 	}
 	if !validTaskStatuses[r.Status] {
-		return api.NewValidationError("status must be one of: open, assigned, in_progress, blocked, review, completed, cancelled", "status")
+		return api.NewValidationError("validation.one_of", "status", api.P("field", "status"), api.P("values", "open, assigned, in_progress, blocked, review, completed, cancelled"))
 	}
 	return nil
 }
@@ -129,7 +129,7 @@ type AddCommentRequest struct {
 // Validate checks that the body is present.
 func (r AddCommentRequest) Validate() error {
 	if r.Body == "" {
-		return api.NewValidationError("body is required", "body")
+		return api.NewValidationError("validation.required", "body", api.P("field", "body"))
 	}
 	return nil
 }

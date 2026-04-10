@@ -44,21 +44,22 @@ func (r *PostgresAssessmentRepository) CreateSchedule(ctx context.Context, s *As
 
 	const q = `
 		INSERT INTO assessment_schedules (
-			org_id, name, description, frequency, amount_strategy,
+			org_id, currency_code, name, description, frequency, amount_strategy,
 			base_amount_cents, amount_rules, day_of_month, grace_days,
 			starts_at, ends_at, is_active, approved_by, approved_at, created_by
 		) VALUES (
-			$1, $2, $3, $4, $5,
-			$6, $7, $8, $9,
-			$10, $11, $12, $13, $14, $15
+			$1, $2, $3, $4, $5, $6,
+			$7, $8, $9, $10,
+			$11, $12, $13, $14, $15, $16
 		)
-		RETURNING id, org_id, name, description, frequency, amount_strategy,
+		RETURNING id, org_id, currency_code, name, description, frequency, amount_strategy,
 		          base_amount_cents, amount_rules, day_of_month, grace_days,
 		          starts_at, ends_at, is_active, approved_by, approved_at,
 		          created_by, created_at, updated_at, deleted_at`
 
 	row := r.pool.QueryRow(ctx, q,
 		s.OrgID,
+		s.CurrencyCode,
 		s.Name,
 		s.Description,
 		s.Frequency,
@@ -86,7 +87,7 @@ func (r *PostgresAssessmentRepository) CreateSchedule(ctx context.Context, s *As
 // found or soft-deleted.
 func (r *PostgresAssessmentRepository) FindScheduleByID(ctx context.Context, id uuid.UUID) (*AssessmentSchedule, error) {
 	const q = `
-		SELECT id, org_id, name, description, frequency, amount_strategy,
+		SELECT id, org_id, currency_code, name, description, frequency, amount_strategy,
 		       base_amount_cents, amount_rules, day_of_month, grace_days,
 		       starts_at, ends_at, is_active, approved_by, approved_at,
 		       created_by, created_at, updated_at, deleted_at
@@ -108,7 +109,7 @@ func (r *PostgresAssessmentRepository) FindScheduleByID(ctx context.Context, id 
 // ordered by created_at. Returns an empty (non-nil) slice when none exist.
 func (r *PostgresAssessmentRepository) ListSchedulesByOrg(ctx context.Context, orgID uuid.UUID) ([]AssessmentSchedule, error) {
 	const q = `
-		SELECT id, org_id, name, description, frequency, amount_strategy,
+		SELECT id, org_id, currency_code, name, description, frequency, amount_strategy,
 		       base_amount_cents, amount_rules, day_of_month, grace_days,
 		       starts_at, ends_at, is_active, approved_by, approved_at,
 		       created_by, created_at, updated_at, deleted_at
@@ -144,27 +145,29 @@ func (r *PostgresAssessmentRepository) UpdateSchedule(ctx context.Context, s *As
 
 	const q = `
 		UPDATE assessment_schedules SET
-			name              = $1,
-			description       = $2,
-			frequency         = $3,
-			amount_strategy   = $4,
-			base_amount_cents = $5,
-			amount_rules      = $6,
-			day_of_month      = $7,
-			grace_days        = $8,
-			starts_at         = $9,
-			ends_at           = $10,
-			is_active         = $11,
-			approved_by       = $12,
-			approved_at       = $13,
+			currency_code     = $1,
+			name              = $2,
+			description       = $3,
+			frequency         = $4,
+			amount_strategy   = $5,
+			base_amount_cents = $6,
+			amount_rules      = $7,
+			day_of_month      = $8,
+			grace_days        = $9,
+			starts_at         = $10,
+			ends_at           = $11,
+			is_active         = $12,
+			approved_by       = $13,
+			approved_at       = $14,
 			updated_at        = now()
-		WHERE id = $14 AND deleted_at IS NULL
-		RETURNING id, org_id, name, description, frequency, amount_strategy,
+		WHERE id = $15 AND deleted_at IS NULL
+		RETURNING id, org_id, currency_code, name, description, frequency, amount_strategy,
 		          base_amount_cents, amount_rules, day_of_month, grace_days,
 		          starts_at, ends_at, is_active, approved_by, approved_at,
 		          created_by, created_at, updated_at, deleted_at`
 
 	row := r.pool.QueryRow(ctx, q,
+		s.CurrencyCode,
 		s.Name,
 		s.Description,
 		s.Frequency,
@@ -212,13 +215,13 @@ func (r *PostgresAssessmentRepository) DeactivateSchedule(ctx context.Context, i
 func (r *PostgresAssessmentRepository) CreateAssessment(ctx context.Context, a *Assessment) (*Assessment, error) {
 	const q = `
 		INSERT INTO assessments (
-			org_id, unit_id, schedule_id, description, amount_cents,
+			org_id, currency_code, unit_id, schedule_id, description, amount_cents,
 			due_date, grace_days, late_fee_cents, is_recurring, created_by
 		) VALUES (
-			$1, $2, $3, $4, $5,
-			$6, $7, $8, $9, $10
+			$1, $2, $3, $4, $5, $6,
+			$7, $8, $9, $10, $11
 		)
-		RETURNING id, org_id, unit_id, schedule_id, description, amount_cents,
+		RETURNING id, org_id, currency_code, unit_id, schedule_id, description, amount_cents,
 		          due_date, grace_days, late_fee_cents, is_recurring,
 		          created_by, created_at, updated_at, deleted_at`
 
@@ -235,6 +238,7 @@ func (r *PostgresAssessmentRepository) CreateAssessment(ctx context.Context, a *
 
 	row := r.pool.QueryRow(ctx, q,
 		a.OrgID,
+		a.CurrencyCode,
 		a.UnitID,
 		a.ScheduleID,
 		a.Description,
@@ -257,7 +261,7 @@ func (r *PostgresAssessmentRepository) CreateAssessment(ctx context.Context, a *
 // not found or soft-deleted.
 func (r *PostgresAssessmentRepository) FindAssessmentByID(ctx context.Context, id uuid.UUID) (*Assessment, error) {
 	const q = `
-		SELECT id, org_id, unit_id, schedule_id, description, amount_cents,
+		SELECT id, org_id, currency_code, unit_id, schedule_id, description, amount_cents,
 		       due_date, grace_days, late_fee_cents, is_recurring,
 		       created_by, created_at, updated_at, deleted_at
 		FROM assessments
@@ -279,7 +283,7 @@ func (r *PostgresAssessmentRepository) FindAssessmentByID(ctx context.Context, i
 // afterID is the cursor from the previous page; hasMore is true when more items exist.
 func (r *PostgresAssessmentRepository) ListAssessmentsByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Assessment, bool, error) {
 	const q = `
-		SELECT id, org_id, unit_id, schedule_id, description, amount_cents,
+		SELECT id, org_id, currency_code, unit_id, schedule_id, description, amount_cents,
 		       due_date, grace_days, late_fee_cents, is_recurring,
 		       created_by, created_at, updated_at, deleted_at
 		FROM assessments
@@ -310,7 +314,7 @@ func (r *PostgresAssessmentRepository) ListAssessmentsByOrg(ctx context.Context,
 // ordered by due_date. Returns an empty (non-nil) slice when none exist.
 func (r *PostgresAssessmentRepository) ListAssessmentsByUnit(ctx context.Context, unitID uuid.UUID) ([]Assessment, error) {
 	const q = `
-		SELECT id, org_id, unit_id, schedule_id, description, amount_cents,
+		SELECT id, org_id, currency_code, unit_id, schedule_id, description, amount_cents,
 		       due_date, grace_days, late_fee_cents, is_recurring,
 		       created_by, created_at, updated_at, deleted_at
 		FROM assessments
@@ -340,19 +344,21 @@ func (r *PostgresAssessmentRepository) UpdateAssessment(ctx context.Context, a *
 
 	const q = `
 		UPDATE assessments SET
-			description    = $1,
-			amount_cents   = $2,
-			due_date       = $3,
-			grace_days     = $4,
-			late_fee_cents = $5,
-			is_recurring   = $6,
+			currency_code  = $1,
+			description    = $2,
+			amount_cents   = $3,
+			due_date       = $4,
+			grace_days     = $5,
+			late_fee_cents = $6,
+			is_recurring   = $7,
 			updated_at     = now()
-		WHERE id = $7 AND deleted_at IS NULL
-		RETURNING id, org_id, unit_id, schedule_id, description, amount_cents,
+		WHERE id = $8 AND deleted_at IS NULL
+		RETURNING id, org_id, currency_code, unit_id, schedule_id, description, amount_cents,
 		          due_date, grace_days, late_fee_cents, is_recurring,
 		          created_by, created_at, updated_at, deleted_at`
 
 	row := r.pool.QueryRow(ctx, q,
+		a.CurrencyCode,
 		a.Description,
 		a.AmountCents,
 		a.DueDate,
@@ -409,14 +415,14 @@ func (r *PostgresAssessmentRepository) CreateLedgerEntry(ctx context.Context, en
 			) AS prev_balance
 		)
 		INSERT INTO ledger_entries (
-			org_id, unit_id, assessment_id, entry_type, amount_cents,
+			org_id, currency_code, unit_id, assessment_id, entry_type, amount_cents,
 			balance_cents, description, reference_type, reference_id, effective_date
 		)
 		SELECT
-			$2, $1, $3, $4::ledger_entry_type, $5,
+			$2, $10, $1, $3, $4::ledger_entry_type, $5,
 			(prev.prev_balance + $5), $6, $7, $8, $9
 		FROM prev
-		RETURNING id, org_id, unit_id, assessment_id, entry_type, amount_cents,
+		RETURNING id, org_id, currency_code, unit_id, assessment_id, entry_type, amount_cents,
 		          balance_cents, description, reference_type, reference_id,
 		          effective_date, created_at`
 
@@ -430,6 +436,7 @@ func (r *PostgresAssessmentRepository) CreateLedgerEntry(ctx context.Context, en
 		entry.ReferenceType,
 		entry.ReferenceID,
 		entry.EffectiveDate,
+		entry.CurrencyCode,
 	)
 
 	result, err := scanLedgerEntry(row)
@@ -443,7 +450,7 @@ func (r *PostgresAssessmentRepository) CreateLedgerEntry(ctx context.Context, en
 // pagination ordered by id. afterID is the cursor from the previous page.
 func (r *PostgresAssessmentRepository) ListLedgerByUnit(ctx context.Context, unitID uuid.UUID, limit int, afterID *uuid.UUID) ([]LedgerEntry, bool, error) {
 	const q = `
-		SELECT id, org_id, unit_id, assessment_id, entry_type, amount_cents,
+		SELECT id, org_id, currency_code, unit_id, assessment_id, entry_type, amount_cents,
 		       balance_cents, description, reference_type, reference_id,
 		       effective_date, created_at
 		FROM ledger_entries
@@ -475,7 +482,7 @@ func (r *PostgresAssessmentRepository) ListLedgerByUnit(ctx context.Context, uni
 // none exist.
 func (r *PostgresAssessmentRepository) ListLedgerByOrg(ctx context.Context, orgID uuid.UUID) ([]LedgerEntry, error) {
 	const q = `
-		SELECT id, org_id, unit_id, assessment_id, entry_type, amount_cents,
+		SELECT id, org_id, currency_code, unit_id, assessment_id, entry_type, amount_cents,
 		       balance_cents, description, reference_type, reference_id,
 		       effective_date, created_at
 		FROM ledger_entries
@@ -523,6 +530,7 @@ func scanSchedule(row pgx.Row) (*AssessmentSchedule, error) {
 	err := row.Scan(
 		&s.ID,
 		&s.OrgID,
+		&s.CurrencyCode,
 		&s.Name,
 		&s.Description,
 		&s.Frequency,
@@ -571,6 +579,7 @@ func collectSchedules(rows pgx.Rows, op string) ([]AssessmentSchedule, error) {
 		if err := rows.Scan(
 			&s.ID,
 			&s.OrgID,
+			&s.CurrencyCode,
 			&s.Name,
 			&s.Description,
 			&s.Frequency,
@@ -620,6 +629,7 @@ func scanAssessment(row pgx.Row) (*Assessment, error) {
 	err := row.Scan(
 		&a.ID,
 		&a.OrgID,
+		&a.CurrencyCode,
 		&a.UnitID,
 		&a.ScheduleID,
 		&a.Description,
@@ -654,6 +664,7 @@ func collectAssessments(rows pgx.Rows, op string) ([]Assessment, error) {
 		if err := rows.Scan(
 			&a.ID,
 			&a.OrgID,
+			&a.CurrencyCode,
 			&a.UnitID,
 			&a.ScheduleID,
 			&a.Description,
@@ -686,6 +697,7 @@ func scanLedgerEntry(row pgx.Row) (*LedgerEntry, error) {
 	err := row.Scan(
 		&e.ID,
 		&e.OrgID,
+		&e.CurrencyCode,
 		&e.UnitID,
 		&e.AssessmentID,
 		&e.EntryType,
@@ -711,6 +723,7 @@ func collectLedgerEntries(rows pgx.Rows, op string) ([]LedgerEntry, error) {
 		if err := rows.Scan(
 			&e.ID,
 			&e.OrgID,
+			&e.CurrencyCode,
 			&e.UnitID,
 			&e.AssessmentID,
 			&e.EntryType,

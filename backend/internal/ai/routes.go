@@ -101,7 +101,7 @@ func RegisterJurisdictionAdminRoutes(
 		return middleware.Auth(validator, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, err := resolveUserID(r.Context())
 			if err != nil {
-				api.WriteError(w, api.NewUnauthenticatedError("could not resolve user"))
+				api.WriteError(w, api.NewUnauthenticatedError("auth.resolve_failed"))
 				return
 			}
 			allowed, err := checker.HasPermission(r.Context(), userID, uuid.Nil, perm)
@@ -110,7 +110,7 @@ func RegisterJurisdictionAdminRoutes(
 				return
 			}
 			if !allowed {
-				api.WriteError(w, api.NewForbiddenError("insufficient permissions"))
+				api.WriteError(w, api.NewForbiddenError("access.insufficient_permissions"))
 				return
 			}
 			h(w, r)

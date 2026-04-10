@@ -86,6 +86,10 @@ func (s *OrgService) CreateOrganization(ctx context.Context, req CreateOrgReques
 		Phone:        req.Phone,
 		Email:        req.Email,
 		Website:      req.Website,
+		Locale:       req.Locale,
+		Timezone:     req.Timezone,
+		CurrencyCode: req.CurrencyCode,
+		Country:      req.Country,
 		Settings:     req.Settings,
 	}
 	if org.Settings == nil {
@@ -108,7 +112,7 @@ func (s *OrgService) GetOrganization(ctx context.Context, id uuid.UUID) (*Organi
 		return nil, fmt.Errorf("org service: GetOrganization: %w", err)
 	}
 	if org == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("organization %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "organization"), api.P("id", id.String()))
 	}
 	return org, nil
 }
@@ -119,7 +123,7 @@ func (s *OrgService) GetOrganization(ctx context.Context, id uuid.UUID) (*Organi
 func (s *OrgService) ListOrganizations(ctx context.Context, limit int, afterID *uuid.UUID) ([]Organization, bool, error) {
 	claims, ok := auth.ClaimsFromContext(ctx)
 	if !ok {
-		return nil, false, api.NewUnauthenticatedError("no claims in context")
+		return nil, false, api.NewUnauthenticatedError("auth.missing_claims")
 	}
 
 	user, err := s.userRepo.FindByIDPUserID(ctx, claims.Subject)
@@ -127,7 +131,7 @@ func (s *OrgService) ListOrganizations(ctx context.Context, limit int, afterID *
 		return nil, false, fmt.Errorf("org service: ListOrganizations find user: %w", err)
 	}
 	if user == nil {
-		return nil, false, api.NewNotFoundError("user not found")
+		return nil, false, api.NewNotFoundError("resource.not_found", api.P("resource", "user"))
 	}
 
 	orgs, hasMore, err := s.orgRepo.ListByUserAccess(ctx, user.ID, limit, afterID)
@@ -182,6 +186,18 @@ func (s *OrgService) UpdateOrganization(ctx context.Context, id uuid.UUID, req U
 	if req.Settings != nil {
 		org.Settings = req.Settings
 	}
+	if req.Locale != nil {
+		org.Locale = *req.Locale
+	}
+	if req.Timezone != nil {
+		org.Timezone = *req.Timezone
+	}
+	if req.CurrencyCode != nil {
+		org.CurrencyCode = *req.CurrencyCode
+	}
+	if req.Country != nil {
+		org.Country = *req.Country
+	}
 
 	updated, err := s.orgRepo.Update(ctx, org)
 	if err != nil {
@@ -225,8 +241,8 @@ func (s *OrgService) ConnectManagement(ctx context.Context, hoaOrgID uuid.UUID, 
 	}
 	if hoa.Type != "hoa" {
 		return nil, api.NewValidationError(
-			fmt.Sprintf("organization %s is not of type 'hoa'", hoaOrgID),
-			"hoa_org_id",
+			"validation.constraint", "hoa_org_id",
+			api.P("field", "hoa_org_id"), api.P("constraint", "must be of type hoa"),
 		)
 	}
 
@@ -237,8 +253,8 @@ func (s *OrgService) ConnectManagement(ctx context.Context, hoaOrgID uuid.UUID, 
 	}
 	if firm.Type != "firm" {
 		return nil, api.NewValidationError(
-			fmt.Sprintf("organization %s is not of type 'firm'", req.FirmOrgID),
-			"firm_org_id",
+			"validation.constraint", "firm_org_id",
+			api.P("field", "firm_org_id"), api.P("constraint", "must be of type firm"),
 		)
 	}
 
@@ -309,7 +325,7 @@ func (s *OrgService) UpdateMembership(ctx context.Context, id uuid.UUID, roleID 
 		return nil, fmt.Errorf("org service: UpdateMembership find: %w", err)
 	}
 	if m == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("membership %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "membership"), api.P("id", id.String()))
 	}
 
 	if roleID != nil {
@@ -335,7 +351,7 @@ func (s *OrgService) FindMembership(ctx context.Context, id uuid.UUID) (*iam.Mem
 		return nil, fmt.Errorf("org service: FindMembership: %w", err)
 	}
 	if m == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("membership %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "membership"), api.P("id", id.String()))
 	}
 	return m, nil
 }
@@ -371,6 +387,7 @@ func (s *OrgService) CreateUnit(ctx context.Context, orgID uuid.UUID, req Create
 		City:         req.City,
 		State:        req.State,
 		Zip:          req.Zip,
+		Country:      req.Country,
 		LotSizeSqft:  req.LotSizeSqft,
 		VotingWeight: votingWeight,
 		Status:       "active",
@@ -396,7 +413,7 @@ func (s *OrgService) GetUnit(ctx context.Context, id uuid.UUID) (*Unit, error) {
 		return nil, fmt.Errorf("org service: GetUnit: %w", err)
 	}
 	if unit == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("unit %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "unit"), api.P("id", id.String()))
 	}
 	return unit, nil
 }
@@ -484,7 +501,7 @@ func (s *OrgService) GetProperty(ctx context.Context, unitID uuid.UUID) (*Proper
 		return nil, fmt.Errorf("org service: GetProperty: %w", err)
 	}
 	if prop == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("property for unit %s not found", unitID))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "property"), api.P("id", unitID.String()))
 	}
 	return prop, nil
 }
@@ -543,7 +560,7 @@ func (s *OrgService) UpdateUnitMembership(ctx context.Context, id uuid.UUID, req
 		return nil, fmt.Errorf("org service: UpdateUnitMembership find: %w", err)
 	}
 	if um == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("unit membership %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "unit_membership"), api.P("id", id.String()))
 	}
 
 	if req.Relationship != nil {
@@ -663,7 +680,7 @@ func (s *OrgService) GetAmenity(ctx context.Context, id uuid.UUID) (*Amenity, er
 		return nil, fmt.Errorf("org service: GetAmenity: %w", err)
 	}
 	if a == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("amenity %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "amenity"), api.P("id", id.String()))
 	}
 	return a, nil
 }
@@ -787,7 +804,7 @@ func (s *OrgService) GetReservation(ctx context.Context, id uuid.UUID) (*Amenity
 		return nil, fmt.Errorf("org service: GetReservation: %w", err)
 	}
 	if res == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("reservation %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "reservation"), api.P("id", id.String()))
 	}
 	return res, nil
 }
@@ -864,7 +881,7 @@ func (s *OrgService) GetVendor(ctx context.Context, id uuid.UUID) (*Vendor, erro
 		return nil, fmt.Errorf("org service: GetVendor: %w", err)
 	}
 	if v == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("vendor %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "vendor"), api.P("id", id.String()))
 	}
 	return v, nil
 }
@@ -1011,7 +1028,7 @@ func (s *OrgService) UpdateRegistrationType(ctx context.Context, id uuid.UUID, r
 		return nil, fmt.Errorf("org service: UpdateRegistrationType find: %w", err)
 	}
 	if rt == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("registration type %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "registration_type"), api.P("id", id.String()))
 	}
 
 	if req.Name != nil {
@@ -1085,7 +1102,7 @@ func (s *OrgService) GetRegistration(ctx context.Context, id uuid.UUID) (*Regist
 		return nil, fmt.Errorf("org service: GetRegistration: %w", err)
 	}
 	if reg == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("registration %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "registration"), api.P("id", id.String()))
 	}
 	return reg, nil
 }

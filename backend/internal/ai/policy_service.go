@@ -27,17 +27,17 @@ func NewPolicyService(repo PolicyRepository, logger *slog.Logger) *PolicyService
 func (s *PolicyService) RegisterGoverningDoc(ctx context.Context, orgID uuid.UUID, req RegisterGoverningDocRequest) (*GoverningDocument, error) {
 	documentID, err := uuid.Parse(req.DocumentID)
 	if err != nil {
-		return nil, api.NewValidationError("document_id must be a valid UUID", "document_id")
+		return nil, api.NewValidationError("validation.invalid_uuid", "document_id", api.P("field", "document_id"))
 	}
 	if req.DocType == "" {
-		return nil, api.NewValidationError("doc_type is required", "doc_type")
+		return nil, api.NewValidationError("validation.required", "doc_type", api.P("field", "doc_type"))
 	}
 	if req.Title == "" {
-		return nil, api.NewValidationError("title is required", "title")
+		return nil, api.NewValidationError("validation.required", "title", api.P("field", "title"))
 	}
 	effectiveDate, err := time.Parse("2006-01-02", req.EffectiveDate)
 	if err != nil {
-		return nil, api.NewValidationError("effective_date must be in YYYY-MM-DD format", "effective_date")
+		return nil, api.NewValidationError("validation.constraint", "effective_date", api.P("field", "effective_date"), api.P("constraint", "YYYY-MM-DD format"))
 	}
 
 	doc := &GoverningDocument{
@@ -64,7 +64,7 @@ func (s *PolicyService) GetGoverningDoc(ctx context.Context, id uuid.UUID) (*Gov
 		return nil, err
 	}
 	if doc == nil {
-		return nil, api.NewNotFoundError("governing document not found")
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "governing_document"), api.P("id", id.String()))
 	}
 	return doc, nil
 }
@@ -106,7 +106,7 @@ func (s *PolicyService) GetExtraction(ctx context.Context, id uuid.UUID) (*Polic
 		return nil, err
 	}
 	if e == nil {
-		return nil, api.NewNotFoundError("policy extraction not found")
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "policy_extraction"), api.P("id", id.String()))
 	}
 	return e, nil
 }
@@ -196,7 +196,7 @@ func (s *PolicyService) GetResolution(ctx context.Context, id uuid.UUID) (*Polic
 		return nil, err
 	}
 	if r == nil {
-		return nil, api.NewNotFoundError("policy resolution not found")
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "policy_resolution"), api.P("id", id.String()))
 	}
 	return r, nil
 }

@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 )
 
@@ -24,9 +23,10 @@ type Meta struct {
 
 // Error is a single machine-readable error entry inside the errors array.
 type Error struct {
-	Code    string `json:"code"`
-	Field   string `json:"field,omitempty"`
-	Message string `json:"message"`
+	Code       string         `json:"code"`
+	MessageKey string         `json:"message_key"`
+	Field      string         `json:"field,omitempty"`
+	Params     map[string]any `json:"params,omitempty"`
 }
 
 // WriteJSON writes a successful JSON response wrapped in the data envelope.
@@ -49,51 +49,18 @@ func WriteError(w http.ResponseWriter, err error) {
 	}
 
 	entry := Error{
-		Code:    apiErr.ErrorCode(),
-		Message: apiErr.Error(),
+		Code:       apiErr.ErrorCode(),
+		MessageKey: apiErr.MsgKey(),
+		Params:     apiErr.MsgParams(),
 	}
 
 	// Expose the field if this is a ValidationError.
 	var valErr *ValidationError
 	if errors.As(err, &valErr) {
 		entry.Field = valErr.Field
-		entry.Message = valErr.Message
 	}
-
-	// For other typed errors use the message directly rather than the wrapped form.
-	if entry.Message == "" {
-		entry.Message = apiErr.Error()
-	}
-
-	// Use the human-readable message from the concrete error types where available.
-	entry.Message = humanMessage(apiErr)
 
 	writeJSON(w, apiErr.StatusCode(), Response{Errors: []Error{entry}})
-}
-
-// humanMessage returns the most user-friendly message from an APIError,
-// preferring the struct's Message field over the Error() string.
-func humanMessage(apiErr APIError) string {
-	switch e := apiErr.(type) {
-	case *ValidationError:
-		return e.Message
-	case *UnauthenticatedError:
-		return e.Message
-	case *ForbiddenError:
-		return e.Message
-	case *NotFoundError:
-		return e.Message
-	case *ConflictError:
-		return e.Message
-	case *UnprocessableError:
-		return e.Message
-	case *RateLimitedError:
-		return e.Message
-	case *InternalError:
-		return "internal server error"
-	default:
-		return apiErr.Error()
-	}
 }
 
 // ReadJSON decodes the JSON request body into dst. It returns a *ValidationError
@@ -103,7 +70,7 @@ func ReadJSON(r *http.Request, dst any) error {
 	dec.DisallowUnknownFields()
 
 	if err := dec.Decode(dst); err != nil {
-		return NewValidationError(fmt.Sprintf("invalid request body: %s", err.Error()), "")
+		return NewValidationError("validation.invalid_body", "", P("detail", err.Error()))
 	}
 	return nil
 }

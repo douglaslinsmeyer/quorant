@@ -217,7 +217,7 @@ func TestUpdateBillingAccount_ValidationError(t *testing.T) {
 	// No fields → validation error.
 	_, err := svc.UpdateBillingAccount(context.Background(), orgID, billing.UpdateBillingAccountRequest{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "at least one field")
+	assert.Contains(t, err.Error(), "validation.at_least_one")
 }
 
 // ─── ListInvoices tests ───────────────────────────────────────────────────────

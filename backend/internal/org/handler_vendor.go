@@ -45,7 +45,7 @@ func (h *VendorHandler) ListVendors(w http.ResponseWriter, r *http.Request) {
 
 	afterID, err := parseCursorID(page.Cursor)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_cursor", "cursor"))
 		return
 	}
 
@@ -193,11 +193,11 @@ func (h *VendorHandler) DeleteVendorAssignment(w http.ResponseWriter, r *http.Re
 func parseVendorID(r *http.Request) (uuid.UUID, error) {
 	raw := r.PathValue("vendor_id")
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError("vendor_id is required", "vendor_id")
+		return uuid.Nil, api.NewValidationError("validation.required", "vendor_id", api.P("field", "vendor_id"))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError("vendor_id must be a valid UUID", "vendor_id")
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", "vendor_id", api.P("field", "vendor_id"))
 	}
 	return id, nil
 }
@@ -206,11 +206,11 @@ func parseVendorID(r *http.Request) (uuid.UUID, error) {
 func parseAssignmentID(r *http.Request) (uuid.UUID, error) {
 	raw := r.PathValue("id")
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError("id is required", "id")
+		return uuid.Nil, api.NewValidationError("validation.required", "id", api.P("field", "id"))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError("id must be a valid UUID", "id")
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", "id", api.P("field", "id"))
 	}
 	return id, nil
 }

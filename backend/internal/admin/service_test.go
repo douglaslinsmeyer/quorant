@@ -411,7 +411,7 @@ func TestStartImpersonation_ReturnsUnprocessable(t *testing.T) {
 
 	assert.Nil(t, result)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not yet implemented")
+	assert.Contains(t, err.Error(), "unprocessable.not_implemented")
 }
 
 func TestStopImpersonation_ReturnsUnprocessable(t *testing.T) {
@@ -422,7 +422,7 @@ func TestStopImpersonation_ReturnsUnprocessable(t *testing.T) {
 
 	assert.Nil(t, result)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not yet implemented")
+	assert.Contains(t, err.Error(), "unprocessable.not_implemented")
 }
 
 func TestResetPassword_ReturnsUnprocessable(t *testing.T) {
@@ -433,5 +433,5 @@ func TestResetPassword_ReturnsUnprocessable(t *testing.T) {
 
 	assert.Nil(t, result)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not yet implemented")
+	assert.Contains(t, err.Error(), "unprocessable.not_implemented")
 }

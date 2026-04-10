@@ -47,7 +47,7 @@ func RateLimit(limiter *RateLimiter) func(http.Handler) http.Handler {
 			}
 
 			if !limiter.Allow(key) {
-				api.WriteError(w, api.NewRateLimitedError("rate limit exceeded"))
+				api.WriteError(w, api.NewRateLimitedError("rate_limit.exceeded"))
 				return
 			}
 

@@ -55,7 +55,7 @@ func (h *ViolationHandler) ListViolations(w http.ResponseWriter, r *http.Request
 	page := api.ParsePageRequest(r)
 	afterID, err := parseGovCursorID(page.Cursor)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_cursor", "cursor"))
 		return
 	}
 
@@ -207,7 +207,7 @@ func (h *ViolationHandler) ScheduleHearing(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if body.MeetingID == uuid.Nil {
-		api.WriteError(w, api.NewValidationError("meeting_id is required", "meeting_id"))
+		api.WriteError(w, api.NewValidationError("validation.required", "meeting_id", api.P("field", "meeting_id")))
 		return
 	}
 
@@ -309,11 +309,11 @@ func parseGovOrgID(r *http.Request) (uuid.UUID, error) {
 func parseGovPathUUID(r *http.Request, key string) (uuid.UUID, error) {
 	raw := r.PathValue(key)
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError(key+" is required", key)
+		return uuid.Nil, api.NewValidationError("validation.required", key, api.P("field", key))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError(key+" must be a valid UUID", key)
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", key, api.P("field", key))
 	}
 	return id, nil
 }

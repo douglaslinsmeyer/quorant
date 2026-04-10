@@ -125,11 +125,11 @@ func (h *MembershipHandler) DeleteMembership(w http.ResponseWriter, r *http.Requ
 func parseMembershipID(r *http.Request) (uuid.UUID, error) {
 	raw := r.PathValue("membership_id")
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError("membership_id is required", "membership_id")
+		return uuid.Nil, api.NewValidationError("validation.required", "membership_id", api.P("field", "membership_id"))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError("membership_id must be a valid UUID", "membership_id")
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", "membership_id", api.P("field", "membership_id"))
 	}
 	return id, nil
 }

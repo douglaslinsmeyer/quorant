@@ -51,11 +51,11 @@ func ResolveUserID(resolveUserID func(ctx context.Context) (uuid.UUID, error)) f
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, err := resolveUserID(r.Context())
 			if err != nil {
-				api.WriteError(w, api.NewUnauthenticatedError("could not resolve user"))
+				api.WriteError(w, api.NewUnauthenticatedError("auth.resolve_failed"))
 				return
 			}
 			if userID == uuid.Nil {
-				api.WriteError(w, api.NewUnauthenticatedError("could not resolve user identity"))
+				api.WriteError(w, api.NewUnauthenticatedError("auth.resolve_failed"))
 				return
 			}
 			ctx := WithUserID(r.Context(), userID)
@@ -164,17 +164,17 @@ func RequirePermission(
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			orgID := OrgIDFromContext(r.Context())
 			if orgID == uuid.Nil {
-				api.WriteError(w, api.NewForbiddenError("no organization context"))
+				api.WriteError(w, api.NewForbiddenError("access.no_organization"))
 				return
 			}
 
 			userID, err := resolveUserID(r.Context())
 			if err != nil {
-				api.WriteError(w, api.NewUnauthenticatedError("could not resolve user"))
+				api.WriteError(w, api.NewUnauthenticatedError("auth.resolve_failed"))
 				return
 			}
 			if userID == uuid.Nil {
-				api.WriteError(w, api.NewUnauthenticatedError("could not resolve user identity"))
+				api.WriteError(w, api.NewUnauthenticatedError("auth.resolve_failed"))
 				return
 			}
 
@@ -185,7 +185,7 @@ func RequirePermission(
 			}
 
 			if !allowed {
-				api.WriteError(w, api.NewForbiddenError("insufficient permissions"))
+				api.WriteError(w, api.NewForbiddenError("access.insufficient_permissions"))
 				return
 			}
 

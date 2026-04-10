@@ -178,7 +178,7 @@ func (h *ARBHandler) VerifyCondition(w http.ResponseWriter, r *http.Request) {
 	var conditions []map[string]any
 	if len(req.Conditions) > 0 {
 		if err := json.Unmarshal(req.Conditions, &conditions); err != nil {
-			api.WriteError(w, api.NewValidationError("conditions field is not a valid JSON array", "conditions"))
+			api.WriteError(w, api.NewValidationError("validation.invalid_json", "conditions", api.P("field", "conditions")))
 			return
 		}
 	}
@@ -193,7 +193,7 @@ func (h *ARBHandler) VerifyCondition(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
-		api.WriteError(w, api.NewNotFoundError("condition not found in ARB request"))
+		api.WriteError(w, api.NewNotFoundError("resource.not_found", api.P("resource", "condition")))
 		return
 	}
 
