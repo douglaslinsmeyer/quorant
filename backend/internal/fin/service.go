@@ -11,6 +11,7 @@ import (
 	"github.com/quorant/quorant/internal/ai"
 	"github.com/quorant/quorant/internal/platform/api"
 	"github.com/quorant/quorant/internal/platform/db"
+	"github.com/quorant/quorant/internal/platform/policy"
 )
 
 // UpdateAssessmentScheduleRequest holds the fields that can be updated on an
@@ -38,6 +39,7 @@ type FinService struct {
 	gl          *GLService
 	policy      ai.PolicyResolver
 	compliance  ai.ComplianceResolver
+	registry    *policy.Registry
 	logger      *slog.Logger
 	uowFactory  *db.UnitOfWorkFactory
 }
@@ -52,6 +54,7 @@ func NewFinService(
 	gl *GLService,
 	policy ai.PolicyResolver,
 	compliance ai.ComplianceResolver,
+	registry *policy.Registry,
 	logger *slog.Logger,
 	uowFactory *db.UnitOfWorkFactory,
 ) *FinService {
@@ -64,6 +67,7 @@ func NewFinService(
 		gl:          gl,
 		policy:      policy,
 		compliance:  compliance,
+		registry:    registry,
 		logger:      logger,
 		uowFactory:  uowFactory,
 	}

@@ -45,6 +45,7 @@ func setupPaymentTestServer(t *testing.T) *paymentTestServer {
 		nil,
 		ai.NewNoopPolicyResolver(),
 		ai.NewNoopComplianceResolver(),
+		nil,
 		logger,
 		nil,
 	)

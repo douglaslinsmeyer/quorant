@@ -45,6 +45,7 @@ func setupAssessmentTestServer(t *testing.T) *assessmentTestServer {
 		nil,
 		ai.NewNoopPolicyResolver(),
 		ai.NewNoopComplianceResolver(),
+		nil,
 		logger,
 		nil,
 	)
