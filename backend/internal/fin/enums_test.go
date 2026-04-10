@@ -244,13 +244,13 @@ func TestAmountStrategy_IsValid(t *testing.T) {
 }
 
 func TestBudgetCategoryType_IsValid(t *testing.T) {
-	valid := []BudgetCategoryType{BudgetCategoryTypeExpense}
+	valid := []BudgetCategoryType{BudgetCategoryTypeExpense, BudgetCategoryTypeIncome}
 	for _, v := range valid {
 		if !v.IsValid() {
 			t.Errorf("expected %q to be valid", v)
 		}
 	}
-	invalid := []BudgetCategoryType{"", "unknown", "Expense"}
+	invalid := []BudgetCategoryType{"", "unknown", "Expense", "Income"}
 	for _, v := range invalid {
 		if v.IsValid() {
 			t.Errorf("expected %q to be invalid", v)

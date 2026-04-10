@@ -296,12 +296,13 @@ type BudgetCategoryType string
 
 const (
 	BudgetCategoryTypeExpense BudgetCategoryType = "expense"
+	BudgetCategoryTypeIncome  BudgetCategoryType = "income"
 )
 
 // IsValid returns true if the BudgetCategoryType value is one of the defined constants.
 func (s BudgetCategoryType) IsValid() bool {
 	switch s {
-	case BudgetCategoryTypeExpense:
+	case BudgetCategoryTypeExpense, BudgetCategoryTypeIncome:
 		return true
 	}
 	return false
