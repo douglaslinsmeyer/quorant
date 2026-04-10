@@ -308,6 +308,16 @@ func (m *mockPaymentRepo) SoftDeletePaymentMethod(_ context.Context, id uuid.UUI
 	return nil
 }
 
+func (m *mockPaymentRepo) CreatePaymentAllocation(_ context.Context, a *fin.PaymentAllocation) (*fin.PaymentAllocation, error) {
+	a.ID = uuid.New()
+	a.CreatedAt = time.Now()
+	return a, nil
+}
+
+func (m *mockPaymentRepo) ListAllocationsByPayment(_ context.Context, _ uuid.UUID) ([]fin.PaymentAllocation, error) {
+	return []fin.PaymentAllocation{}, nil
+}
+
 func (m *mockPaymentRepo) WithTx(_ pgx.Tx) fin.PaymentRepository { return m }
 
 // mockBudgetRepo is an in-memory implementation of BudgetRepository.

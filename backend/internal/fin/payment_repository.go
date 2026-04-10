@@ -49,6 +49,14 @@ type PaymentRepository interface {
 	// removing the row.
 	SoftDeletePaymentMethod(ctx context.Context, id uuid.UUID) error
 
+	// ── Payment Allocations ──────────────────────────────────────────────────
+
+	// CreatePaymentAllocation inserts a new allocation record.
+	CreatePaymentAllocation(ctx context.Context, a *PaymentAllocation) (*PaymentAllocation, error)
+
+	// ListAllocationsByPayment returns all allocations for the given payment.
+	ListAllocationsByPayment(ctx context.Context, paymentID uuid.UUID) ([]PaymentAllocation, error)
+
 	// WithTx returns a copy of the repository that runs queries against the
 	// given transaction. Used by UnitOfWork to enlist the repo in a shared tx.
 	WithTx(tx pgx.Tx) PaymentRepository
