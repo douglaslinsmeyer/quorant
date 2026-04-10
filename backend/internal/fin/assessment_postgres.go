@@ -9,17 +9,24 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	dbpkg "github.com/quorant/quorant/internal/platform/db"
 )
 
-// PostgresAssessmentRepository implements AssessmentRepository using a pgxpool.
+// PostgresAssessmentRepository implements AssessmentRepository using a DBTX.
 type PostgresAssessmentRepository struct {
-	pool *pgxpool.Pool
+	db dbpkg.DBTX
 }
 
 // NewPostgresAssessmentRepository creates a new PostgresAssessmentRepository
 // backed by pool.
 func NewPostgresAssessmentRepository(pool *pgxpool.Pool) *PostgresAssessmentRepository {
-	return &PostgresAssessmentRepository{pool: pool}
+	return &PostgresAssessmentRepository{db: pool}
+}
+
+// WithTx returns a new PostgresAssessmentRepository scoped to the given
+// transaction, enabling participation in a caller-managed transaction.
+func (r *PostgresAssessmentRepository) WithTx(tx pgx.Tx) AssessmentRepository {
+	return &PostgresAssessmentRepository{db: tx}
 }
 
 // ─── Schedule CRUD ────────────────────────────────────────────────────────────
@@ -57,7 +64,7 @@ func (r *PostgresAssessmentRepository) CreateSchedule(ctx context.Context, s *As
 		          starts_at, ends_at, is_active, approved_by, approved_at,
 		          created_by, created_at, updated_at, deleted_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		s.OrgID,
 		s.CurrencyCode,
 		s.Name,
@@ -94,7 +101,7 @@ func (r *PostgresAssessmentRepository) FindScheduleByID(ctx context.Context, id 
 		FROM assessment_schedules
 		WHERE id = $1 AND deleted_at IS NULL`
 
-	row := r.pool.QueryRow(ctx, q, id)
+	row := r.db.QueryRow(ctx, q, id)
 	result, err := scanSchedule(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -117,7 +124,7 @@ func (r *PostgresAssessmentRepository) ListSchedulesByOrg(ctx context.Context, o
 		WHERE org_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.db.Query(ctx, q, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListSchedulesByOrg: %w", err)
 	}
@@ -166,7 +173,7 @@ func (r *PostgresAssessmentRepository) UpdateSchedule(ctx context.Context, s *As
 		          starts_at, ends_at, is_active, approved_by, approved_at,
 		          created_by, created_at, updated_at, deleted_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		s.CurrencyCode,
 		s.Name,
 		s.Description,
@@ -201,7 +208,7 @@ func (r *PostgresAssessmentRepository) DeactivateSchedule(ctx context.Context, i
 		SET is_active = false, updated_at = now()
 		WHERE id = $1 AND deleted_at IS NULL`
 
-	_, err := r.pool.Exec(ctx, q, id)
+	_, err := r.db.Exec(ctx, q, id)
 	if err != nil {
 		return fmt.Errorf("fin: DeactivateSchedule: %w", err)
 	}
@@ -236,7 +243,7 @@ func (r *PostgresAssessmentRepository) CreateAssessment(ctx context.Context, a *
 		lateFeeCents = *a.LateFeeCents
 	}
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		a.OrgID,
 		a.CurrencyCode,
 		a.UnitID,
@@ -267,7 +274,7 @@ func (r *PostgresAssessmentRepository) FindAssessmentByID(ctx context.Context, i
 		FROM assessments
 		WHERE id = $1 AND deleted_at IS NULL`
 
-	row := r.pool.QueryRow(ctx, q, id)
+	row := r.db.QueryRow(ctx, q, id)
 	result, err := scanAssessment(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -292,7 +299,7 @@ func (r *PostgresAssessmentRepository) ListAssessmentsByOrg(ctx context.Context,
 		ORDER BY id
 		LIMIT $2`
 
-	rows, err := r.pool.Query(ctx, q, orgID, limit+1, afterID)
+	rows, err := r.db.Query(ctx, q, orgID, limit+1, afterID)
 	if err != nil {
 		return nil, false, fmt.Errorf("fin: ListAssessmentsByOrg: %w", err)
 	}
@@ -321,7 +328,7 @@ func (r *PostgresAssessmentRepository) ListAssessmentsByUnit(ctx context.Context
 		WHERE unit_id = $1 AND deleted_at IS NULL
 		ORDER BY due_date`
 
-	rows, err := r.pool.Query(ctx, q, unitID)
+	rows, err := r.db.Query(ctx, q, unitID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListAssessmentsByUnit: %w", err)
 	}
@@ -357,7 +364,7 @@ func (r *PostgresAssessmentRepository) UpdateAssessment(ctx context.Context, a *
 		          due_date, grace_days, late_fee_cents, is_recurring,
 		          created_by, created_at, updated_at, deleted_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		a.CurrencyCode,
 		a.Description,
 		a.AmountCents,
@@ -385,7 +392,7 @@ func (r *PostgresAssessmentRepository) SoftDeleteAssessment(ctx context.Context,
 		SET deleted_at = now()
 		WHERE id = $1 AND deleted_at IS NULL`
 
-	_, err := r.pool.Exec(ctx, q, id)
+	_, err := r.db.Exec(ctx, q, id)
 	if err != nil {
 		return fmt.Errorf("fin: SoftDeleteAssessment: %w", err)
 	}
@@ -400,7 +407,7 @@ func (r *PostgresAssessmentRepository) SoftDeleteAssessment(ctx context.Context,
 // keyed on unit_id serializes concurrent writes to prevent running
 // balance corruption.
 func (r *PostgresAssessmentRepository) CreateLedgerEntry(ctx context.Context, entry *LedgerEntry) (*LedgerEntry, error) {
-	tx, err := r.pool.Begin(ctx)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fin: CreateLedgerEntry begin tx: %w", err)
 	}
@@ -473,7 +480,7 @@ func (r *PostgresAssessmentRepository) ListLedgerByUnit(ctx context.Context, uni
 		ORDER BY id
 		LIMIT $2`
 
-	rows, err := r.pool.Query(ctx, q, unitID, limit+1, afterID)
+	rows, err := r.db.Query(ctx, q, unitID, limit+1, afterID)
 	if err != nil {
 		return nil, false, fmt.Errorf("fin: ListLedgerByUnit: %w", err)
 	}
@@ -503,7 +510,7 @@ func (r *PostgresAssessmentRepository) ListLedgerByOrg(ctx context.Context, orgI
 		WHERE org_id = $1
 		ORDER BY effective_date ASC, created_at ASC`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.db.Query(ctx, q, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListLedgerByOrg: %w", err)
 	}
@@ -523,7 +530,7 @@ func (r *PostgresAssessmentRepository) GetUnitBalance(ctx context.Context, unitI
 		LIMIT 1`
 
 	var balance int64
-	err := r.pool.QueryRow(ctx, q, unitID).Scan(&balance)
+	err := r.db.QueryRow(ctx, q, unitID).Scan(&balance)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return 0, nil
 	}

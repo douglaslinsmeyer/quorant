@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // PaymentRepository persists and retrieves payment transactions and saved
@@ -47,4 +48,8 @@ type PaymentRepository interface {
 	// SoftDeletePaymentMethod marks the payment method as deleted without
 	// removing the row.
 	SoftDeletePaymentMethod(ctx context.Context, id uuid.UUID) error
+
+	// WithTx returns a copy of the repository that runs queries against the
+	// given transaction. Used by UnitOfWork to enlist the repo in a shared tx.
+	WithTx(tx pgx.Tx) PaymentRepository
 }

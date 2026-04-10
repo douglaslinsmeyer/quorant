@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/ai"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/db"
 )
 
 // UpdateAssessmentScheduleRequest holds the fields that can be updated on an
@@ -38,6 +39,7 @@ type FinService struct {
 	policy      ai.PolicyResolver
 	compliance  ai.ComplianceResolver
 	logger      *slog.Logger
+	uowFactory  *db.UnitOfWorkFactory
 }
 
 // NewFinService creates a new FinService with the given repositories and logger.
@@ -51,6 +53,7 @@ func NewFinService(
 	policy ai.PolicyResolver,
 	compliance ai.ComplianceResolver,
 	logger *slog.Logger,
+	uowFactory *db.UnitOfWorkFactory,
 ) *FinService {
 	return &FinService{
 		assessments: assessments,
@@ -62,6 +65,7 @@ func NewFinService(
 		policy:      policy,
 		compliance:  compliance,
 		logger:      logger,
+		uowFactory:  uowFactory,
 	}
 }
 
@@ -157,6 +161,8 @@ func (s *FinService) DeactivateSchedule(ctx context.Context, id uuid.UUID) error
 
 // CreateAssessment validates the request, creates the assessment record, and
 // also creates a corresponding "charge" ledger entry against the unit.
+// When a UnitOfWorkFactory is configured, all writes (assessment, ledger entry,
+// GL journal entry) execute within a single database transaction.
 func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req CreateAssessmentRequest) (*Assessment, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -185,7 +191,26 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 		}
 	}
 
-	created, err := s.assessments.CreateAssessment(ctx, a)
+	// When UoW factory available, wrap all writes in a single transaction.
+	// When nil (unit tests), operations run against the repos directly.
+	var uow *db.UnitOfWork
+	assessments := s.assessments
+	gl := s.gl
+
+	if s.uowFactory != nil {
+		var err error
+		uow, err = s.uowFactory.Begin(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("fin: CreateAssessment begin tx: %w", err)
+		}
+		defer uow.Rollback(ctx) //nolint:errcheck
+		assessments = s.assessments.WithTx(uow.Tx())
+		if s.gl != nil {
+			gl = s.gl.WithTx(uow.Tx())
+		}
+	}
+
+	created, err := assessments.CreateAssessment(ctx, a)
 	if err != nil {
 		return nil, err
 	}
@@ -202,15 +227,14 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 		Description:   &desc,
 		EffectiveDate: created.DueDate,
 	}
-	if _, err := s.assessments.CreateLedgerEntry(ctx, entry); err != nil {
-		s.logger.Error("failed to create ledger entry for assessment", "assessment_id", created.ID, "error", err)
-		return nil, err
+	if _, err := assessments.CreateLedgerEntry(ctx, entry); err != nil {
+		return nil, fmt.Errorf("fin: CreateAssessment ledger entry: %w", err)
 	}
 
 	// Post GL journal entry: Debit AR / Credit Revenue.
-	if s.gl != nil {
-		arAccount, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 1100)
-		revenueAccount, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 4010)
+	if gl != nil {
+		arAccount, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, 1100)
+		revenueAccount, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, 4010)
 		if arAccount != nil && revenueAccount != nil {
 			sourceType := GLSourceTypeAssessment
 			lines := []GLJournalLine{
@@ -218,12 +242,17 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 				{AccountID: revenueAccount.ID, DebitCents: 0, CreditCents: created.AmountCents},
 			}
 			memo := fmt.Sprintf("Assessment: %s", created.Description)
-			if _, glErr := s.gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, created.DueDate, memo, &sourceType, &created.ID, &req.UnitID, lines); glErr != nil {
-				s.logger.Error("GL: failed to post assessment journal entry", "assessment_id", created.ID, "error", glErr)
+			if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, created.DueDate, memo, &sourceType, &created.ID, &req.UnitID, lines); glErr != nil {
+				return nil, fmt.Errorf("fin: CreateAssessment GL entry: %w", glErr)
 			}
 		}
 	}
 
+	if uow != nil {
+		if err := uow.Commit(ctx); err != nil {
+			return nil, fmt.Errorf("fin: CreateAssessment commit: %w", err)
+		}
+	}
 	return created, nil
 }
 
@@ -299,7 +328,27 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 		Description:     req.Description,
 		PaidAt:          &now,
 	}
-	created, err := s.payments.CreatePayment(ctx, p)
+
+	var uow *db.UnitOfWork
+	payments := s.payments
+	assessments := s.assessments
+	gl := s.gl
+
+	if s.uowFactory != nil {
+		var err error
+		uow, err = s.uowFactory.Begin(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("fin: RecordPayment begin tx: %w", err)
+		}
+		defer uow.Rollback(ctx) //nolint:errcheck
+		payments = s.payments.WithTx(uow.Tx())
+		assessments = s.assessments.WithTx(uow.Tx())
+		if s.gl != nil {
+			gl = s.gl.WithTx(uow.Tx())
+		}
+	}
+
+	created, err := payments.CreatePayment(ctx, p)
 	if err != nil {
 		return nil, err
 	}
@@ -317,15 +366,14 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 		ReferenceID:   &created.ID,
 		EffectiveDate: now,
 	}
-	if _, err := s.assessments.CreateLedgerEntry(ctx, entry); err != nil {
-		s.logger.Error("failed to create ledger entry for payment", "payment_id", created.ID, "error", err)
-		return nil, err
+	if _, err := assessments.CreateLedgerEntry(ctx, entry); err != nil {
+		return nil, fmt.Errorf("fin: RecordPayment ledger entry: %w", err)
 	}
 
 	// Post GL journal entry: Debit Cash / Credit AR.
-	if s.gl != nil {
-		cashAccount, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 1010)
-		arAccount, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 1100)
+	if gl != nil {
+		cashAccount, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, 1010)
+		arAccount, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, 1100)
 		if cashAccount != nil && arAccount != nil {
 			sourceType := GLSourceTypePayment
 			memo := "Payment received"
@@ -336,12 +384,17 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 				{AccountID: cashAccount.ID, DebitCents: created.AmountCents, CreditCents: 0},
 				{AccountID: arAccount.ID, DebitCents: 0, CreditCents: created.AmountCents},
 			}
-			if _, glErr := s.gl.PostSystemJournalEntry(ctx, orgID, userID, now, memo, &sourceType, &created.ID, &req.UnitID, lines); glErr != nil {
-				s.logger.Error("GL: failed to post payment journal entry", "payment_id", created.ID, "error", glErr)
+			if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, userID, now, memo, &sourceType, &created.ID, &req.UnitID, lines); glErr != nil {
+				return nil, fmt.Errorf("fin: RecordPayment GL entry: %w", glErr)
 			}
 		}
 	}
 
+	if uow != nil {
+		if err := uow.Commit(ctx); err != nil {
+			return nil, fmt.Errorf("fin: RecordPayment commit: %w", err)
+		}
+	}
 	return created, nil
 }
 
@@ -667,7 +720,25 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 		Description:   req.Description,
 		EffectiveDate: now,
 	}
-	created, err := s.funds.CreateTransfer(ctx, t)
+
+	var uow *db.UnitOfWork
+	funds := s.funds
+	gl := s.gl
+
+	if s.uowFactory != nil {
+		var err error
+		uow, err = s.uowFactory.Begin(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("fin: CreateFundTransfer begin tx: %w", err)
+		}
+		defer uow.Rollback(ctx) //nolint:errcheck
+		funds = s.funds.WithTx(uow.Tx())
+		if s.gl != nil {
+			gl = s.gl.WithTx(uow.Tx())
+		}
+	}
+
+	created, err := funds.CreateTransfer(ctx, t)
 	if err != nil {
 		return nil, err
 	}
@@ -706,17 +777,17 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 	}
 
 	// Post GL journal entry for both sides of the inter-fund transfer.
-	if s.gl != nil {
-		fromFund, _ := s.funds.FindFundByID(ctx, req.FromFundID)
-		toFund, _ := s.funds.FindFundByID(ctx, req.ToFundID)
+	if gl != nil {
+		fromFund, _ := funds.FindFundByID(ctx, req.FromFundID)
+		toFund, _ := funds.FindFundByID(ctx, req.ToFundID)
 		if fromFund != nil && toFund != nil {
 			fromCashNum := cashAccountForFundType(fromFund.FundType)
 			toCashNum := cashAccountForFundType(toFund.FundType)
 
-			fromCash, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, fromCashNum)
-			toCash, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, toCashNum)
-			transferOut, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 3100)
-			transferIn, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 3110)
+			fromCash, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, fromCashNum)
+			toCash, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, toCashNum)
+			transferOut, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, 3100)
+			transferIn, _ := gl.FindAccountByOrgAndNumber(ctx, orgID, 3110)
 
 			if fromCash != nil && toCash != nil && transferOut != nil && transferIn != nil {
 				sourceType := GLSourceTypeTransfer
@@ -727,13 +798,18 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 					{AccountID: toCash.ID, DebitCents: req.AmountCents, CreditCents: 0},
 					{AccountID: transferIn.ID, DebitCents: 0, CreditCents: req.AmountCents},
 				}
-				if _, glErr := s.gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, now, memo, &sourceType, &created.ID, nil, lines); glErr != nil {
-					s.logger.Error("GL: failed to post transfer journal entry", "transfer_id", created.ID, "error", glErr)
+				if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, now, memo, &sourceType, &created.ID, nil, lines); glErr != nil {
+					return nil, fmt.Errorf("fin: CreateFundTransfer GL entry: %w", glErr)
 				}
 			}
 		}
 	}
 
+	if uow != nil {
+		if err := uow.Commit(ctx); err != nil {
+			return nil, fmt.Errorf("fin: CreateFundTransfer commit: %w", err)
+		}
+	}
 	return created, nil
 }
 

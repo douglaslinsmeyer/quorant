@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/quorant/quorant/internal/ai"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/fin"
@@ -207,6 +208,8 @@ func (m *mockAssessmentRepo) GetUnitBalance(_ context.Context, unitID uuid.UUID)
 	return balance, nil
 }
 
+func (m *mockAssessmentRepo) WithTx(_ pgx.Tx) fin.AssessmentRepository { return m }
+
 // mockPaymentRepo is an in-memory implementation of PaymentRepository.
 type mockPaymentRepo struct {
 	payments []fin.Payment
@@ -304,6 +307,8 @@ func (m *mockPaymentRepo) SoftDeletePaymentMethod(_ context.Context, id uuid.UUI
 	}
 	return nil
 }
+
+func (m *mockPaymentRepo) WithTx(_ pgx.Tx) fin.PaymentRepository { return m }
 
 // mockBudgetRepo is an in-memory implementation of BudgetRepository.
 type mockBudgetRepo struct {
@@ -499,6 +504,8 @@ func (m *mockBudgetRepo) SoftDeleteExpense(_ context.Context, id uuid.UUID) erro
 	return nil
 }
 
+func (m *mockBudgetRepo) WithTx(_ pgx.Tx) fin.BudgetRepository { return m }
+
 // mockFundRepo is an in-memory implementation of FundRepository.
 type mockFundRepo struct {
 	funds        []fin.Fund
@@ -599,6 +606,8 @@ func (m *mockFundRepo) ListTransfersByOrg(_ context.Context, orgID uuid.UUID) ([
 	}
 	return result, nil
 }
+
+func (m *mockFundRepo) WithTx(_ pgx.Tx) fin.FundRepository { return m }
 
 // mockCollectionRepo is an in-memory implementation of CollectionRepository.
 type mockCollectionRepo struct {
@@ -716,6 +725,8 @@ func (m *mockCollectionRepo) GetCollectionStatusForUnit(_ context.Context, unitI
 	return nil, nil
 }
 
+func (m *mockCollectionRepo) WithTx(_ pgx.Tx) fin.CollectionRepository { return m }
+
 // ── Helper ────────────────────────────────────────────────────────────────────
 
 func newTestService() (*fin.FinService, *mockAssessmentRepo, *mockPaymentRepo, *mockBudgetRepo, *mockFundRepo, *mockCollectionRepo) {
@@ -725,7 +736,7 @@ func newTestService() (*fin.FinService, *mockAssessmentRepo, *mockPaymentRepo, *
 	funds := &mockFundRepo{}
 	collections := &mockCollectionRepo{}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger, nil)
 	return svc, assessments, payments, budgets, funds, collections
 }
 
@@ -1081,7 +1092,7 @@ func TestCreateAssessment_PostsJournalEntry(t *testing.T) {
 	glRepo.accounts[arAccount.ID] = arAccount
 	glRepo.accounts[revenueAccount.ID] = revenueAccount
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger, nil)
 
 	unitID := uuid.New()
 	req := fin.CreateAssessmentRequest{
@@ -1108,6 +1119,45 @@ func TestCreateAssessment_PostsJournalEntry(t *testing.T) {
 		assert.Equal(t, int64(0), entry.Lines[1].DebitCents)
 		assert.Equal(t, int64(15000), entry.Lines[1].CreditCents)
 	}
+}
+
+// TestCreateAssessment_GLFailureReturnsError verifies that a GL posting error
+// now propagates to the caller instead of being silently swallowed.
+func TestCreateAssessment_GLFailureReturnsError(t *testing.T) {
+	assessments := &mockAssessmentRepo{}
+	payments := &mockPaymentRepo{}
+	budgets := &mockBudgetRepo{}
+	funds := &mockFundRepo{}
+	collections := &mockCollectionRepo{}
+
+	glRepo := newMockGLRepo()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	glService := fin.NewGLService(glRepo, audit.NewNoopAuditor(), logger)
+
+	orgID := uuid.New()
+
+	arAccount := &fin.GLAccount{
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 1100, Name: "AR",
+		AccountType: fin.GLAccountTypeAsset, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	revenueAccount := &fin.GLAccount{
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 4010, Name: "Revenue",
+		AccountType: fin.GLAccountTypeRevenue, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	glRepo.SetAccounts(arAccount, revenueAccount)
+	glRepo.SetPostError(fmt.Errorf("simulated GL failure"))
+
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger, nil)
+
+	_, err := svc.CreateAssessment(context.Background(), orgID, fin.CreateAssessmentRequest{
+		UnitID:      uuid.New(),
+		Description: "Test assessment",
+		AmountCents: 10000,
+		DueDate:     time.Now().Add(30 * 24 * time.Hour),
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "simulated GL failure")
 }
 
 // TestRecordPayment_PostsJournalEntry verifies that recording a payment
@@ -1137,7 +1187,7 @@ func TestRecordPayment_PostsJournalEntry(t *testing.T) {
 	glRepo.accounts[cashAccount.ID] = cashAccount
 	glRepo.accounts[arAccount.ID] = arAccount
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger, nil)
 
 	unitID := uuid.New()
 	userID := uuid.New()
@@ -1188,6 +1238,87 @@ func TestCreateAssessment_NilGLService_StillWorks(t *testing.T) {
 }
 
 // ── CurrencyCode Tests ──────────────────────────────────────────────────────
+
+// TestRecordPayment_GLFailureReturnsError verifies that a GL posting error
+// propagates to the caller instead of being silently swallowed.
+func TestRecordPayment_GLFailureReturnsError(t *testing.T) {
+	assessments := &mockAssessmentRepo{}
+	payments := &mockPaymentRepo{}
+	budgets := &mockBudgetRepo{}
+	funds := &mockFundRepo{}
+	collections := &mockCollectionRepo{}
+
+	glRepo := newMockGLRepo()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	glService := fin.NewGLService(glRepo, audit.NewNoopAuditor(), logger)
+
+	orgID := uuid.New()
+	userID := uuid.New()
+
+	cashAccount := &fin.GLAccount{
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 1010, Name: "Cash",
+		AccountType: fin.GLAccountTypeAsset, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	arAccount := &fin.GLAccount{
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 1100, Name: "AR",
+		AccountType: fin.GLAccountTypeAsset, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	glRepo.SetAccounts(cashAccount, arAccount)
+	glRepo.SetPostError(fmt.Errorf("simulated GL failure"))
+
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger, nil)
+
+	desc := "Test payment"
+	_, err := svc.RecordPayment(context.Background(), orgID, userID, fin.CreatePaymentRequest{
+		UnitID:      uuid.New(),
+		AmountCents: 5000,
+		Description: &desc,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "simulated GL failure")
+}
+
+// TestCreateFundTransfer_GLFailureReturnsError verifies that a GL posting error
+// propagates to the caller instead of being silently swallowed.
+func TestCreateFundTransfer_GLFailureReturnsError(t *testing.T) {
+	assessments := &mockAssessmentRepo{}
+	payments := &mockPaymentRepo{}
+	budgets := &mockBudgetRepo{}
+	funds := &mockFundRepo{}
+	collections := &mockCollectionRepo{}
+
+	glRepo := newMockGLRepo()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	glService := fin.NewGLService(glRepo, audit.NewNoopAuditor(), logger)
+
+	orgID := uuid.New()
+
+	fromFund := &fin.Fund{OrgID: orgID, CurrencyCode: "USD", Name: "Operating", FundType: "operating", BalanceCents: 100000}
+	toFund := &fin.Fund{OrgID: orgID, CurrencyCode: "USD", Name: "Reserve", FundType: "reserve", BalanceCents: 0}
+	fromFund, _ = funds.CreateFund(context.Background(), fromFund)
+	toFund, _ = funds.CreateFund(context.Background(), toFund)
+
+	fromCash := &fin.GLAccount{ID: uuid.New(), OrgID: orgID, AccountNumber: 1010, Name: "Cash-Operating", AccountType: fin.GLAccountTypeAsset, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	toCash := &fin.GLAccount{ID: uuid.New(), OrgID: orgID, AccountNumber: 1020, Name: "Cash-Reserve", AccountType: fin.GLAccountTypeAsset, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	transferOut := &fin.GLAccount{ID: uuid.New(), OrgID: orgID, AccountNumber: 3100, Name: "Transfer Out", AccountType: fin.GLAccountTypeEquity, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	transferIn := &fin.GLAccount{ID: uuid.New(), OrgID: orgID, AccountNumber: 3110, Name: "Transfer In", AccountType: fin.GLAccountTypeEquity, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	glRepo.SetAccounts(fromCash, toCash, transferOut, transferIn)
+	glRepo.SetPostError(fmt.Errorf("simulated GL failure"))
+
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger, nil)
+
+	desc := "Test transfer"
+	_, err := svc.CreateFundTransfer(context.Background(), orgID, fin.CreateFundTransferRequest{
+		FromFundID:  fromFund.ID,
+		ToFundID:    toFund.ID,
+		AmountCents: 5000,
+		Description: &desc,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "simulated GL failure")
+}
 
 // TestCreateSchedule_SetsCurrencyCode verifies that CurrencyCode is explicitly
 // set to "USD" when creating a schedule.

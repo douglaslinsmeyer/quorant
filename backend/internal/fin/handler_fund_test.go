@@ -43,6 +43,7 @@ func setupFundTestServer(t *testing.T) *fundTestServer {
 		ai.NewNoopPolicyResolver(),
 		ai.NewNoopComplianceResolver(),
 		logger,
+		nil,
 	)
 	fundHandler := fin.NewFundHandler(service, logger)
 

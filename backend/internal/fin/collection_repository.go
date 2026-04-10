@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // CollectionRepository persists and retrieves collection cases, collection
@@ -58,4 +59,8 @@ type CollectionRepository interface {
 	// index (idx_collection_cases_active) ensures at most one open case per
 	// unit.
 	GetCollectionStatusForUnit(ctx context.Context, unitID uuid.UUID) (*CollectionCase, error)
+
+	// WithTx returns a copy of the repository that runs queries against the
+	// given transaction instead of the pool.
+	WithTx(tx pgx.Tx) CollectionRepository
 }
