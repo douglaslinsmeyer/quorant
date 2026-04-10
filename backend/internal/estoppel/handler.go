@@ -28,20 +28,17 @@ func defaultEstoppelRules() *EstoppelRules {
 	}
 }
 
-// actorID resolves the acting user from context, falling back to a new UUID
-// when no auth middleware has run (e.g. in handler unit tests).
-func actorID(r *http.Request) uuid.UUID {
-	if id := middleware.UserIDFromContext(r.Context()); id != uuid.Nil {
-		return id
-	}
-	return uuid.New()
-}
-
 // CreateRequest handles POST /organizations/{org_id}/estoppel/requests.
 func (h *Handler) CreateRequest(w http.ResponseWriter, r *http.Request) {
 	orgID, err := parseEstoppelPathUUID(r, "org_id")
 	if err != nil {
 		api.WriteError(w, err)
+		return
+	}
+
+	userID := middleware.UserIDFromContext(r.Context())
+	if userID == uuid.Nil {
+		api.WriteError(w, api.NewUnauthenticatedError("user identity required"))
 		return
 	}
 
@@ -52,7 +49,7 @@ func (h *Handler) CreateRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rules := defaultEstoppelRules()
-	created, err := h.service.CreateRequest(r.Context(), orgID, dto, rules, actorID(r))
+	created, err := h.service.CreateRequest(r.Context(), orgID, dto, rules, userID)
 	if err != nil {
 		h.logger.Error("CreateRequest failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
@@ -119,13 +116,19 @@ func (h *Handler) ApproveRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID := middleware.UserIDFromContext(r.Context())
+	if userID == uuid.Nil {
+		api.WriteError(w, api.NewUnauthenticatedError("user identity required"))
+		return
+	}
+
 	var dto ApproveRequestDTO
 	if err := api.ReadJSON(r, &dto); err != nil {
 		api.WriteError(w, err)
 		return
 	}
 
-	updated, err := h.service.ApproveRequest(r.Context(), id, dto, actorID(r))
+	updated, err := h.service.ApproveRequest(r.Context(), id, dto, userID)
 	if err != nil {
 		h.logger.Error("ApproveRequest failed", "id", id, "error", err)
 		api.WriteError(w, err)
@@ -143,13 +146,19 @@ func (h *Handler) RejectRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID := middleware.UserIDFromContext(r.Context())
+	if userID == uuid.Nil {
+		api.WriteError(w, api.NewUnauthenticatedError("user identity required"))
+		return
+	}
+
 	var dto RejectRequestDTO
 	if err := api.ReadJSON(r, &dto); err != nil {
 		api.WriteError(w, err)
 		return
 	}
 
-	updated, err := h.service.RejectRequest(r.Context(), id, dto, actorID(r))
+	updated, err := h.service.RejectRequest(r.Context(), id, dto, userID)
 	if err != nil {
 		h.logger.Error("RejectRequest failed", "id", id, "error", err)
 		api.WriteError(w, err)

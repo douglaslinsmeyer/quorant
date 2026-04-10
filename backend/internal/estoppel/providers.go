@@ -205,6 +205,10 @@ type PropertySnapshot struct {
 	IsRental        bool        `json:"is_rental"`
 	PetRestrictions string      `json:"pet_restrictions"`
 	LeaseOnFile     bool        `json:"lease_on_file"`
+	// OrgState is the two-letter US state code for the HOA's jurisdiction,
+	// derived from the Organization.State field. Used to populate Jurisdiction
+	// on the generated EstoppelCertificate.
+	OrgState        string      `json:"org_state,omitempty"`
 }
 
 // ---------------------------------------------------------------------------

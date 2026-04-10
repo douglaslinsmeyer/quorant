@@ -146,7 +146,7 @@ func (r *PostgresRepository) ListRequestsByOrg(
 		WHERE org_id = $1
 		  AND deleted_at IS NULL
 		  AND ($2::text IS NULL OR status = $2)
-		  AND ($4::uuid IS NULL OR id < $4)
+		  AND ($4::uuid IS NULL OR created_at < (SELECT created_at FROM estoppel_requests WHERE id = $4))
 		ORDER BY created_at DESC, id DESC
 		LIMIT $3`
 
@@ -460,13 +460,14 @@ func collectRequests(rows pgx.Rows, op string) ([]EstoppelRequest, error) {
 // scanCertificate reads a single estoppel_certificates row from a pgx.Row.
 func scanCertificate(row pgx.Row) (*EstoppelCertificate, error) {
 	var cert EstoppelCertificate
+	var docID *uuid.UUID
 
 	err := row.Scan(
 		&cert.ID,
 		&cert.RequestID,
 		&cert.OrgID,
 		&cert.UnitID,
-		&cert.DocumentID,
+		&docID,
 		&cert.Jurisdiction,
 		&cert.EffectiveDate,
 		&cert.ExpiresAt,
@@ -482,6 +483,7 @@ func scanCertificate(row pgx.Row) (*EstoppelCertificate, error) {
 	if err != nil {
 		return nil, err
 	}
+	cert.DocumentID = docID
 
 	return &cert, nil
 }
@@ -492,13 +494,14 @@ func collectCertificates(rows pgx.Rows, op string) ([]EstoppelCertificate, error
 	certs := []EstoppelCertificate{}
 	for rows.Next() {
 		var cert EstoppelCertificate
+		var docID *uuid.UUID
 
 		if err := rows.Scan(
 			&cert.ID,
 			&cert.RequestID,
 			&cert.OrgID,
 			&cert.UnitID,
-			&cert.DocumentID,
+			&docID,
 			&cert.Jurisdiction,
 			&cert.EffectiveDate,
 			&cert.ExpiresAt,
@@ -513,6 +516,7 @@ func collectCertificates(rows pgx.Rows, op string) ([]EstoppelCertificate, error
 		); err != nil {
 			return nil, fmt.Errorf("estoppel: %s scan: %w", op, err)
 		}
+		cert.DocumentID = docID
 
 		certs = append(certs, cert)
 	}

@@ -226,13 +226,37 @@ func addSpacer(m core.Maroto, height float64) {
 	m.AddRow(height, text.NewCol(12, ""))
 }
 
-// formatCents formats an integer cent amount as a US dollar string
-// (e.g. 250000 → "$2,500.00").
+// formatCents formats an integer cent amount as a US dollar string with
+// comma grouping (e.g. 250000 → "$2,500.00", -5050 → "-$50.50").
 func formatCents(cents int64) string {
+	negative := cents < 0
+	if negative {
+		cents = -cents
+	}
 	dollars := cents / 100
 	pennies := cents % 100
-	if pennies < 0 {
-		pennies = -pennies
+	formatted := insertCommas(dollars)
+	result := fmt.Sprintf("$%s.%02d", formatted, pennies)
+	if negative {
+		result = "-" + result
 	}
-	return fmt.Sprintf("$%d.%02d", dollars, pennies)
+	return result
+}
+
+// insertCommas returns the decimal string representation of n with commas
+// inserted every three digits from the right (e.g. 1234567 → "1,234,567").
+func insertCommas(n int64) string {
+	s := fmt.Sprintf("%d", n)
+	if len(s) <= 3 {
+		return s
+	}
+	// Work from right to left, inserting commas every three digits.
+	result := make([]byte, 0, len(s)+len(s)/3)
+	for i, ch := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			result = append(result, ',')
+		}
+		result = append(result, byte(ch))
+	}
+	return string(result)
 }

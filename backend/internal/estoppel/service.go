@@ -378,12 +378,22 @@ func (s *EstoppelService) GenerateCertificate(
 	}
 
 	now := time.Now()
+
+	// Compute ExpiresAt from the effective period rules.
+	var expiresAt *time.Time
+	if rules.EffectivePeriodDays != nil && *rules.EffectivePeriodDays > 0 {
+		exp := now.AddDate(0, 0, *rules.EffectivePeriodDays)
+		expiresAt = &exp
+	}
+
 	cert := &EstoppelCertificate{
 		RequestID:         requestID,
 		OrgID:             req.OrgID,
 		UnitID:            req.UnitID,
-		DocumentID:        uuid.New(), // placeholder until doc storage is wired
+		// DocumentID is nil until document storage is wired (column is nullable).
+		Jurisdiction:      data.Property.OrgState,
 		EffectiveDate:     now,
+		ExpiresAt:         expiresAt,
 		DataSnapshot:      json.RawMessage(snapshotJSON),
 		NarrativeSections: narrativeJSON,
 		SignedBy:          signedBy,

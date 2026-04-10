@@ -27,6 +27,13 @@ func NewEstoppelPropertyAdapter(service *OrgService) *EstoppelPropertyAdapter {
 func (a *EstoppelPropertyAdapter) GetPropertySnapshot(ctx context.Context, orgID, unitID uuid.UUID) (*estoppel.PropertySnapshot, error) {
 	snap := &estoppel.PropertySnapshot{}
 
+	// ── Organization state (jurisdiction) ────────────────────────────────────
+	org, err := a.service.GetOrganization(ctx, orgID)
+	if err == nil && org != nil && org.State != nil {
+		snap.OrgState = *org.State
+	}
+	// Non-fatal if org lookup fails; OrgState remains empty.
+
 	// ── Unit ──────────────────────────────────────────────────────────────────
 	unit, err := a.service.GetUnit(ctx, unitID)
 	if err != nil {

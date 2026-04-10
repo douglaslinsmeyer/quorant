@@ -48,7 +48,7 @@ type EstoppelCertificate struct {
 	RequestID        uuid.UUID       `json:"request_id"`
 	OrgID            uuid.UUID       `json:"org_id"`
 	UnitID           uuid.UUID       `json:"unit_id"`
-	DocumentID       uuid.UUID       `json:"document_id"`
+	DocumentID       *uuid.UUID      `json:"document_id,omitempty"`
 	Jurisdiction     string          `json:"jurisdiction"`
 	EffectiveDate    time.Time       `json:"effective_date"`
 	ExpiresAt        *time.Time      `json:"expires_at,omitempty"`

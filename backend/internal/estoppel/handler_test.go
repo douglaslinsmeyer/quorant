@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/estoppel"
+	"github.com/quorant/quorant/internal/platform/middleware"
 	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,15 +39,28 @@ func newTestHandler() (*estoppel.Handler, *mockRepo) {
 	return estoppel.NewHandler(svc, logger), repo
 }
 
-// newHandlerMux builds a minimal ServeMux wiring the handler routes directly
-// (no auth/entitlement middleware) so we can test handler logic in isolation.
+// withTestUserID is a test middleware that injects a fixed user UUID into the
+// request context so that handlers requiring authentication succeed.
+func withTestUserID(userID uuid.UUID, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := middleware.WithUserID(r.Context(), userID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// newHandlerMux builds a minimal ServeMux wiring the handler routes with a
+// stub auth middleware that injects a test user ID into the request context.
 func newHandlerMux(h *estoppel.Handler) *http.ServeMux {
+	testUserID := uuid.New()
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /organizations/{org_id}/estoppel/requests", h.CreateRequest)
+	mux.Handle("POST /organizations/{org_id}/estoppel/requests",
+		withTestUserID(testUserID, http.HandlerFunc(h.CreateRequest)))
 	mux.HandleFunc("GET /organizations/{org_id}/estoppel/requests", h.ListRequests)
 	mux.HandleFunc("GET /organizations/{org_id}/estoppel/requests/{id}", h.GetRequest)
-	mux.HandleFunc("POST /organizations/{org_id}/estoppel/requests/{id}/approve", h.ApproveRequest)
-	mux.HandleFunc("POST /organizations/{org_id}/estoppel/requests/{id}/reject", h.RejectRequest)
+	mux.Handle("POST /organizations/{org_id}/estoppel/requests/{id}/approve",
+		withTestUserID(testUserID, http.HandlerFunc(h.ApproveRequest)))
+	mux.Handle("POST /organizations/{org_id}/estoppel/requests/{id}/reject",
+		withTestUserID(testUserID, http.HandlerFunc(h.RejectRequest)))
 	return mux
 }
 
@@ -182,4 +196,40 @@ func TestHandler_CreateRequest_MissingOrgID(t *testing.T) {
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestHandler_CreateRequest_Unauthenticated(t *testing.T) {
+	h, _ := newTestHandler()
+	// Build a mux WITHOUT the auth middleware so no user ID is injected.
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /organizations/{org_id}/estoppel/requests", h.CreateRequest)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	orgID := uuid.New()
+	body := estoppel.CreateEstoppelRequestDTO{
+		UnitID:          uuid.New(),
+		RequestType:     "estoppel_certificate",
+		RequestorType:   "title_company",
+		RequestorName:   "Jane Doe",
+		RequestorEmail:  "jane@title.com",
+		RequestorPhone:  "555-0200",
+		RequestorCompany: "Best Title",
+		PropertyAddress: "456 Elm St",
+		OwnerName:       "Sam Green",
+	}
+	b, err := json.Marshal(body)
+	require.NoError(t, err)
+
+	url := srv.URL + "/organizations/" + orgID.String() + "/estoppel/requests"
+	resp, err := http.Post(url, "application/json", bytes.NewReader(b)) //nolint:noctx
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+
+	var env apiResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&env))
+	require.Len(t, env.Errors, 1)
+	assert.Equal(t, "UNAUTHENTICATED", env.Errors[0].Code)
 }
