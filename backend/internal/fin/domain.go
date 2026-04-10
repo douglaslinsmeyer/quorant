@@ -16,8 +16,8 @@ type AssessmentSchedule struct {
 	CurrencyCode     string         `json:"currency_code"`
 	Name             string         `json:"name"`
 	Description      *string        `json:"description,omitempty"`
-	Frequency        string         `json:"frequency"`       // monthly|quarterly|annually|semi_annually
-	AmountStrategy   string         `json:"amount_strategy"` // flat|per_unit_type|per_sqft|custom
+	Frequency        AssessmentFrequency `json:"frequency"`
+	AmountStrategy   AmountStrategy      `json:"amount_strategy"`
 	BaseAmountCents  int64          `json:"base_amount_cents"`
 	AmountRules      map[string]any `json:"amount_rules"`
 	DayOfMonth       *int           `json:"day_of_month,omitempty"`
@@ -59,11 +59,11 @@ type LedgerEntry struct {
 	CurrencyCode  string     `json:"currency_code"`
 	UnitID        uuid.UUID  `json:"unit_id"`
 	AssessmentID  *uuid.UUID `json:"assessment_id,omitempty"`
-	EntryType     string     `json:"entry_type"` // charge|payment|credit|adjustment|late_fee
-	AmountCents   int64      `json:"amount_cents"`
-	BalanceCents  int64      `json:"balance_cents"`
-	Description   *string    `json:"description,omitempty"`
-	ReferenceType *string    `json:"reference_type,omitempty"`
+	EntryType     LedgerEntryType      `json:"entry_type"`
+	AmountCents   int64                `json:"amount_cents"`
+	BalanceCents  int64                `json:"balance_cents"`
+	Description   *string              `json:"description,omitempty"`
+	ReferenceType *LedgerReferenceType `json:"reference_type,omitempty"`
 	ReferenceID   *uuid.UUID `json:"reference_id,omitempty"`
 	EffectiveDate time.Time  `json:"effective_date"`
 	CreatedAt     time.Time  `json:"created_at"`
@@ -74,7 +74,7 @@ type PaymentMethod struct {
 	ID          uuid.UUID  `json:"id"`
 	OrgID       uuid.UUID  `json:"org_id"`
 	UserID      uuid.UUID  `json:"user_id"`
-	MethodType  string     `json:"method_type"`
+	MethodType  PaymentMethodType `json:"method_type"`
 	ProviderRef *string    `json:"provider_ref,omitempty"`
 	LastFour    *string    `json:"last_four,omitempty"`
 	IsDefault   bool       `json:"is_default"`
@@ -90,9 +90,9 @@ type Payment struct {
 	UnitID          uuid.UUID  `json:"unit_id"`
 	UserID          uuid.UUID  `json:"user_id"`
 	PaymentMethodID *uuid.UUID `json:"payment_method_id,omitempty"`
-	AmountCents     int64      `json:"amount_cents"`
-	Status          string     `json:"status"`
-	ProviderRef     *string    `json:"provider_ref,omitempty"`
+	AmountCents     int64         `json:"amount_cents"`
+	Status          PaymentStatus `json:"status"`
+	ProviderRef     *string       `json:"provider_ref,omitempty"`
 	Description     *string    `json:"description,omitempty"`
 	PaidAt          *time.Time `json:"paid_at,omitempty"`
 	CreatedAt       time.Time  `json:"created_at"`
@@ -103,8 +103,8 @@ type Payment struct {
 type BudgetCategory struct {
 	ID           uuid.UUID  `json:"id"`
 	OrgID        uuid.UUID  `json:"org_id"`
-	Name         string     `json:"name"`
-	CategoryType string     `json:"category_type"`
+	Name         string             `json:"name"`
+	CategoryType BudgetCategoryType `json:"category_type"`
 	ParentID     *uuid.UUID `json:"parent_id,omitempty"`
 	SortOrder    int        `json:"sort_order"`
 	IsReserve    bool       `json:"is_reserve"`
@@ -115,9 +115,9 @@ type BudgetCategory struct {
 type Budget struct {
 	ID                 uuid.UUID  `json:"id"`
 	OrgID              uuid.UUID  `json:"org_id"`
-	FiscalYear         int        `json:"fiscal_year"`
-	Name               string     `json:"name"`
-	Status             string     `json:"status"`
+	FiscalYear         int          `json:"fiscal_year"`
+	Name               string       `json:"name"`
+	Status             BudgetStatus `json:"status"`
 	TotalIncomeCents   int64      `json:"total_income_cents"`
 	TotalExpenseCents  int64      `json:"total_expense_cents"`
 	NetCents           int64      `json:"net_cents"`
@@ -154,12 +154,12 @@ type Expense struct {
 	VendorID      *uuid.UUID     `json:"vendor_id,omitempty"`
 	CategoryID    *uuid.UUID     `json:"category_id,omitempty"`
 	BudgetID      *uuid.UUID     `json:"budget_id,omitempty"`
-	FundType      *string        `json:"fund_type,omitempty"`
+	FundType      *FundType      `json:"fund_type,omitempty"`
 	Description   string         `json:"description"`
 	AmountCents   int64          `json:"amount_cents"`
 	TaxCents      int64          `json:"tax_cents"`
 	TotalCents    int64          `json:"total_cents"`
-	Status        string         `json:"status"`
+	Status        ExpenseStatus  `json:"status"`
 	ExpenseDate   time.Time      `json:"expense_date"`
 	DueDate       *time.Time     `json:"due_date,omitempty"`
 	PaidDate      *time.Time     `json:"paid_date,omitempty"`
@@ -182,8 +182,8 @@ type Fund struct {
 	ID                  uuid.UUID  `json:"id"`
 	OrgID               uuid.UUID  `json:"org_id"`
 	CurrencyCode        string     `json:"currency_code"`
-	Name                string     `json:"name"`
-	FundType            string     `json:"fund_type"` // operating|reserve|capital|special
+	Name                string   `json:"name"`
+	FundType            FundType `json:"fund_type"`
 	BalanceCents        int64      `json:"balance_cents"`
 	TargetBalanceCents  *int64     `json:"target_balance_cents,omitempty"`
 	IsDefault           bool       `json:"is_default"`
@@ -233,8 +233,8 @@ type BudgetReport struct {
 type CollectionCase struct {
 	ID                uuid.UUID      `json:"id"`
 	OrgID             uuid.UUID      `json:"org_id"`
-	UnitID            uuid.UUID      `json:"unit_id"`
-	Status            string         `json:"status"`
+	UnitID            uuid.UUID            `json:"unit_id"`
+	Status            CollectionCaseStatus `json:"status"`
 	TotalOwedCents    int64          `json:"total_owed_cents"`
 	CurrentOwedCents  int64          `json:"current_owed_cents"`
 	EscalationPaused  bool           `json:"escalation_paused"`
@@ -251,11 +251,11 @@ type CollectionCase struct {
 // CollectionAction records a step taken within a collection case.
 type CollectionAction struct {
 	ID            uuid.UUID      `json:"id"`
-	CaseID        uuid.UUID      `json:"case_id"`
-	ActionType    string         `json:"action_type"`
-	Notes         *string        `json:"notes,omitempty"`
-	DocumentID    *uuid.UUID     `json:"document_id,omitempty"`
-	TriggeredBy   *string        `json:"triggered_by,omitempty"` // "system" or "user"
+	CaseID        uuid.UUID            `json:"case_id"`
+	ActionType    CollectionActionType `json:"action_type"`
+	Notes         *string              `json:"notes,omitempty"`
+	DocumentID    *uuid.UUID           `json:"document_id,omitempty"`
+	TriggeredBy   *TriggeredBy         `json:"triggered_by,omitempty"`
 	PerformedBy   *uuid.UUID     `json:"performed_by,omitempty"`
 	ScheduledFor  *time.Time     `json:"scheduled_for,omitempty"`
 	CompletedAt   *time.Time     `json:"completed_at,omitempty"`
@@ -271,11 +271,11 @@ type PaymentPlan struct {
 	UnitID             uuid.UUID  `json:"unit_id"`
 	TotalOwedCents     int64      `json:"total_owed_cents"`
 	InstallmentCents   int64      `json:"installment_cents"`
-	Frequency          string     `json:"frequency"`
-	InstallmentsTotal  int        `json:"installments_total"`
-	InstallmentsPaid   int        `json:"installments_paid"`
-	NextDueDate        time.Time  `json:"next_due_date"`
-	Status             string     `json:"status"`
+	Frequency          PaymentPlanFrequency `json:"frequency"`
+	InstallmentsTotal  int                  `json:"installments_total"`
+	InstallmentsPaid   int                  `json:"installments_paid"`
+	NextDueDate        time.Time            `json:"next_due_date"`
+	Status             PaymentPlanStatus    `json:"status"`
 	ApprovedBy         *uuid.UUID `json:"approved_by,omitempty"`
 	ApprovedAt         *time.Time `json:"approved_at,omitempty"`
 	DefaultedAt        *time.Time `json:"defaulted_at,omitempty"`
@@ -289,9 +289,9 @@ type GLAccount struct {
 	OrgID         uuid.UUID  `json:"org_id"`
 	ParentID      *uuid.UUID `json:"parent_id,omitempty"`
 	FundID        *uuid.UUID `json:"fund_id,omitempty"`
-	AccountNumber int        `json:"account_number"`
-	Name          string     `json:"name"`
-	AccountType   string     `json:"account_type"`
+	AccountNumber int           `json:"account_number"`
+	Name          string        `json:"name"`
+	AccountType   GLAccountType `json:"account_type"`
 	IsHeader      bool       `json:"is_header"`
 	IsSystem      bool       `json:"is_system"`
 	Description   *string    `json:"description,omitempty"`
@@ -306,8 +306,8 @@ type GLJournalEntry struct {
 	OrgID       uuid.UUID       `json:"org_id"`
 	EntryNumber int             `json:"entry_number"`
 	EntryDate   time.Time       `json:"entry_date"`
-	Memo        string          `json:"memo"`
-	SourceType  *string         `json:"source_type,omitempty"`
+	Memo        string        `json:"memo"`
+	SourceType  *GLSourceType `json:"source_type,omitempty"`
 	SourceID    *uuid.UUID      `json:"source_id,omitempty"`
 	UnitID      *uuid.UUID      `json:"unit_id,omitempty"`
 	PostedBy    uuid.UUID       `json:"posted_by"`
@@ -329,19 +329,19 @@ type GLJournalLine struct {
 
 // TrialBalanceRow is a single row in a trial balance report.
 type TrialBalanceRow struct {
-	AccountID     uuid.UUID `json:"account_id"`
-	AccountNumber int       `json:"account_number"`
-	AccountName   string    `json:"account_name"`
-	AccountType   string    `json:"account_type"`
-	DebitCents    int64     `json:"debit_cents"`
-	CreditCents   int64     `json:"credit_cents"`
+	AccountID     uuid.UUID     `json:"account_id"`
+	AccountNumber int           `json:"account_number"`
+	AccountName   string        `json:"account_name"`
+	AccountType   GLAccountType `json:"account_type"`
+	DebitCents    int64         `json:"debit_cents"`
+	CreditCents   int64         `json:"credit_cents"`
 }
 
 // AccountBalance holds the net balance for a single GL account.
 type AccountBalance struct {
-	AccountID     uuid.UUID `json:"account_id"`
-	AccountNumber int       `json:"account_number"`
-	AccountName   string    `json:"account_name"`
-	AccountType   string    `json:"account_type"`
-	BalanceCents  int64     `json:"balance_cents"`
+	AccountID     uuid.UUID     `json:"account_id"`
+	AccountNumber int           `json:"account_number"`
+	AccountName   string        `json:"account_name"`
+	AccountType   GLAccountType `json:"account_type"`
+	BalanceCents  int64         `json:"balance_cents"`
 }
