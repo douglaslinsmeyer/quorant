@@ -48,6 +48,8 @@ func setupUnitTestServer(t *testing.T) *unitTestServer {
 	mux.HandleFunc("GET /api/v1/organizations/{org_id}/units/{unit_id}/memberships", handler.ListUnitMemberships)
 	mux.HandleFunc("PATCH /api/v1/organizations/{org_id}/units/{unit_id}/memberships/{id}", handler.UpdateUnitMembership)
 	mux.HandleFunc("DELETE /api/v1/organizations/{org_id}/units/{unit_id}/memberships/{id}", handler.EndUnitMembership)
+	mux.HandleFunc("POST /api/v1/organizations/{org_id}/units/{unit_id}/transfer", handler.TransferOwnership)
+	mux.HandleFunc("GET /api/v1/organizations/{org_id}/units/{unit_id}/ownership-history", handler.GetOwnershipHistory)
 
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
@@ -470,4 +472,90 @@ func TestEndUnitMembership_InvalidUUID(t *testing.T) {
 	path := "/api/v1/organizations/" + orgID.String() + "/units/" + u.ID.String() + "/memberships/not-a-uuid"
 	resp := doUnitRequest(t, ts, http.MethodDelete, path, nil)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+// ─── TransferOwnership tests ──────────────────────────────────────────────────
+
+func TestTransferOwnership_Success(t *testing.T) {
+	ts := setupUnitTestServer(t)
+	orgID := uuid.New()
+	u := seedUnit(t, ts.mockUnitRepo, orgID)
+
+	body := map[string]any{
+		"to_user_id":    uuid.New(),
+		"transfer_type": "sale",
+		"transfer_date": time.Now().Format(time.RFC3339),
+	}
+	path := "/api/v1/organizations/" + orgID.String() + "/units/" + u.ID.String() + "/transfer"
+	resp := doUnitRequest(t, ts, http.MethodPost, path, body)
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var envelope struct {
+		Data *org.UnitOwnershipHistory `json:"data"`
+	}
+	decodeBody(t, resp, &envelope)
+	require.NotNil(t, envelope.Data)
+	assert.Equal(t, u.ID, envelope.Data.UnitID)
+	assert.Equal(t, orgID, envelope.Data.OrgID)
+	assert.Equal(t, "sale", envelope.Data.TransferType)
+	assert.NotEqual(t, uuid.Nil, envelope.Data.ID)
+}
+
+func TestTransferOwnership_MissingRequiredFields(t *testing.T) {
+	ts := setupUnitTestServer(t)
+	orgID := uuid.New()
+	u := seedUnit(t, ts.mockUnitRepo, orgID)
+
+	// Missing to_user_id and transfer_date
+	body := map[string]any{"transfer_type": "sale"}
+	path := "/api/v1/organizations/" + orgID.String() + "/units/" + u.ID.String() + "/transfer"
+	resp := doUnitRequest(t, ts, http.MethodPost, path, body)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+// ─── GetOwnershipHistory tests ────────────────────────────────────────────────
+
+func TestGetOwnershipHistory_Success(t *testing.T) {
+	ts := setupUnitTestServer(t)
+	orgID := uuid.New()
+	u := seedUnit(t, ts.mockUnitRepo, orgID)
+
+	// Seed ownership history directly.
+	toUserID := uuid.New()
+	ts.mockUnitRepo.ownershipHistory = append(ts.mockUnitRepo.ownershipHistory, org.UnitOwnershipHistory{
+		ID:           uuid.New(),
+		UnitID:       u.ID,
+		OrgID:        orgID,
+		ToUserID:     toUserID,
+		TransferType: "sale",
+		TransferDate: time.Now(),
+		CreatedAt:    time.Now(),
+	})
+
+	path := "/api/v1/organizations/" + orgID.String() + "/units/" + u.ID.String() + "/ownership-history"
+	resp := doUnitRequest(t, ts, http.MethodGet, path, nil)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var envelope struct {
+		Data []org.UnitOwnershipHistory `json:"data"`
+	}
+	decodeBody(t, resp, &envelope)
+	assert.Len(t, envelope.Data, 1)
+	assert.Equal(t, toUserID, envelope.Data[0].ToUserID)
+}
+
+func TestGetOwnershipHistory_Empty(t *testing.T) {
+	ts := setupUnitTestServer(t)
+	orgID := uuid.New()
+	u := seedUnit(t, ts.mockUnitRepo, orgID)
+
+	path := "/api/v1/organizations/" + orgID.String() + "/units/" + u.ID.String() + "/ownership-history"
+	resp := doUnitRequest(t, ts, http.MethodGet, path, nil)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var envelope struct {
+		Data []org.UnitOwnershipHistory `json:"data"`
+	}
+	decodeBody(t, resp, &envelope)
+	assert.Empty(t, envelope.Data)
 }

@@ -11,18 +11,18 @@ import (
 
 // BillingHandler handles HTTP requests for the billing domain.
 type BillingHandler struct {
-	service             *BillingService
+	service             Service
 	logger              *slog.Logger
 	stripeWebhookSecret string
 }
 
 // NewBillingHandler constructs a BillingHandler backed by the given service.
-func NewBillingHandler(service *BillingService, logger *slog.Logger) *BillingHandler {
+func NewBillingHandler(service Service, logger *slog.Logger) *BillingHandler {
 	return &BillingHandler{service: service, logger: logger}
 }
 
 // NewBillingHandlerWithSecret constructs a BillingHandler with a Stripe webhook secret for signature verification.
-func NewBillingHandlerWithSecret(service *BillingService, logger *slog.Logger, stripeWebhookSecret string) *BillingHandler {
+func NewBillingHandlerWithSecret(service Service, logger *slog.Logger, stripeWebhookSecret string) *BillingHandler {
 	return &BillingHandler{service: service, logger: logger, stripeWebhookSecret: stripeWebhookSecret}
 }
 

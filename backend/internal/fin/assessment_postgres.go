@@ -274,24 +274,36 @@ func (r *PostgresAssessmentRepository) FindAssessmentByID(ctx context.Context, i
 	return result, nil
 }
 
-// ListAssessmentsByOrg returns all non-deleted assessments for the given org
-// ordered by due_date. Returns an empty (non-nil) slice when none exist.
-func (r *PostgresAssessmentRepository) ListAssessmentsByOrg(ctx context.Context, orgID uuid.UUID) ([]Assessment, error) {
+// ListAssessmentsByOrg returns non-deleted assessments for the given org,
+// supporting cursor-based pagination ordered by id.
+// afterID is the cursor from the previous page; hasMore is true when more items exist.
+func (r *PostgresAssessmentRepository) ListAssessmentsByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Assessment, bool, error) {
 	const q = `
 		SELECT id, org_id, unit_id, schedule_id, description, amount_cents,
 		       due_date, grace_days, late_fee_cents, is_recurring,
 		       created_by, created_at, updated_at, deleted_at
 		FROM assessments
 		WHERE org_id = $1 AND deleted_at IS NULL
-		ORDER BY due_date`
+		  AND ($3::uuid IS NULL OR id > $3)
+		ORDER BY id
+		LIMIT $2`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.pool.Query(ctx, q, orgID, limit+1, afterID)
 	if err != nil {
-		return nil, fmt.Errorf("fin: ListAssessmentsByOrg: %w", err)
+		return nil, false, fmt.Errorf("fin: ListAssessmentsByOrg: %w", err)
 	}
 	defer rows.Close()
 
-	return collectAssessments(rows, "ListAssessmentsByOrg")
+	assessments, err := collectAssessments(rows, "ListAssessmentsByOrg")
+	if err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(assessments) > limit
+	if hasMore {
+		assessments = assessments[:limit]
+	}
+	return assessments, hasMore, nil
 }
 
 // ListAssessmentsByUnit returns all non-deleted assessments for the given unit
@@ -427,25 +439,35 @@ func (r *PostgresAssessmentRepository) CreateLedgerEntry(ctx context.Context, en
 	return result, nil
 }
 
-// ListLedgerByUnit returns all ledger entries for a unit ordered by
-// effective_date ASC, created_at ASC. Returns an empty (non-nil) slice when
-// none exist.
-func (r *PostgresAssessmentRepository) ListLedgerByUnit(ctx context.Context, unitID uuid.UUID) ([]LedgerEntry, error) {
+// ListLedgerByUnit returns ledger entries for a unit, supporting cursor-based
+// pagination ordered by id. afterID is the cursor from the previous page.
+func (r *PostgresAssessmentRepository) ListLedgerByUnit(ctx context.Context, unitID uuid.UUID, limit int, afterID *uuid.UUID) ([]LedgerEntry, bool, error) {
 	const q = `
 		SELECT id, org_id, unit_id, assessment_id, entry_type, amount_cents,
 		       balance_cents, description, reference_type, reference_id,
 		       effective_date, created_at
 		FROM ledger_entries
 		WHERE unit_id = $1
-		ORDER BY effective_date ASC, created_at ASC`
+		  AND ($3::uuid IS NULL OR id > $3)
+		ORDER BY id
+		LIMIT $2`
 
-	rows, err := r.pool.Query(ctx, q, unitID)
+	rows, err := r.pool.Query(ctx, q, unitID, limit+1, afterID)
 	if err != nil {
-		return nil, fmt.Errorf("fin: ListLedgerByUnit: %w", err)
+		return nil, false, fmt.Errorf("fin: ListLedgerByUnit: %w", err)
 	}
 	defer rows.Close()
 
-	return collectLedgerEntries(rows, "ListLedgerByUnit")
+	entries, err := collectLedgerEntries(rows, "ListLedgerByUnit")
+	if err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(entries) > limit
+	if hasMore {
+		entries = entries[:limit]
+	}
+	return entries, hasMore, nil
 }
 
 // ListLedgerByOrg returns all ledger entries for an org ordered by

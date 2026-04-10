@@ -9,12 +9,12 @@ import (
 
 // FundHandler handles HTTP requests for funds and fund transfers.
 type FundHandler struct {
-	service *FinService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewFundHandler constructs a FundHandler backed by the given service.
-func NewFundHandler(service *FinService, logger *slog.Logger) *FundHandler {
+func NewFundHandler(service Service, logger *slog.Logger) *FundHandler {
 	return &FundHandler{service: service, logger: logger}
 }
 
@@ -84,6 +84,36 @@ func (h *FundHandler) GetFund(w http.ResponseWriter, r *http.Request) {
 	}
 
 	api.WriteJSON(w, http.StatusOK, fund)
+}
+
+// UpdateFund handles PATCH /organizations/{org_id}/funds/{fund_id}.
+func (h *FundHandler) UpdateFund(w http.ResponseWriter, r *http.Request) {
+	_, err := parseFinOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	fundID, err := parsePathUUID(r, "fund_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	var f Fund
+	if err := api.ReadJSON(r, &f); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	updated, err := h.service.UpdateFund(r.Context(), fundID, &f)
+	if err != nil {
+		h.logger.Error("UpdateFund failed", "fund_id", fundID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, updated)
 }
 
 // GetFundTransactions handles GET /organizations/{org_id}/funds/{fund_id}/transactions.

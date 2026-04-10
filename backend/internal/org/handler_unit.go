@@ -6,16 +6,17 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
+	"github.com/quorant/quorant/internal/platform/middleware"
 )
 
 // UnitHandler handles unit, property, and unit membership HTTP requests.
 type UnitHandler struct {
-	service *OrgService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewUnitHandler constructs a UnitHandler backed by the given service.
-func NewUnitHandler(service *OrgService, logger *slog.Logger) *UnitHandler {
+func NewUnitHandler(service Service, logger *slog.Logger) *UnitHandler {
 	return &UnitHandler{service: service, logger: logger}
 }
 
@@ -53,14 +54,30 @@ func (h *UnitHandler) ListUnits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	units, err := h.service.ListUnits(r.Context(), orgID)
+	page := api.ParsePageRequest(r)
+
+	afterID, err := parseCursorID(page.Cursor)
+	if err != nil {
+		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		return
+	}
+
+	units, hasMore, err := h.service.ListUnits(r.Context(), orgID, page.Limit, afterID)
 	if err != nil {
 		h.logger.Error("ListUnits failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, units)
+	var meta *api.Meta
+	if hasMore && len(units) > 0 {
+		meta = &api.Meta{
+			Cursor:  api.EncodeCursor(map[string]string{"id": units[len(units)-1].ID.String()}),
+			HasMore: true,
+		}
+	}
+
+	api.WriteJSONWithMeta(w, http.StatusOK, units, meta)
 }
 
 // GetUnit handles GET /api/v1/organizations/{org_id}/units/{unit_id}.
@@ -95,14 +112,7 @@ func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, err := h.service.UpdateUnit(
-		r.Context(), unitID,
-		req.Label, req.UnitType,
-		req.AddressLine1, req.AddressLine2,
-		req.City, req.State, req.Zip,
-		req.LotSizeSqft, req.VotingWeight, req.Status,
-		req.Metadata,
-	)
+	updated, err := h.service.UpdateUnit(r.Context(), unitID, req)
 	if err != nil {
 		h.logger.Error("UpdateUnit failed", "unit_id", unitID, "error", err)
 		api.WriteError(w, err)
@@ -268,6 +278,64 @@ func (h *UnitHandler) EndUnitMembership(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ─── Ownership History ────────────────────────────────────────────────────────
+
+// TransferOwnership handles POST /api/v1/organizations/{org_id}/units/{unit_id}/transfer.
+func (h *UnitHandler) TransferOwnership(w http.ResponseWriter, r *http.Request) {
+	orgID, err := parseOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	unitID, err := parseUnitID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	var req TransferOwnershipRequest
+	if err := api.ReadJSON(r, &req); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	recordedBy := middleware.UserIDFromContext(r.Context())
+
+	record, err := h.service.TransferOwnership(r.Context(), orgID, unitID, recordedBy, req)
+	if err != nil {
+		h.logger.Error("TransferOwnership failed", "unit_id", unitID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusCreated, record)
+}
+
+// GetOwnershipHistory handles GET /api/v1/organizations/{org_id}/units/{unit_id}/ownership-history.
+func (h *UnitHandler) GetOwnershipHistory(w http.ResponseWriter, r *http.Request) {
+	_, err := parseOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	unitID, err := parseUnitID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	history, err := h.service.GetOwnershipHistory(r.Context(), unitID)
+	if err != nil {
+		h.logger.Error("GetOwnershipHistory failed", "unit_id", unitID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, history)
 }
 
 // ─── Path value helpers ───────────────────────────────────────────────────────

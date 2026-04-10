@@ -1,9 +1,203 @@
 package org
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/api"
 )
+
+// ─── Amenity requests ────────────────────────────────────────────────────────
+
+// CreateAmenityRequest is the request body for POST /organizations/{org_id}/amenities.
+type CreateAmenityRequest struct {
+	Name             string         `json:"name"`         // required
+	AmenityType      string         `json:"amenity_type"` // required
+	Description      *string        `json:"description,omitempty"`
+	Location         *string        `json:"location,omitempty"`
+	Capacity         *int           `json:"capacity,omitempty"`
+	IsReservable     bool           `json:"is_reservable"`
+	ReservationRules map[string]any `json:"reservation_rules,omitempty"`
+	FeeCents         *int64         `json:"fee_cents,omitempty"`
+	Hours            map[string]any `json:"hours,omitempty"`
+	Metadata         map[string]any `json:"metadata,omitempty"`
+}
+
+// Validate checks that required fields are present.
+func (r CreateAmenityRequest) Validate() error {
+	if r.Name == "" {
+		return api.NewValidationError("name is required", "name")
+	}
+	if r.AmenityType == "" {
+		return api.NewValidationError("amenity_type is required", "amenity_type")
+	}
+	return nil
+}
+
+// UpdateAmenityRequest is the request body for PATCH /organizations/{org_id}/amenities/{amenity_id}.
+type UpdateAmenityRequest struct {
+	Name             *string        `json:"name,omitempty"`
+	AmenityType      *string        `json:"amenity_type,omitempty"`
+	Description      *string        `json:"description,omitempty"`
+	Location         *string        `json:"location,omitempty"`
+	Capacity         *int           `json:"capacity,omitempty"`
+	IsReservable     *bool          `json:"is_reservable,omitempty"`
+	ReservationRules map[string]any `json:"reservation_rules,omitempty"`
+	FeeCents         *int64         `json:"fee_cents,omitempty"`
+	Hours            map[string]any `json:"hours,omitempty"`
+	Status           *string        `json:"status,omitempty"`
+	Metadata         map[string]any `json:"metadata,omitempty"`
+}
+
+// CreateReservationRequest is the request body for
+// POST /organizations/{org_id}/amenities/{amenity_id}/reservations.
+type CreateReservationRequest struct {
+	UserID     uuid.UUID `json:"user_id"`  // required
+	UnitID     uuid.UUID `json:"unit_id"`  // required
+	StartsAt   time.Time `json:"starts_at"` // required
+	EndsAt     time.Time `json:"ends_at"`   // required
+	GuestCount *int      `json:"guest_count,omitempty"`
+	Notes      *string   `json:"notes,omitempty"`
+}
+
+// Validate checks that required fields are present.
+func (r CreateReservationRequest) Validate() error {
+	if r.UserID == (uuid.UUID{}) {
+		return api.NewValidationError("user_id is required", "user_id")
+	}
+	if r.UnitID == (uuid.UUID{}) {
+		return api.NewValidationError("unit_id is required", "unit_id")
+	}
+	if r.StartsAt.IsZero() {
+		return api.NewValidationError("starts_at is required", "starts_at")
+	}
+	if r.EndsAt.IsZero() {
+		return api.NewValidationError("ends_at is required", "ends_at")
+	}
+	return nil
+}
+
+// UpdateReservationRequest is the request body for PATCH /organizations/{org_id}/reservations/{id}.
+type UpdateReservationRequest struct {
+	Status     *string    `json:"status,omitempty"`
+	StartsAt   *time.Time `json:"starts_at,omitempty"`
+	EndsAt     *time.Time `json:"ends_at,omitempty"`
+	GuestCount *int       `json:"guest_count,omitempty"`
+	Notes      *string    `json:"notes,omitempty"`
+}
+
+// ─── Vendor requests ──────────────────────────────────────────────────────────
+
+// CreateVendorRequest is the request body for POST /api/v1/vendors.
+type CreateVendorRequest struct {
+	Name            string         `json:"name"` // required
+	ContactEmail    *string        `json:"contact_email,omitempty"`
+	ContactPhone    *string        `json:"contact_phone,omitempty"`
+	ServiceTypes    []string       `json:"service_types,omitempty"`
+	LicenseNumber   *string        `json:"license_number,omitempty"`
+	InsuranceExpiry *time.Time     `json:"insurance_expiry,omitempty"`
+	Metadata        map[string]any `json:"metadata,omitempty"`
+}
+
+// Validate checks that required fields are present.
+func (r CreateVendorRequest) Validate() error {
+	if r.Name == "" {
+		return api.NewValidationError("name is required", "name")
+	}
+	return nil
+}
+
+// UpdateVendorRequest is the request body for PATCH /api/v1/vendors/{vendor_id}.
+type UpdateVendorRequest struct {
+	Name            *string        `json:"name,omitempty"`
+	ContactEmail    *string        `json:"contact_email,omitempty"`
+	ContactPhone    *string        `json:"contact_phone,omitempty"`
+	ServiceTypes    []string       `json:"service_types,omitempty"`
+	LicenseNumber   *string        `json:"license_number,omitempty"`
+	InsuranceExpiry *time.Time     `json:"insurance_expiry,omitempty"`
+	Metadata        map[string]any `json:"metadata,omitempty"`
+}
+
+// CreateVendorAssignmentRequest is the request body for
+// POST /organizations/{org_id}/vendor-assignments.
+type CreateVendorAssignmentRequest struct {
+	VendorID     uuid.UUID `json:"vendor_id"`    // required
+	ServiceScope string    `json:"service_scope"` // required
+	ContractRef  *string   `json:"contract_ref,omitempty"`
+}
+
+// Validate checks that required fields are present.
+func (r CreateVendorAssignmentRequest) Validate() error {
+	if r.VendorID == (uuid.UUID{}) {
+		return api.NewValidationError("vendor_id is required", "vendor_id")
+	}
+	if r.ServiceScope == "" {
+		return api.NewValidationError("service_scope is required", "service_scope")
+	}
+	return nil
+}
+
+// ─── Registration requests ────────────────────────────────────────────────────
+
+// CreateRegistrationTypeRequest is the request body for
+// POST /organizations/{org_id}/registration-types.
+type CreateRegistrationTypeRequest struct {
+	Name             string         `json:"name"` // required
+	Slug             string         `json:"slug"` // required
+	Schema           map[string]any `json:"schema,omitempty"`
+	MaxPerUnit       *int           `json:"max_per_unit,omitempty"`
+	RequiresApproval bool           `json:"requires_approval"`
+}
+
+// Validate checks that required fields are present.
+func (r CreateRegistrationTypeRequest) Validate() error {
+	if r.Name == "" {
+		return api.NewValidationError("name is required", "name")
+	}
+	if r.Slug == "" {
+		return api.NewValidationError("slug is required", "slug")
+	}
+	return nil
+}
+
+// UpdateRegistrationTypeRequest is the request body for
+// PATCH /organizations/{org_id}/registration-types/{id}.
+type UpdateRegistrationTypeRequest struct {
+	Name             *string        `json:"name,omitempty"`
+	Slug             *string        `json:"slug,omitempty"`
+	Schema           map[string]any `json:"schema,omitempty"`
+	MaxPerUnit       *int           `json:"max_per_unit,omitempty"`
+	RequiresApproval *bool          `json:"requires_approval,omitempty"`
+	IsActive         *bool          `json:"is_active,omitempty"`
+}
+
+// CreateRegistrationRequest is the request body for
+// POST /organizations/{org_id}/units/{unit_id}/registrations.
+type CreateRegistrationRequest struct {
+	UserID             uuid.UUID      `json:"user_id"`              // required
+	RegistrationTypeID uuid.UUID      `json:"registration_type_id"` // required
+	Data               map[string]any `json:"data,omitempty"`
+	ExpiresAt          *time.Time     `json:"expires_at,omitempty"`
+}
+
+// Validate checks that required fields are present.
+func (r CreateRegistrationRequest) Validate() error {
+	if r.UserID == (uuid.UUID{}) {
+		return api.NewValidationError("user_id is required", "user_id")
+	}
+	if r.RegistrationTypeID == (uuid.UUID{}) {
+		return api.NewValidationError("registration_type_id is required", "registration_type_id")
+	}
+	return nil
+}
+
+// UpdateRegistrationRequest is the request body for
+// PATCH /organizations/{org_id}/registrations/{id}.
+type UpdateRegistrationRequest struct {
+	Data      map[string]any `json:"data,omitempty"`
+	Status    *string        `json:"status,omitempty"`
+	ExpiresAt *time.Time     `json:"expires_at,omitempty"`
+}
 
 // CreateOrgRequest is the request body for POST /api/v1/organizations.
 type CreateOrgRequest struct {
@@ -170,6 +364,34 @@ type UpdateUnitMembershipRequest struct {
 	Relationship *string `json:"relationship,omitempty"`
 	IsVoter      *bool   `json:"is_voter,omitempty"`
 	Notes        *string `json:"notes,omitempty"`
+}
+
+// TransferOwnershipRequest is the request body for
+// POST /api/v1/organizations/{org_id}/units/{unit_id}/transfer.
+type TransferOwnershipRequest struct {
+	ToUserID                uuid.UUID  `json:"to_user_id"`    // required
+	TransferType            string     `json:"transfer_type"` // required: sale|gift|inheritance|foreclosure|other
+	TransferDate            time.Time  `json:"transfer_date"` // required
+	FromUserID              *uuid.UUID `json:"from_user_id,omitempty"`
+	SalePriceCents          *int64     `json:"sale_price_cents,omitempty"`
+	OutstandingBalanceCents *int64     `json:"outstanding_balance_cents,omitempty"`
+	BalanceSettled          bool       `json:"balance_settled"`
+	RecordingRef            *string    `json:"recording_ref,omitempty"`
+	Notes                   *string    `json:"notes,omitempty"`
+}
+
+// Validate checks that the required fields are present.
+func (r TransferOwnershipRequest) Validate() error {
+	if r.ToUserID == (uuid.UUID{}) {
+		return api.NewValidationError("to_user_id is required", "to_user_id")
+	}
+	if r.TransferType == "" {
+		return api.NewValidationError("transfer_type is required", "transfer_type")
+	}
+	if r.TransferDate.IsZero() {
+		return api.NewValidationError("transfer_date is required", "transfer_date")
+	}
+	return nil
 }
 
 // ConnectManagementRequest is the request body for

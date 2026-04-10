@@ -10,12 +10,12 @@ import (
 
 // OrgHandler handles organization HTTP requests.
 type OrgHandler struct {
-	service *OrgService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewOrgHandler constructs an OrgHandler backed by the given service.
-func NewOrgHandler(service *OrgService, logger *slog.Logger) *OrgHandler {
+func NewOrgHandler(service Service, logger *slog.Logger) *OrgHandler {
 	return &OrgHandler{service: service, logger: logger}
 }
 
@@ -39,14 +39,30 @@ func (h *OrgHandler) CreateOrg(w http.ResponseWriter, r *http.Request) {
 
 // ListOrgs handles GET /api/v1/organizations.
 func (h *OrgHandler) ListOrgs(w http.ResponseWriter, r *http.Request) {
-	orgs, err := h.service.ListOrganizations(r.Context())
+	page := api.ParsePageRequest(r)
+
+	afterID, err := parseCursorID(page.Cursor)
+	if err != nil {
+		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		return
+	}
+
+	orgs, hasMore, err := h.service.ListOrganizations(r.Context(), page.Limit, afterID)
 	if err != nil {
 		h.logger.Error("ListOrgs failed", "error", err)
 		api.WriteError(w, err)
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, orgs)
+	var meta *api.Meta
+	if hasMore && len(orgs) > 0 {
+		meta = &api.Meta{
+			Cursor:  api.EncodeCursor(map[string]string{"id": orgs[len(orgs)-1].ID.String()}),
+			HasMore: true,
+		}
+	}
+
+	api.WriteJSONWithMeta(w, http.StatusOK, orgs, meta)
 }
 
 // GetOrg handles GET /api/v1/organizations/{org_id}.
@@ -183,6 +199,24 @@ func (h *OrgHandler) GetManagementHistory(w http.ResponseWriter, r *http.Request
 	}
 
 	api.WriteJSON(w, http.StatusOK, history)
+}
+
+// parseCursorID decodes a pagination cursor and returns the ID it encodes.
+// Returns nil, nil when cursor is empty (first page). Returns an error if the
+// cursor is non-empty but cannot be decoded or does not contain a valid UUID.
+func parseCursorID(cursor string) (*uuid.UUID, error) {
+	if cursor == "" {
+		return nil, nil
+	}
+	vals, err := api.DecodeCursor(cursor)
+	if err != nil {
+		return nil, err
+	}
+	id, err := uuid.Parse(vals["id"])
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
 }
 
 // parseOrgID extracts and parses the {org_id} path value from the request.

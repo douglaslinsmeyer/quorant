@@ -10,12 +10,12 @@ import (
 
 // PaymentHandler handles HTTP requests for payments and payment methods.
 type PaymentHandler struct {
-	service *FinService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewPaymentHandler constructs a PaymentHandler backed by the given service.
-func NewPaymentHandler(service *FinService, logger *slog.Logger) *PaymentHandler {
+func NewPaymentHandler(service Service, logger *slog.Logger) *PaymentHandler {
 	return &PaymentHandler{service: service, logger: logger}
 }
 
@@ -53,14 +53,29 @@ func (h *PaymentHandler) ListPayments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	payments, err := h.service.ListPayments(r.Context(), orgID)
+	page := api.ParsePageRequest(r)
+	afterID, err := parseFinCursorID(page.Cursor)
+	if err != nil {
+		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		return
+	}
+
+	payments, hasMore, err := h.service.ListPayments(r.Context(), orgID, page.Limit, afterID)
 	if err != nil {
 		h.logger.Error("ListPayments failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, payments)
+	var meta *api.Meta
+	if hasMore && len(payments) > 0 {
+		meta = &api.Meta{
+			Cursor:  api.EncodeCursor(map[string]string{"id": payments[len(payments)-1].ID.String()}),
+			HasMore: true,
+		}
+	}
+
+	api.WriteJSONWithMeta(w, http.StatusOK, payments, meta)
 }
 
 // GetPayment handles GET /organizations/{org_id}/payments/{payment_id}.

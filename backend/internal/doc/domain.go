@@ -65,6 +65,30 @@ func (r UploadDocumentRequest) Validate() *api.ValidationError {
 	return nil
 }
 
+// UploadFromBytesRequest is the request type for server-side document upload
+// where the caller provides raw bytes rather than using a pre-signed URL.
+type UploadFromBytesRequest struct {
+	Title       string     `json:"title"`
+	FileName    string     `json:"file_name"`
+	ContentType string     `json:"content_type"`
+	CategoryID  *uuid.UUID `json:"category_id,omitempty"`
+	Visibility  string     `json:"visibility,omitempty"`
+}
+
+// Validate checks that the UploadFromBytesRequest has all required fields.
+func (r UploadFromBytesRequest) Validate() *api.ValidationError {
+	if r.Title == "" {
+		return api.NewValidationError("title is required", "title")
+	}
+	if r.FileName == "" {
+		return api.NewValidationError("file_name is required", "file_name")
+	}
+	if r.ContentType == "" {
+		return api.NewValidationError("content_type is required", "content_type")
+	}
+	return nil
+}
+
 // CreateCategoryRequest is the request type for creating a document category.
 type CreateCategoryRequest struct {
 	Name     string     `json:"name"`

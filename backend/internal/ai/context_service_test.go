@@ -78,8 +78,8 @@ func (m *mockOrgRepo) FindByID(ctx context.Context, id uuid.UUID) (*org.Organiza
 func (m *mockOrgRepo) FindBySlug(ctx context.Context, slug string) (*org.Organization, error) {
 	return nil, nil
 }
-func (m *mockOrgRepo) ListByUserAccess(ctx context.Context, userID uuid.UUID) ([]org.Organization, error) {
-	return nil, nil
+func (m *mockOrgRepo) ListByUserAccess(ctx context.Context, userID uuid.UUID, limit int, afterID *uuid.UUID) ([]org.Organization, bool, error) {
+	return nil, false, nil
 }
 func (m *mockOrgRepo) Update(ctx context.Context, o *org.Organization) (*org.Organization, error) {
 	return nil, nil

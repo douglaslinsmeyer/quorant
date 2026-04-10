@@ -10,12 +10,12 @@ import (
 
 // CommLogHandler handles communication log HTTP requests.
 type CommLogHandler struct {
-	service *ComService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewCommLogHandler constructs a CommLogHandler backed by the given service.
-func NewCommLogHandler(service *ComService, logger *slog.Logger) *CommLogHandler {
+func NewCommLogHandler(service Service, logger *slog.Logger) *CommLogHandler {
 	return &CommLogHandler{service: service, logger: logger}
 }
 

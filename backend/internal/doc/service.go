@@ -1,7 +1,9 @@
 package doc
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -64,6 +66,44 @@ func (s *DocService) UploadDocument(ctx context.Context, orgID uuid.UUID, req Up
 	return s.repo.Create(ctx, doc)
 }
 
+// UploadFromBytes validates the request, uploads the provided raw bytes to
+// storage under the key "generated/{orgID}/{uuid}/{fileName}", then creates a
+// Document record. This method is used for server-side generated documents
+// (e.g. estoppel certificate PDFs) that do not go through the client-side
+// pre-signed URL flow.
+func (s *DocService) UploadFromBytes(ctx context.Context, orgID uuid.UUID, req UploadFromBytesRequest, data []byte, uploadedBy uuid.UUID) (*Document, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	visibility := req.Visibility
+	if visibility == "" {
+		visibility = "members"
+	}
+
+	fileID := uuid.New()
+	storageKey := fmt.Sprintf("generated/%s/%s/%s", orgID, fileID, req.FileName)
+
+	if err := s.storage.Upload(ctx, s.bucket, storageKey, req.ContentType, bytes.NewReader(data), int64(len(data))); err != nil {
+		return nil, fmt.Errorf("uploading to storage: %w", err)
+	}
+
+	doc := &Document{
+		OrgID:       orgID,
+		CategoryID:  req.CategoryID,
+		UploadedBy:  uploadedBy,
+		Title:       req.Title,
+		FileName:    req.FileName,
+		ContentType: req.ContentType,
+		SizeBytes:   int64(len(data)),
+		StorageKey:  storageKey,
+		Visibility:  visibility,
+		Metadata:    map[string]any{},
+	}
+
+	return s.repo.Create(ctx, doc)
+}
+
 // GetDocument returns a single document by ID or a 404 error if not found.
 func (s *DocService) GetDocument(ctx context.Context, id uuid.UUID) (*Document, error) {
 	doc, err := s.repo.FindByID(ctx, id)
@@ -76,9 +116,10 @@ func (s *DocService) GetDocument(ctx context.Context, id uuid.UUID) (*Document, 
 	return doc, nil
 }
 
-// ListDocuments returns all current documents for the given organization.
-func (s *DocService) ListDocuments(ctx context.Context, orgID uuid.UUID) ([]Document, error) {
-	return s.repo.ListByOrg(ctx, orgID)
+// ListDocuments returns current documents for the given organization, supporting cursor-based pagination.
+// limit controls the page size; afterID is the cursor from the previous page.
+func (s *DocService) ListDocuments(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Document, bool, error) {
+	return s.repo.ListByOrg(ctx, orgID, limit, afterID)
 }
 
 // UpdateDocument persists changes to an existing document and returns it.

@@ -20,6 +20,7 @@ import (
 	"github.com/quorant/quorant/internal/billing"
 	"github.com/quorant/quorant/internal/com"
 	"github.com/quorant/quorant/internal/doc"
+	"github.com/quorant/quorant/internal/estoppel"
 	"github.com/quorant/quorant/internal/fin"
 	"github.com/quorant/quorant/internal/gov"
 	"github.com/quorant/quorant/internal/iam"
@@ -161,15 +162,25 @@ func run() error {
 	orgRepo := org.NewPostgresOrgRepository(pool)
 	membershipRepo := org.NewPostgresMembershipRepository(pool)
 	unitRepo := org.NewPostgresUnitRepository(pool)
-	orgService := org.NewOrgService(orgRepo, membershipRepo, unitRepo, userRepo, auditor, outboxPublisher, logger)
+	amenityRepo := org.NewPostgresAmenityRepository(pool)
+	vendorRepo := org.NewPostgresVendorRepository(pool)
+	registrationRepo := org.NewPostgresRegistrationRepository(pool)
+	orgService := org.NewOrgService(orgRepo, membershipRepo, unitRepo, userRepo, auditor, outboxPublisher, logger).
+		WithAmenityRepo(amenityRepo).
+		WithVendorRepo(vendorRepo).
+		WithRegistrationRepo(registrationRepo)
 	orgHandler := org.NewOrgHandler(orgService, logger)
 	membershipHandler := org.NewMembershipHandler(orgService, logger)
 	unitHandler := org.NewUnitHandler(orgService, logger)
-	org.RegisterRoutes(mux, orgHandler, membershipHandler, unitHandler, tokenValidator, permChecker, resolveUserID)
+	amenityHandler := org.NewAmenityHandler(orgService, logger)
+	vendorHandler := org.NewVendorHandler(orgService, logger)
+	registrationHandler := org.NewRegistrationHandler(orgService, logger)
+	org.RegisterRoutes(mux, orgHandler, membershipHandler, unitHandler, amenityHandler, vendorHandler, registrationHandler, tokenValidator, permChecker, resolveUserID)
 
 	// License module (initialized early — entitlementChecker is needed by AI and Webhook routes)
 	licenseRepo := license.NewPostgresLicenseRepository(pool)
-	entitlementChecker := license.NewPostgresEntitlementChecker(licenseRepo)
+	pgChecker := license.NewPostgresEntitlementChecker(licenseRepo)
+	entitlementChecker := license.NewCachedEntitlementChecker(pgChecker, rdb, 60*time.Second)
 	licenseService := license.NewLicenseService(licenseRepo, entitlementChecker, auditor, outboxPublisher, logger)
 	licenseHandler := license.NewLicenseHandler(licenseService, logger)
 	license.RegisterRoutes(mux, licenseHandler, tokenValidator, permChecker, resolveUserID)
@@ -250,6 +261,10 @@ func run() error {
 	adminHandler := admin.NewAdminHandler(adminService, logger)
 	admin.RegisterRoutes(mux, adminHandler, tokenValidator, permChecker, resolveUserID)
 
+	// Audit module
+	auditHandler := audit.NewHandler(auditor, logger)
+	audit.RegisterRoutes(mux, auditHandler, tokenValidator, permChecker, resolveUserID)
+
 	// Webhook module
 	webhookRepo := webhook.NewPostgresWebhookRepository(pool)
 	webhookService := webhook.NewWebhookService(webhookRepo, auditor, outboxPublisher, logger)
@@ -280,8 +295,36 @@ func run() error {
 	docHandler := doc.NewDocHandler(docService, logger)
 	doc.RegisterRoutes(mux, docHandler, tokenValidator, permChecker, resolveUserID)
 
+	// --- Estoppel module ---
+	estoppelRepo := estoppel.NewPostgresRepository(pool)
+	financialProvider := fin.NewEstoppelFinancialAdapter(finService)
+	complianceProvider := gov.NewEstoppelComplianceAdapter(govService)
+	propertyProvider := org.NewEstoppelPropertyAdapter(orgService)
+	jurisdictionRulesRepo := estoppel.NewPostgresJurisdictionRulesRepository(pool)
+	narrativeGen := estoppel.NewNoopNarrativeGenerator()
+	pdfGen := estoppel.NewMarotoGenerator()
+	estoppelDocAdapter := doc.NewEstoppelDocumentAdapter(docService)
+	estoppelService := estoppel.NewEstoppelService(
+		estoppelRepo,
+		financialProvider,
+		complianceProvider,
+		propertyProvider,
+		jurisdictionRulesRepo,
+		narrativeGen,
+		pdfGen,
+		estoppelDocAdapter,
+		estoppelDocAdapter,
+		auditor,
+		outboxPublisher,
+		logger,
+	)
+	estoppelHandler := estoppel.NewHandler(estoppelService, logger)
+	estoppel.RegisterRoutes(mux, estoppelHandler, tokenValidator, permChecker, entitlementChecker, resolveUserID)
+
 	// 10. Middleware chain (innermost to outermost)
+	rateLimiter := middleware.NewRateLimiter(100, 100, time.Minute) // 100 req/min default
 	var handler http.Handler = mux
+	handler = middleware.RateLimit(rateLimiter)(handler)
 	handler = middleware.Logging(logger, handler)
 	handler = middleware.Recovery(logger, handler)
 	handler = middleware.RequestID(handler)

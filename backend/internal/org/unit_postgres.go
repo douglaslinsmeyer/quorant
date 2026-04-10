@@ -105,8 +105,9 @@ func (r *PostgresUnitRepository) FindUnitByID(ctx context.Context, id uuid.UUID)
 
 // ─── ListUnitsByOrg ──────────────────────────────────────────────────────────
 
-// ListUnitsByOrg returns all non-deleted units for the given org, ordered by label.
-func (r *PostgresUnitRepository) ListUnitsByOrg(ctx context.Context, orgID uuid.UUID) ([]Unit, error) {
+// ListUnitsByOrg returns non-deleted units for the given org, supporting cursor-based
+// pagination ordered by id. afterID is the ID of the last item from the previous page.
+func (r *PostgresUnitRepository) ListUnitsByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Unit, bool, error) {
 	const q = `
 		SELECT id, org_id, label, unit_type,
 		       address_line1, address_line2, city, state, zip,
@@ -114,15 +115,26 @@ func (r *PostgresUnitRepository) ListUnitsByOrg(ctx context.Context, orgID uuid.
 		       created_at, updated_at, deleted_at
 		FROM units
 		WHERE org_id = $1 AND deleted_at IS NULL
-		ORDER BY label`
+		  AND ($3::uuid IS NULL OR id > $3)
+		ORDER BY id
+		LIMIT $2`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.pool.Query(ctx, q, orgID, limit+1, afterID)
 	if err != nil {
-		return nil, fmt.Errorf("unit: ListUnitsByOrg: %w", err)
+		return nil, false, fmt.Errorf("unit: ListUnitsByOrg: %w", err)
 	}
 	defer rows.Close()
 
-	return collectUnits(rows, "ListUnitsByOrg")
+	units, err := collectUnits(rows, "ListUnitsByOrg")
+	if err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(units) > limit
+	if hasMore {
+		units = units[:limit]
+	}
+	return units, hasMore, nil
 }
 
 // ─── UpdateUnit ──────────────────────────────────────────────────────────────
@@ -411,6 +423,68 @@ func (r *PostgresUnitRepository) EndUnitMembership(ctx context.Context, id uuid.
 	return nil
 }
 
+// ─── CreateOwnershipHistory ──────────────────────────────────────────────────
+
+// CreateOwnershipHistory inserts a new unit ownership history record.
+func (r *PostgresUnitRepository) CreateOwnershipHistory(ctx context.Context, h *UnitOwnershipHistory) (*UnitOwnershipHistory, error) {
+	const q = `
+		INSERT INTO unit_ownership_history (
+			unit_id, org_id, from_user_id, to_user_id, transfer_type,
+			transfer_date, sale_price_cents, outstanding_balance_cents,
+			balance_settled, recording_ref, notes, recorded_by
+		) VALUES (
+			$1, $2, $3, $4, $5,
+			$6, $7, $8,
+			$9, $10, $11, $12
+		)
+		RETURNING id, unit_id, org_id, from_user_id, to_user_id, transfer_type,
+		          transfer_date, sale_price_cents, outstanding_balance_cents,
+		          balance_settled, recording_ref, notes, recorded_by, created_at`
+
+	row := r.pool.QueryRow(ctx, q,
+		h.UnitID,
+		h.OrgID,
+		h.FromUserID,
+		h.ToUserID,
+		h.TransferType,
+		h.TransferDate,
+		h.SalePriceCents,
+		h.OutstandingBalanceCents,
+		h.BalanceSettled,
+		h.RecordingRef,
+		h.Notes,
+		h.RecordedBy,
+	)
+
+	result, err := scanOwnershipHistory(row)
+	if err != nil {
+		return nil, fmt.Errorf("unit: CreateOwnershipHistory: %w", err)
+	}
+	return result, nil
+}
+
+// ─── ListOwnershipHistoryByUnit ──────────────────────────────────────────────
+
+// ListOwnershipHistoryByUnit returns all ownership history records for the given unit,
+// ordered by transfer_date DESC.
+func (r *PostgresUnitRepository) ListOwnershipHistoryByUnit(ctx context.Context, unitID uuid.UUID) ([]UnitOwnershipHistory, error) {
+	const q = `
+		SELECT id, unit_id, org_id, from_user_id, to_user_id, transfer_type,
+		       transfer_date, sale_price_cents, outstanding_balance_cents,
+		       balance_settled, recording_ref, notes, recorded_by, created_at
+		FROM unit_ownership_history
+		WHERE unit_id = $1
+		ORDER BY transfer_date DESC`
+
+	rows, err := r.pool.Query(ctx, q, unitID)
+	if err != nil {
+		return nil, fmt.Errorf("unit: ListOwnershipHistoryByUnit: %w", err)
+	}
+	defer rows.Close()
+
+	return collectOwnershipHistory(rows, "ListOwnershipHistoryByUnit")
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 // scanUnit reads a single unit row.
@@ -567,4 +641,60 @@ func collectUnitMemberships(rows pgx.Rows, op string) ([]UnitMembership, error) 
 		return nil, fmt.Errorf("unit: %s rows: %w", op, err)
 	}
 	return memberships, nil
+}
+
+// scanOwnershipHistory reads a single unit_ownership_history row.
+func scanOwnershipHistory(row pgx.Row) (*UnitOwnershipHistory, error) {
+	var h UnitOwnershipHistory
+	err := row.Scan(
+		&h.ID,
+		&h.UnitID,
+		&h.OrgID,
+		&h.FromUserID,
+		&h.ToUserID,
+		&h.TransferType,
+		&h.TransferDate,
+		&h.SalePriceCents,
+		&h.OutstandingBalanceCents,
+		&h.BalanceSettled,
+		&h.RecordingRef,
+		&h.Notes,
+		&h.RecordedBy,
+		&h.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &h, nil
+}
+
+// collectOwnershipHistory drains pgx.Rows into a slice of UnitOwnershipHistory values.
+func collectOwnershipHistory(rows pgx.Rows, op string) ([]UnitOwnershipHistory, error) {
+	var history []UnitOwnershipHistory
+	for rows.Next() {
+		var h UnitOwnershipHistory
+		if err := rows.Scan(
+			&h.ID,
+			&h.UnitID,
+			&h.OrgID,
+			&h.FromUserID,
+			&h.ToUserID,
+			&h.TransferType,
+			&h.TransferDate,
+			&h.SalePriceCents,
+			&h.OutstandingBalanceCents,
+			&h.BalanceSettled,
+			&h.RecordingRef,
+			&h.Notes,
+			&h.RecordedBy,
+			&h.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("unit: %s scan: %w", op, err)
+		}
+		history = append(history, h)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("unit: %s rows: %w", op, err)
+	}
+	return history, nil
 }

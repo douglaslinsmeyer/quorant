@@ -142,7 +142,12 @@ INSERT INTO permissions (key, description, module) VALUES
     ('ai.config.manage',             'Manage AI configuration',           'ai'),
     -- webhook
     ('webhook.manage',               'Manage webhooks',                   'webhook'),
-    ('webhook.read',                 'Read webhooks',                     'webhook');
+    ('webhook.read',                 'Read webhooks',                     'webhook'),
+    -- admin (jurisdiction)
+    ('admin.jurisdiction_rule.manage', 'Manage jurisdiction rules',        'admin'),
+    -- ai (compliance / jurisdiction)
+    ('ai.compliance.read',             'Read compliance status',           'ai'),
+    ('ai.jurisdiction_rule.read',      'Read jurisdiction rules',          'ai');
 
 -- ============================================================
 -- Role → Permission mappings
@@ -224,6 +229,8 @@ SELECT r.id, p.id
 FROM roles r, permissions p
 WHERE r.name = 'firm_admin'
 AND p.key IN (
+    'ai.compliance.read',
+    'ai.jurisdiction_rule.read',
     'org.organization.create',
     'org.organization.read',
     'org.organization.update',
@@ -451,6 +458,8 @@ SELECT r.id, p.id
 FROM roles r, permissions p
 WHERE r.name = 'hoa_manager'
 AND p.key IN (
+    'ai.compliance.read',
+    'ai.jurisdiction_rule.read',
     'org.organization.read',
     'org.membership.read',
     'org.unit.create',
@@ -544,6 +553,8 @@ SELECT r.id, p.id
 FROM roles r, permissions p
 WHERE r.name = 'board_president'
 AND p.key IN (
+    'ai.compliance.read',
+    'ai.jurisdiction_rule.read',
     'org.organization.read',
     'org.organization.update',
     'org.membership.manage',

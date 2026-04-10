@@ -48,6 +48,9 @@ func RegisterRoutes(
 	mux.Handle("PATCH /api/v1/organizations/{org_id}/threads/{thread_id}/messages/{message_id}", permMw("com.message.send", threadHandler.EditMessage))
 	mux.Handle("DELETE /api/v1/organizations/{org_id}/threads/{thread_id}/messages/{message_id}", permMw("com.message.send", threadHandler.DeleteMessage))
 
+	// Unified Calendar
+	mux.Handle("GET /api/v1/organizations/{org_id}/calendar", permMw("com.calendar.read", calendarHandler.GetUnifiedCalendar))
+
 	// Calendar Events (6 routes)
 	mux.Handle("POST /api/v1/organizations/{org_id}/calendar-events", permMw("com.calendar_event.create", calendarHandler.Create))
 	mux.Handle("GET /api/v1/organizations/{org_id}/calendar-events", permMw("com.calendar_event.read", calendarHandler.List))
@@ -80,4 +83,8 @@ func RegisterRoutes(
 	mux.Handle("GET /api/v1/organizations/{org_id}/communications/{comm_id}", permMw("com.comm_log.read", commLogHandler.Get))
 	mux.Handle("PATCH /api/v1/organizations/{org_id}/communications/{comm_id}", permMw("com.comm_log.create", commLogHandler.Update))
 	mux.Handle("GET /api/v1/organizations/{org_id}/units/{unit_id}/communications", permMw("com.comm_log.read", commLogHandler.ListByUnit))
+	mux.Handle("GET /api/v1/organizations/{org_id}/communications/summary", permMw("com.comm_log.read", commLogHandler.GetCommunicationsSummary))
+
+	// Directory
+	mux.Handle("GET /api/v1/organizations/{org_id}/directory", permMw("com.directory.read", calendarHandler.GetDirectory))
 }

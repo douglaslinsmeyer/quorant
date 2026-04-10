@@ -55,6 +55,7 @@ func setupCollectionTestServer(t *testing.T) *collectionTestServer {
 	mux.HandleFunc("PATCH /organizations/{org_id}/collections/{case_id}", collectionHandler.UpdateCollection)
 	mux.HandleFunc("POST /organizations/{org_id}/collections/{case_id}/actions", collectionHandler.AddCollectionAction)
 	mux.HandleFunc("POST /organizations/{org_id}/collections/{case_id}/payment-plans", collectionHandler.CreatePaymentPlan)
+	mux.HandleFunc("PATCH /organizations/{org_id}/payment-plans/{plan_id}", collectionHandler.UpdatePaymentPlan)
 	mux.HandleFunc("GET /organizations/{org_id}/collections/{case_id}/payment-plans", collectionHandler.ListPaymentPlans)
 	mux.HandleFunc("GET /organizations/{org_id}/units/{unit_id}/collection-status", collectionHandler.GetUnitCollectionStatus)
 
@@ -317,6 +318,48 @@ func TestGetUnitCollectionStatus_Success(t *testing.T) {
 	require.NotNil(t, envelope.Data)
 	assert.Equal(t, c.ID, envelope.Data.ID)
 	assert.Equal(t, unitID, envelope.Data.UnitID)
+}
+
+// ── UpdatePaymentPlan tests ───────────────────────────────────────────────────
+
+func TestUpdatePaymentPlan_Success(t *testing.T) {
+	ts := setupCollectionTestServer(t)
+	orgID := uuid.New()
+	unitID := uuid.New()
+	c := seedCollectionCase(t, ts.mockCollectionRepo, orgID, unitID)
+
+	// Seed a payment plan directly.
+	plan := fin.PaymentPlan{
+		ID:                uuid.New(),
+		CaseID:            c.ID,
+		OrgID:             orgID,
+		UnitID:            unitID,
+		TotalOwedCents:    150000,
+		InstallmentCents:  30000,
+		InstallmentsTotal: 5,
+		InstallmentsPaid:  1,
+		NextDueDate:       time.Now().Add(30 * 24 * time.Hour),
+		Frequency:         "monthly",
+		Status:            "active",
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
+	}
+	ts.mockCollectionRepo.paymentPlans = append(ts.mockCollectionRepo.paymentPlans, plan)
+
+	body := map[string]any{
+		"installments_paid": 2,
+		"status":            "active",
+	}
+	resp := doFinRequest(t, ts.server.URL, http.MethodPatch,
+		fmt.Sprintf("/organizations/%s/payment-plans/%s", orgID, plan.ID), body)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var envelope struct {
+		Data *fin.PaymentPlan `json:"data"`
+	}
+	decodeFinBody(t, resp, &envelope)
+	require.NotNil(t, envelope.Data)
+	assert.Equal(t, plan.ID, envelope.Data.ID)
 }
 
 func TestGetUnitCollectionStatus_NoActiveCase(t *testing.T) {

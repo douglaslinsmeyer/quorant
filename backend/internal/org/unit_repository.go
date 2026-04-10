@@ -11,7 +11,10 @@ type UnitRepository interface {
 	// Unit CRUD
 	CreateUnit(ctx context.Context, unit *Unit) (*Unit, error)
 	FindUnitByID(ctx context.Context, id uuid.UUID) (*Unit, error)
-	ListUnitsByOrg(ctx context.Context, orgID uuid.UUID) ([]Unit, error)
+	// ListUnitsByOrg returns units for the org, supporting cursor-based pagination.
+	// afterID is an optional cursor (ID of the last item from the previous page).
+	// hasMore is true when additional items exist beyond the returned page.
+	ListUnitsByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Unit, bool, error)
 	UpdateUnit(ctx context.Context, unit *Unit) (*Unit, error)
 	SoftDeleteUnit(ctx context.Context, id uuid.UUID) error
 
@@ -25,4 +28,8 @@ type UnitRepository interface {
 	ListUnitMemberships(ctx context.Context, unitID uuid.UUID) ([]UnitMembership, error)
 	UpdateUnitMembership(ctx context.Context, m *UnitMembership) (*UnitMembership, error)
 	EndUnitMembership(ctx context.Context, id uuid.UUID) error // sets ended_at
+
+	// Ownership History
+	CreateOwnershipHistory(ctx context.Context, h *UnitOwnershipHistory) (*UnitOwnershipHistory, error)
+	ListOwnershipHistoryByUnit(ctx context.Context, unitID uuid.UUID) ([]UnitOwnershipHistory, error)
 }

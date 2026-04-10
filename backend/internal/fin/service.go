@@ -229,9 +229,10 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 	return created, nil
 }
 
-// ListAssessments returns all non-deleted assessments for the given org.
-func (s *FinService) ListAssessments(ctx context.Context, orgID uuid.UUID) ([]Assessment, error) {
-	return s.assessments.ListAssessmentsByOrg(ctx, orgID)
+// ListAssessments returns non-deleted assessments for the given org, supporting pagination.
+// limit controls the page size; afterID is the cursor from the previous page.
+func (s *FinService) ListAssessments(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Assessment, bool, error) {
+	return s.assessments.ListAssessmentsByOrg(ctx, orgID, limit, afterID)
 }
 
 // GetAssessment returns the assessment with the given id, or a 404 if not found.
@@ -246,11 +247,32 @@ func (s *FinService) GetAssessment(ctx context.Context, id uuid.UUID) (*Assessme
 	return a, nil
 }
 
+// UpdateAssessment persists changes to an existing assessment and returns the updated row.
+func (s *FinService) UpdateAssessment(ctx context.Context, id uuid.UUID, a *Assessment) (*Assessment, error) {
+	existing, err := s.GetAssessment(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	a.ID = existing.ID
+	a.OrgID = existing.OrgID
+	a.UnitID = existing.UnitID
+	return s.assessments.UpdateAssessment(ctx, a)
+}
+
+// DeleteAssessment soft-deletes an assessment.
+func (s *FinService) DeleteAssessment(ctx context.Context, id uuid.UUID) error {
+	if _, err := s.GetAssessment(ctx, id); err != nil {
+		return err
+	}
+	return s.assessments.SoftDeleteAssessment(ctx, id)
+}
+
 // ── Ledger ────────────────────────────────────────────────────────────────────
 
-// GetUnitLedger returns all ledger entries for the given unit.
-func (s *FinService) GetUnitLedger(ctx context.Context, unitID uuid.UUID) ([]LedgerEntry, error) {
-	return s.assessments.ListLedgerByUnit(ctx, unitID)
+// GetUnitLedger returns ledger entries for the given unit, supporting pagination.
+// limit controls the page size; afterID is the cursor from the previous page.
+func (s *FinService) GetUnitLedger(ctx context.Context, unitID uuid.UUID, limit int, afterID *uuid.UUID) ([]LedgerEntry, bool, error) {
+	return s.assessments.ListLedgerByUnit(ctx, unitID, limit, afterID)
 }
 
 // GetOrgLedger returns all ledger entries for the given org.
@@ -323,9 +345,10 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 	return created, nil
 }
 
-// ListPayments returns all payments for the given org.
-func (s *FinService) ListPayments(ctx context.Context, orgID uuid.UUID) ([]Payment, error) {
-	return s.payments.ListPaymentsByOrg(ctx, orgID)
+// ListPayments returns payments for the given org, supporting cursor-based pagination.
+// limit controls the page size; afterID is the cursor from the previous page.
+func (s *FinService) ListPayments(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Payment, bool, error) {
+	return s.payments.ListPaymentsByOrg(ctx, orgID, limit, afterID)
 }
 
 // GetPayment returns the payment with the given id, or a 404 if not found.
@@ -436,6 +459,36 @@ func (s *FinService) ApproveBudget(ctx context.Context, id uuid.UUID, approvedBy
 	b.ApprovedAt = &now
 	b.ApprovedBy = &approvedBy
 	return s.budgets.UpdateBudget(ctx, b)
+}
+
+// GetBudgetReport returns a budget with its line items.
+func (s *FinService) GetBudgetReport(ctx context.Context, budgetID uuid.UUID) (*BudgetReport, error) {
+	b, err := s.GetBudget(ctx, budgetID)
+	if err != nil {
+		return nil, err
+	}
+	items, err := s.budgets.ListLineItemsByBudget(ctx, budgetID)
+	if err != nil {
+		return nil, err
+	}
+	return &BudgetReport{Budget: b, LineItems: items}, nil
+}
+
+// UpdateCategory persists changes to an existing budget category.
+func (s *FinService) UpdateCategory(ctx context.Context, id uuid.UUID, c *BudgetCategory) (*BudgetCategory, error) {
+	c.ID = id
+	return s.budgets.UpdateCategory(ctx, c)
+}
+
+// UpdateExpense applies partial updates to an expense and returns the updated row.
+func (s *FinService) UpdateExpense(ctx context.Context, id uuid.UUID, e *Expense) (*Expense, error) {
+	existing, err := s.GetExpense(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	e.ID = existing.ID
+	e.OrgID = existing.OrgID
+	return s.budgets.UpdateExpense(ctx, e)
 }
 
 // CreateLineItem creates a budget line item.
@@ -574,6 +627,17 @@ func (s *FinService) ListFunds(ctx context.Context, orgID uuid.UUID) ([]Fund, er
 	return s.funds.ListFundsByOrg(ctx, orgID)
 }
 
+// UpdateFund persists changes to an existing fund and returns the updated row.
+func (s *FinService) UpdateFund(ctx context.Context, id uuid.UUID, f *Fund) (*Fund, error) {
+	existing, err := s.GetFund(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	f.ID = existing.ID
+	f.OrgID = existing.OrgID
+	return s.funds.UpdateFund(ctx, f)
+}
+
 // GetFundTransactions returns all transactions for the given fund.
 func (s *FinService) GetFundTransactions(ctx context.Context, fundID uuid.UUID) ([]FundTransaction, error) {
 	return s.funds.ListTransactionsByFund(ctx, fundID)
@@ -697,6 +761,12 @@ func (s *FinService) CreatePaymentPlan(ctx context.Context, caseID uuid.UUID, or
 	return s.collections.CreatePaymentPlan(ctx, p)
 }
 
+// UpdatePaymentPlan persists changes to an existing payment plan.
+func (s *FinService) UpdatePaymentPlan(ctx context.Context, id uuid.UUID, p *PaymentPlan) (*PaymentPlan, error) {
+	p.ID = id
+	return s.collections.UpdatePaymentPlan(ctx, p)
+}
+
 // ListPaymentPlans returns all payment plans for the given collection case.
 func (s *FinService) ListPaymentPlans(ctx context.Context, caseID uuid.UUID) ([]PaymentPlan, error) {
 	return s.collections.ListPaymentPlansByCase(ctx, caseID)
@@ -723,4 +793,47 @@ func cashAccountForFundType(fundType string) int {
 	default:
 		return 1010 // operating and all others default to operating cash
 	}
+}
+
+// ReconciliationResult holds the outcome of a ledger reconciliation check.
+type ReconciliationResult struct {
+	OrgID              uuid.UUID `json:"org_id"`
+	UnitLedgerTotal    int64     `json:"unit_ledger_total_cents"`
+	FundTransTotal     int64     `json:"fund_transaction_total_cents"`
+	Discrepancy        int64     `json:"discrepancy_cents"`
+	IsReconciled       bool      `json:"is_reconciled"`
+}
+
+// CheckReconciliation compares unit-level ledger totals with org-level fund transaction totals.
+// Returns the discrepancy if any. This is a read-only diagnostic — it does not modify data.
+func (s *FinService) CheckReconciliation(ctx context.Context, orgID uuid.UUID) (*ReconciliationResult, error) {
+	// Get total from unit ledger (sum of all charges and payments)
+	ledger, err := s.assessments.ListLedgerByOrg(ctx, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("listing org ledger: %w", err)
+	}
+
+	var unitTotal int64
+	for _, entry := range ledger {
+		unitTotal += entry.AmountCents
+	}
+
+	// Get total from fund transactions
+	funds, err := s.funds.ListFundsByOrg(ctx, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("listing funds: %w", err)
+	}
+
+	var fundTotal int64
+	for _, fund := range funds {
+		fundTotal += fund.BalanceCents
+	}
+
+	return &ReconciliationResult{
+		OrgID:           orgID,
+		UnitLedgerTotal: unitTotal,
+		FundTransTotal:  fundTotal,
+		Discrepancy:     unitTotal - fundTotal,
+		IsReconciled:    unitTotal == fundTotal,
+	}, nil
 }

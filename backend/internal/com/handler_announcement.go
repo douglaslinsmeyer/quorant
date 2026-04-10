@@ -11,12 +11,12 @@ import (
 
 // AnnouncementHandler handles announcement HTTP requests.
 type AnnouncementHandler struct {
-	service *ComService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewAnnouncementHandler constructs an AnnouncementHandler backed by the given service.
-func NewAnnouncementHandler(service *ComService, logger *slog.Logger) *AnnouncementHandler {
+func NewAnnouncementHandler(service Service, logger *slog.Logger) *AnnouncementHandler {
 	return &AnnouncementHandler{service: service, logger: logger}
 }
 
@@ -52,14 +52,29 @@ func (h *AnnouncementHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	announcements, err := h.service.ListAnnouncements(r.Context(), orgID)
+	page := api.ParsePageRequest(r)
+	afterID, err := parseComCursorID(page.Cursor)
+	if err != nil {
+		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		return
+	}
+
+	announcements, hasMore, err := h.service.ListAnnouncements(r.Context(), orgID, page.Limit, afterID)
 	if err != nil {
 		h.logger.Error("ListAnnouncements failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, announcements)
+	var meta *api.Meta
+	if hasMore && len(announcements) > 0 {
+		meta = &api.Meta{
+			Cursor:  api.EncodeCursor(map[string]string{"id": announcements[len(announcements)-1].ID.String()}),
+			HasMore: true,
+		}
+	}
+
+	api.WriteJSONWithMeta(w, http.StatusOK, announcements, meta)
 }
 
 // Get handles GET /api/v1/organizations/{org_id}/announcements/{announcement_id}.
@@ -119,6 +134,25 @@ func (h *AnnouncementHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// parseComCursorID decodes a pagination cursor and returns the ID it encodes.
+// Returns nil, nil when cursor is empty (first page).
+func parseComCursorID(cursor string) (*uuid.UUID, error) {
+	if cursor == "" {
+		return nil, nil
+	}
+	vals, err := api.DecodeCursor(cursor)
+	if err != nil {
+		return nil, err
+	}
+	id, err := uuid.Parse(vals["id"])
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
 }
 
 // ─── Shared path helpers ──────────────────────────────────────────────────────

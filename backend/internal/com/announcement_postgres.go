@@ -74,19 +74,23 @@ func (r *PostgresAnnouncementRepository) FindByID(ctx context.Context, id uuid.U
 
 // ─── ListByOrg ───────────────────────────────────────────────────────────────
 
-// ListByOrg returns all non-deleted announcements for the given org, ordered by published_at desc.
-func (r *PostgresAnnouncementRepository) ListByOrg(ctx context.Context, orgID uuid.UUID) ([]Announcement, error) {
+// ListByOrg returns non-deleted announcements for the given org, supporting
+// cursor-based pagination ordered by id DESC.
+// afterID is the cursor from the previous page; hasMore is true when more items exist.
+func (r *PostgresAnnouncementRepository) ListByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Announcement, bool, error) {
 	const q = `
 		SELECT id, org_id, author_id, title, body, is_pinned,
 		       audience_roles, scheduled_for, published_at,
 		       created_at, updated_at, deleted_at
 		FROM announcements
 		WHERE org_id = $1 AND deleted_at IS NULL
-		ORDER BY published_at DESC NULLS LAST, created_at DESC`
+		  AND ($3::uuid IS NULL OR id < $3)
+		ORDER BY id DESC
+		LIMIT $2`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.pool.Query(ctx, q, orgID, limit+1, afterID)
 	if err != nil {
-		return nil, fmt.Errorf("com: announcement ListByOrg: %w", err)
+		return nil, false, fmt.Errorf("com: announcement ListByOrg: %w", err)
 	}
 	defer rows.Close()
 
@@ -94,14 +98,19 @@ func (r *PostgresAnnouncementRepository) ListByOrg(ctx context.Context, orgID uu
 	for rows.Next() {
 		a, err := scanAnnouncementRow(rows)
 		if err != nil {
-			return nil, fmt.Errorf("com: announcement ListByOrg scan: %w", err)
+			return nil, false, fmt.Errorf("com: announcement ListByOrg scan: %w", err)
 		}
 		results = append(results, *a)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("com: announcement ListByOrg rows: %w", err)
+		return nil, false, fmt.Errorf("com: announcement ListByOrg rows: %w", err)
 	}
-	return results, nil
+
+	hasMore := len(results) > limit
+	if hasMore {
+		results = results[:limit]
+	}
+	return results, hasMore, nil
 }
 
 // ─── Update ──────────────────────────────────────────────────────────────────

@@ -10,12 +10,12 @@ import (
 
 // ThreadHandler handles thread and message HTTP requests.
 type ThreadHandler struct {
-	service *ComService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewThreadHandler constructs a ThreadHandler backed by the given service.
-func NewThreadHandler(service *ComService, logger *slog.Logger) *ThreadHandler {
+func NewThreadHandler(service Service, logger *slog.Logger) *ThreadHandler {
 	return &ThreadHandler{service: service, logger: logger}
 }
 

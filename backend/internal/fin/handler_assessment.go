@@ -11,12 +11,12 @@ import (
 // AssessmentHandler handles HTTP requests for assessment schedules, assessments,
 // and the ledger.
 type AssessmentHandler struct {
-	service *FinService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewAssessmentHandler constructs an AssessmentHandler backed by the given service.
-func NewAssessmentHandler(service *FinService, logger *slog.Logger) *AssessmentHandler {
+func NewAssessmentHandler(service Service, logger *slog.Logger) *AssessmentHandler {
 	return &AssessmentHandler{service: service, logger: logger}
 }
 
@@ -175,14 +175,29 @@ func (h *AssessmentHandler) ListAssessments(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	assessments, err := h.service.ListAssessments(r.Context(), orgID)
+	page := api.ParsePageRequest(r)
+	afterID, err := parseFinCursorID(page.Cursor)
+	if err != nil {
+		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		return
+	}
+
+	assessments, hasMore, err := h.service.ListAssessments(r.Context(), orgID, page.Limit, afterID)
 	if err != nil {
 		h.logger.Error("ListAssessments failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, assessments)
+	var meta *api.Meta
+	if hasMore && len(assessments) > 0 {
+		meta = &api.Meta{
+			Cursor:  api.EncodeCursor(map[string]string{"id": assessments[len(assessments)-1].ID.String()}),
+			HasMore: true,
+		}
+	}
+
+	api.WriteJSONWithMeta(w, http.StatusOK, assessments, meta)
 }
 
 // GetAssessment handles GET /organizations/{org_id}/assessments/{assessment_id}.
@@ -209,6 +224,59 @@ func (h *AssessmentHandler) GetAssessment(w http.ResponseWriter, r *http.Request
 	api.WriteJSON(w, http.StatusOK, assessment)
 }
 
+// UpdateAssessment handles PATCH /organizations/{org_id}/assessments/{assessment_id}.
+func (h *AssessmentHandler) UpdateAssessment(w http.ResponseWriter, r *http.Request) {
+	_, err := parseFinOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	assessmentID, err := parsePathUUID(r, "assessment_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	var a Assessment
+	if err := api.ReadJSON(r, &a); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	updated, err := h.service.UpdateAssessment(r.Context(), assessmentID, &a)
+	if err != nil {
+		h.logger.Error("UpdateAssessment failed", "assessment_id", assessmentID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, updated)
+}
+
+// DeleteAssessment handles DELETE /organizations/{org_id}/assessments/{assessment_id}.
+func (h *AssessmentHandler) DeleteAssessment(w http.ResponseWriter, r *http.Request) {
+	_, err := parseFinOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	assessmentID, err := parsePathUUID(r, "assessment_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	if err := h.service.DeleteAssessment(r.Context(), assessmentID); err != nil {
+		h.logger.Error("DeleteAssessment failed", "assessment_id", assessmentID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ── Ledger ────────────────────────────────────────────────────────────────────
 
 // GetUnitLedger handles GET /organizations/{org_id}/units/{unit_id}/ledger.
@@ -225,14 +293,29 @@ func (h *AssessmentHandler) GetUnitLedger(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	entries, err := h.service.GetUnitLedger(r.Context(), unitID)
+	page := api.ParsePageRequest(r)
+	afterID, err := parseFinCursorID(page.Cursor)
+	if err != nil {
+		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		return
+	}
+
+	entries, hasMore, err := h.service.GetUnitLedger(r.Context(), unitID, page.Limit, afterID)
 	if err != nil {
 		h.logger.Error("GetUnitLedger failed", "unit_id", unitID, "error", err)
 		api.WriteError(w, err)
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, entries)
+	var meta *api.Meta
+	if hasMore && len(entries) > 0 {
+		meta = &api.Meta{
+			Cursor:  api.EncodeCursor(map[string]string{"id": entries[len(entries)-1].ID.String()}),
+			HasMore: true,
+		}
+	}
+
+	api.WriteJSONWithMeta(w, http.StatusOK, entries, meta)
 }
 
 // GetOrgLedger handles GET /organizations/{org_id}/ledger.
@@ -254,6 +337,23 @@ func (h *AssessmentHandler) GetOrgLedger(w http.ResponseWriter, r *http.Request)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// parseFinCursorID decodes a pagination cursor and returns the ID it encodes.
+// Returns nil, nil when cursor is empty (first page).
+func parseFinCursorID(cursor string) (*uuid.UUID, error) {
+	if cursor == "" {
+		return nil, nil
+	}
+	vals, err := api.DecodeCursor(cursor)
+	if err != nil {
+		return nil, err
+	}
+	id, err := uuid.Parse(vals["id"])
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
+}
 
 // parseFinOrgID extracts and parses the {org_id} path value from the request.
 // Returns a ValidationError if the value is missing or not a valid UUID.

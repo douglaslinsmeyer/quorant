@@ -10,12 +10,12 @@ import (
 
 // LicenseHandler handles HTTP requests for the license domain.
 type LicenseHandler struct {
-	service *LicenseService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewLicenseHandler constructs a LicenseHandler backed by the given service.
-func NewLicenseHandler(service *LicenseService, logger *slog.Logger) *LicenseHandler {
+func NewLicenseHandler(service Service, logger *slog.Logger) *LicenseHandler {
 	return &LicenseHandler{service: service, logger: logger}
 }
 

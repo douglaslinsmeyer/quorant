@@ -86,13 +86,14 @@ func (s *ComService) CreateAnnouncement(ctx context.Context, orgID uuid.UUID, re
 	return created, nil
 }
 
-// ListAnnouncements returns all announcements for an organization.
-func (s *ComService) ListAnnouncements(ctx context.Context, orgID uuid.UUID) ([]Announcement, error) {
-	result, err := s.announcements.ListByOrg(ctx, orgID)
+// ListAnnouncements returns announcements for an organization, supporting cursor-based pagination.
+// limit controls the page size; afterID is the cursor from the previous page.
+func (s *ComService) ListAnnouncements(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Announcement, bool, error) {
+	result, hasMore, err := s.announcements.ListByOrg(ctx, orgID, limit, afterID)
 	if err != nil {
-		return nil, fmt.Errorf("com service: ListAnnouncements: %w", err)
+		return nil, false, fmt.Errorf("com service: ListAnnouncements: %w", err)
 	}
-	return result, nil
+	return result, hasMore, nil
 }
 
 // GetAnnouncement returns an announcement by ID, or a 404 if not found.
@@ -548,4 +549,40 @@ func (s *ComService) ListUnitCommunications(ctx context.Context, unitID uuid.UUI
 		return nil, fmt.Errorf("com service: ListUnitCommunications: %w", err)
 	}
 	return result, nil
+}
+
+// CalendarItem represents a unified calendar entry from any module.
+type CalendarItem struct {
+	Source   string    `json:"source"`    // "community_event", "meeting", "ballot_deadline", "assessment_due"
+	SourceID uuid.UUID `json:"source_id"`
+	Title    string    `json:"title"`
+	StartsAt time.Time `json:"starts_at"`
+	EndsAt   *time.Time `json:"ends_at,omitempty"`
+	IsAllDay bool      `json:"is_all_day"`
+	Location string    `json:"location,omitempty"`
+}
+
+// GetUnifiedCalendar returns a merged view of calendar events for the org.
+// For now, this returns community events from the calendar module.
+// Future: aggregate meetings, ballot deadlines, assessment due dates, reservations.
+func (s *ComService) GetUnifiedCalendar(ctx context.Context, orgID uuid.UUID) ([]CalendarItem, error) {
+	events, err := s.calendar.ListEventsByOrg(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]CalendarItem, 0, len(events))
+	for _, e := range events {
+		items = append(items, CalendarItem{
+			Source:   "community_event",
+			SourceID: e.ID,
+			Title:    e.Title,
+			StartsAt: e.StartsAt,
+			EndsAt:   e.EndsAt,
+			IsAllDay: e.IsAllDay,
+			Location: func() string { if e.Location != nil { return *e.Location }; return "" }(),
+		})
+	}
+
+	return items, nil
 }

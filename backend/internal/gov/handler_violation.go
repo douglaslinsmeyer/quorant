@@ -11,12 +11,12 @@ import (
 
 // ViolationHandler handles HTTP requests for the violations sub-domain.
 type ViolationHandler struct {
-	service *GovService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewViolationHandler constructs a ViolationHandler backed by the given service.
-func NewViolationHandler(service *GovService, logger *slog.Logger) *ViolationHandler {
+func NewViolationHandler(service Service, logger *slog.Logger) *ViolationHandler {
 	return &ViolationHandler{service: service, logger: logger}
 }
 
@@ -52,14 +52,29 @@ func (h *ViolationHandler) ListViolations(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	violations, err := h.service.ListViolations(r.Context(), orgID)
+	page := api.ParsePageRequest(r)
+	afterID, err := parseGovCursorID(page.Cursor)
+	if err != nil {
+		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		return
+	}
+
+	violations, hasMore, err := h.service.ListViolations(r.Context(), orgID, page.Limit, afterID)
 	if err != nil {
 		h.logger.Error("ListViolations failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, violations)
+	var meta *api.Meta
+	if hasMore && len(violations) > 0 {
+		meta = &api.Meta{
+			Cursor:  api.EncodeCursor(map[string]string{"id": violations[len(violations)-1].ID.String()}),
+			HasMore: true,
+		}
+	}
+
+	api.WriteJSONWithMeta(w, http.StatusOK, violations, meta)
 }
 
 // GetViolation handles GET /organizations/{org_id}/violations/{violation_id}.
@@ -267,6 +282,23 @@ func (h *ViolationHandler) UpdateHearing(w http.ResponseWriter, r *http.Request)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// parseGovCursorID decodes a pagination cursor and returns the ID it encodes.
+// Returns nil, nil when cursor is empty (first page).
+func parseGovCursorID(cursor string) (*uuid.UUID, error) {
+	if cursor == "" {
+		return nil, nil
+	}
+	vals, err := api.DecodeCursor(cursor)
+	if err != nil {
+		return nil, err
+	}
+	id, err := uuid.Parse(vals["id"])
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
+}
 
 // parseGovOrgID extracts and parses the {org_id} path value from the request.
 func parseGovOrgID(r *http.Request) (uuid.UUID, error) {

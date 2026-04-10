@@ -22,14 +22,14 @@ type EntitlementResult struct {
 // LicenseService provides business logic for the license domain.
 type LicenseService struct {
 	repo      LicenseRepository
-	checker   *PostgresEntitlementChecker
+	checker   EntitlementChecker
 	auditor   audit.Auditor
 	publisher queue.Publisher
 	logger    *slog.Logger
 }
 
 // NewLicenseService constructs a LicenseService.
-func NewLicenseService(repo LicenseRepository, checker *PostgresEntitlementChecker, auditor audit.Auditor, publisher queue.Publisher, logger *slog.Logger) *LicenseService {
+func NewLicenseService(repo LicenseRepository, checker EntitlementChecker, auditor audit.Auditor, publisher queue.Publisher, logger *slog.Logger) *LicenseService {
 	return &LicenseService{repo: repo, checker: checker, auditor: auditor, publisher: publisher, logger: logger}
 }
 

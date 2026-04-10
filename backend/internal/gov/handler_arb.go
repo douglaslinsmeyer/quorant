@@ -1,6 +1,7 @@
 package gov
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 
@@ -10,12 +11,12 @@ import (
 
 // ARBHandler handles HTTP requests for the ARB (Architectural Review Board) sub-domain.
 type ARBHandler struct {
-	service *GovService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewARBHandler constructs an ARBHandler backed by the given service.
-func NewARBHandler(service *GovService, logger *slog.Logger) *ARBHandler {
+func NewARBHandler(service Service, logger *slog.Logger) *ARBHandler {
 	return &ARBHandler{service: service, logger: logger}
 }
 
@@ -143,6 +144,75 @@ func (h *ARBHandler) CastARBVote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	api.WriteJSON(w, http.StatusCreated, vote)
+}
+
+// VerifyCondition handles POST /organizations/{org_id}/arb-requests/{request_id}/conditions/{condition_id}/verify.
+// It marks the condition with the given condition_id as verified in the JSONB conditions array.
+func (h *ARBHandler) VerifyCondition(w http.ResponseWriter, r *http.Request) {
+	_, err := parseGovOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	requestID, err := parseGovPathUUID(r, "request_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	conditionID, err := parseGovPathUUID(r, "condition_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	req, err := h.service.GetARBRequest(r.Context(), requestID)
+	if err != nil {
+		h.logger.Error("VerifyCondition fetch failed", "request_id", requestID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	// Parse conditions JSONB array and mark the matching condition as verified.
+	var conditions []map[string]any
+	if len(req.Conditions) > 0 {
+		if err := json.Unmarshal(req.Conditions, &conditions); err != nil {
+			api.WriteError(w, api.NewValidationError("conditions field is not a valid JSON array", "conditions"))
+			return
+		}
+	}
+
+	found := false
+	for i, c := range conditions {
+		if id, ok := c["id"].(string); ok && id == conditionID.String() {
+			conditions[i]["verified"] = true
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		api.WriteError(w, api.NewNotFoundError("condition not found in ARB request"))
+		return
+	}
+
+	updated_conditions, err := json.Marshal(conditions)
+	if err != nil {
+		h.logger.Error("VerifyCondition marshal failed", "request_id", requestID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+	req.Conditions = json.RawMessage(updated_conditions)
+
+	updated, err := h.service.UpdateARBRequest(r.Context(), requestID, req)
+	if err != nil {
+		h.logger.Error("VerifyCondition update failed", "request_id", requestID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, updated)
 }
 
 // RequestRevision handles POST /organizations/{org_id}/arb-requests/{request_id}/request-revision.

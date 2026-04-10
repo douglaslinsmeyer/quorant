@@ -17,6 +17,9 @@ func RegisterRoutes(
 	orgHandler *OrgHandler,
 	membershipHandler *MembershipHandler,
 	unitHandler *UnitHandler,
+	amenityHandler *AmenityHandler,
+	vendorHandler *VendorHandler,
+	registrationHandler *RegistrationHandler,
 	validator auth.TokenValidator,
 	checker middleware.PermissionChecker,
 	resolveUserID func(context.Context) (uuid.UUID, error),
@@ -64,4 +67,46 @@ func RegisterRoutes(
 	mux.Handle("GET /api/v1/organizations/{org_id}/units/{unit_id}/memberships", permMw("org.unit_membership.read", unitHandler.ListUnitMemberships))
 	mux.Handle("PATCH /api/v1/organizations/{org_id}/units/{unit_id}/memberships/{id}", permMw("org.unit_membership.manage", unitHandler.UpdateUnitMembership))
 	mux.Handle("DELETE /api/v1/organizations/{org_id}/units/{unit_id}/memberships/{id}", permMw("org.unit_membership.manage", unitHandler.EndUnitMembership))
+	mux.Handle("POST /api/v1/organizations/{org_id}/units/{unit_id}/transfer", permMw("org.unit.update", unitHandler.TransferOwnership))
+	mux.Handle("GET /api/v1/organizations/{org_id}/units/{unit_id}/ownership-history", permMw("org.unit.read", unitHandler.GetOwnershipHistory))
+
+	// Amenity endpoints
+	mux.Handle("POST /api/v1/organizations/{org_id}/amenities", permMw("org.amenity.manage", amenityHandler.CreateAmenity))
+	mux.Handle("GET /api/v1/organizations/{org_id}/amenities", permMw("org.amenity.read", amenityHandler.ListAmenities))
+	mux.Handle("GET /api/v1/organizations/{org_id}/amenities/{amenity_id}", permMw("org.amenity.read", amenityHandler.GetAmenity))
+	mux.Handle("PATCH /api/v1/organizations/{org_id}/amenities/{amenity_id}", permMw("org.amenity.manage", amenityHandler.UpdateAmenity))
+	mux.Handle("DELETE /api/v1/organizations/{org_id}/amenities/{amenity_id}", permMw("org.amenity.manage", amenityHandler.DeleteAmenity))
+
+	// Reservation endpoints under amenities
+	mux.Handle("POST /api/v1/organizations/{org_id}/amenities/{amenity_id}/reservations", permMw("org.reservation.create", amenityHandler.CreateReservation))
+	mux.Handle("GET /api/v1/organizations/{org_id}/amenities/{amenity_id}/reservations", permMw("org.reservation.read", amenityHandler.ListAmenityReservations))
+
+	// Reservation endpoints at org level
+	mux.Handle("GET /api/v1/organizations/{org_id}/reservations", permMw("org.reservation.read", amenityHandler.ListOrgReservations))
+	mux.Handle("GET /api/v1/organizations/{org_id}/reservations/{reservation_id}", permMw("org.reservation.read", amenityHandler.GetReservation))
+	mux.Handle("PATCH /api/v1/organizations/{org_id}/reservations/{reservation_id}", permMw("org.reservation.manage", amenityHandler.UpdateReservation))
+
+	// Registration type endpoints
+	mux.Handle("POST /api/v1/organizations/{org_id}/registration-types", permMw("org.registration_type.manage", registrationHandler.CreateRegistrationType))
+	mux.Handle("GET /api/v1/organizations/{org_id}/registration-types", permMw("org.registration_type.manage", registrationHandler.ListRegistrationTypes))
+	mux.Handle("PATCH /api/v1/organizations/{org_id}/registration-types/{id}", permMw("org.registration_type.manage", registrationHandler.UpdateRegistrationType))
+
+	// Registration endpoints
+	mux.Handle("POST /api/v1/organizations/{org_id}/units/{unit_id}/registrations", permMw("org.registration.create", registrationHandler.CreateRegistration))
+	mux.Handle("GET /api/v1/organizations/{org_id}/units/{unit_id}/registrations", permMw("org.registration.read", registrationHandler.ListRegistrations))
+	mux.Handle("PATCH /api/v1/organizations/{org_id}/registrations/{id}", permMw("org.registration.manage", registrationHandler.UpdateRegistration))
+	mux.Handle("POST /api/v1/organizations/{org_id}/registrations/{id}/approve", permMw("org.registration.manage", registrationHandler.ApproveRegistration))
+	mux.Handle("POST /api/v1/organizations/{org_id}/registrations/{id}/revoke", permMw("org.registration.manage", registrationHandler.RevokeRegistration))
+
+	// Vendor endpoints (top-level)
+	mux.Handle("POST /api/v1/vendors", permMw("org.vendor.manage", vendorHandler.CreateVendor))
+	mux.Handle("GET /api/v1/vendors", permMw("org.vendor.read", vendorHandler.ListVendors))
+	mux.Handle("GET /api/v1/vendors/{vendor_id}", permMw("org.vendor.read", vendorHandler.GetVendor))
+	mux.Handle("PATCH /api/v1/vendors/{vendor_id}", permMw("org.vendor.manage", vendorHandler.UpdateVendor))
+	mux.Handle("DELETE /api/v1/vendors/{vendor_id}", permMw("org.vendor.manage", vendorHandler.DeleteVendor))
+
+	// Vendor assignment endpoints
+	mux.Handle("POST /api/v1/organizations/{org_id}/vendor-assignments", permMw("org.vendor.manage", vendorHandler.CreateVendorAssignment))
+	mux.Handle("GET /api/v1/organizations/{org_id}/vendor-assignments", permMw("org.vendor.read", vendorHandler.ListVendorAssignments))
+	mux.Handle("DELETE /api/v1/organizations/{org_id}/vendor-assignments/{id}", permMw("org.vendor.manage", vendorHandler.DeleteVendorAssignment))
 }

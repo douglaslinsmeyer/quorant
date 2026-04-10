@@ -11,12 +11,12 @@ import (
 
 // DocHandler handles HTTP requests for the document management module.
 type DocHandler struct {
-	service *DocService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewDocHandler constructs a DocHandler backed by the given service.
-func NewDocHandler(service *DocService, logger *slog.Logger) *DocHandler {
+func NewDocHandler(service Service, logger *slog.Logger) *DocHandler {
 	return &DocHandler{service: service, logger: logger}
 }
 
@@ -56,14 +56,29 @@ func (h *DocHandler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	docs, err := h.service.ListDocuments(r.Context(), orgID)
+	page := api.ParsePageRequest(r)
+	afterID, err := parseDocCursorID(page.Cursor)
+	if err != nil {
+		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		return
+	}
+
+	docs, hasMore, err := h.service.ListDocuments(r.Context(), orgID, page.Limit, afterID)
 	if err != nil {
 		h.logger.Error("ListDocuments failed", "org_id", orgID, "error", err)
 		api.WriteError(w, err)
 		return
 	}
 
-	api.WriteJSON(w, http.StatusOK, docs)
+	var meta *api.Meta
+	if hasMore && len(docs) > 0 {
+		meta = &api.Meta{
+			Cursor:  api.EncodeCursor(map[string]string{"id": docs[len(docs)-1].ID.String()}),
+			HasMore: true,
+		}
+	}
+
+	api.WriteJSONWithMeta(w, http.StatusOK, docs, meta)
 }
 
 // GetDocument handles GET /organizations/{org_id}/documents/{document_id}.
@@ -322,6 +337,23 @@ func (h *DocHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// parseDocCursorID decodes a pagination cursor and returns the ID it encodes.
+// Returns nil, nil when cursor is empty (first page).
+func parseDocCursorID(cursor string) (*uuid.UUID, error) {
+	if cursor == "" {
+		return nil, nil
+	}
+	vals, err := api.DecodeCursor(cursor)
+	if err != nil {
+		return nil, err
+	}
+	id, err := uuid.Parse(vals["id"])
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
+}
 
 // parseDocOrgID extracts and parses the {org_id} path value.
 func parseDocOrgID(r *http.Request) (uuid.UUID, error) {

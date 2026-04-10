@@ -11,12 +11,12 @@ import (
 // CollectionHandler handles HTTP requests for collection cases, actions,
 // and payment plans.
 type CollectionHandler struct {
-	service *FinService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewCollectionHandler constructs a CollectionHandler backed by the given service.
-func NewCollectionHandler(service *FinService, logger *slog.Logger) *CollectionHandler {
+func NewCollectionHandler(service Service, logger *slog.Logger) *CollectionHandler {
 	return &CollectionHandler{service: service, logger: logger}
 }
 
@@ -193,6 +193,36 @@ func (h *CollectionHandler) CreatePaymentPlan(w http.ResponseWriter, r *http.Req
 	}
 
 	api.WriteJSON(w, http.StatusCreated, created)
+}
+
+// UpdatePaymentPlan handles PATCH /organizations/{org_id}/payment-plans/{plan_id}.
+func (h *CollectionHandler) UpdatePaymentPlan(w http.ResponseWriter, r *http.Request) {
+	_, err := parseFinOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	planID, err := parsePathUUID(r, "plan_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	var p PaymentPlan
+	if err := api.ReadJSON(r, &p); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	updated, err := h.service.UpdatePaymentPlan(r.Context(), planID, &p)
+	if err != nil {
+		h.logger.Error("UpdatePaymentPlan failed", "plan_id", planID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, updated)
 }
 
 // ListPaymentPlans handles GET /organizations/{org_id}/collections/{case_id}/payment-plans.

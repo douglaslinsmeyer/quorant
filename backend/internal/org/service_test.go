@@ -80,15 +80,19 @@ func (m *mockOrgRepo) FindBySlug(_ context.Context, slug string) (*org.Organizat
 	return nil, nil
 }
 
-func (m *mockOrgRepo) ListByUserAccess(_ context.Context, _ uuid.UUID) ([]org.Organization, error) {
+func (m *mockOrgRepo) ListByUserAccess(_ context.Context, _ uuid.UUID, limit int, afterID *uuid.UUID) ([]org.Organization, bool, error) {
 	if m.findErr != nil {
-		return nil, m.findErr
+		return nil, false, m.findErr
 	}
 	result := make([]org.Organization, 0, len(m.orgs))
 	for _, o := range m.orgs {
 		result = append(result, *o)
 	}
-	return result, nil
+	hasMore := limit > 0 && len(result) > limit
+	if hasMore {
+		result = result[:limit]
+	}
+	return result, hasMore, nil
 }
 
 func (m *mockOrgRepo) Update(_ context.Context, o *org.Organization) (*org.Organization, error) {
@@ -250,13 +254,14 @@ func (m *mockMembershipRepo) SoftDelete(_ context.Context, id uuid.UUID) error {
 
 // mockUnitRepo is an in-memory UnitRepository for unit tests.
 type mockUnitRepo struct {
-	units           map[uuid.UUID]*org.Unit
-	properties      map[uuid.UUID]*org.Property
-	unitMemberships map[uuid.UUID]*org.UnitMembership
-	createErr       error
-	findErr         error
-	updateErr       error
-	deleteErr       error
+	units            map[uuid.UUID]*org.Unit
+	properties       map[uuid.UUID]*org.Property
+	unitMemberships  map[uuid.UUID]*org.UnitMembership
+	ownershipHistory []org.UnitOwnershipHistory
+	createErr        error
+	findErr          error
+	updateErr        error
+	deleteErr        error
 }
 
 func newMockUnitRepo() *mockUnitRepo {
@@ -296,9 +301,9 @@ func (m *mockUnitRepo) FindUnitByID(_ context.Context, id uuid.UUID) (*org.Unit,
 	return &copy, nil
 }
 
-func (m *mockUnitRepo) ListUnitsByOrg(_ context.Context, orgID uuid.UUID) ([]org.Unit, error) {
+func (m *mockUnitRepo) ListUnitsByOrg(_ context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]org.Unit, bool, error) {
 	if m.findErr != nil {
-		return nil, m.findErr
+		return nil, false, m.findErr
 	}
 	result := []org.Unit{}
 	for _, u := range m.units {
@@ -306,7 +311,11 @@ func (m *mockUnitRepo) ListUnitsByOrg(_ context.Context, orgID uuid.UUID) ([]org
 			result = append(result, *u)
 		}
 	}
-	return result, nil
+	hasMore := limit > 0 && len(result) > limit
+	if hasMore {
+		result = result[:limit]
+	}
+	return result, hasMore, nil
 }
 
 func (m *mockUnitRepo) UpdateUnit(_ context.Context, u *org.Unit) (*org.Unit, error) {
@@ -411,6 +420,35 @@ func (m *mockUnitRepo) EndUnitMembership(_ context.Context, id uuid.UUID) error 
 		um.EndedAt = &now
 	}
 	return nil
+}
+
+func (m *mockUnitRepo) CreateOwnershipHistory(_ context.Context, h *org.UnitOwnershipHistory) (*org.UnitOwnershipHistory, error) {
+	if m.createErr != nil {
+		return nil, m.createErr
+	}
+	if h.ID == uuid.Nil {
+		h.ID = uuid.New()
+	}
+	h.CreatedAt = time.Now()
+	copy := *h
+	m.ownershipHistory = append(m.ownershipHistory, copy)
+	return &copy, nil
+}
+
+func (m *mockUnitRepo) ListOwnershipHistoryByUnit(_ context.Context, unitID uuid.UUID) ([]org.UnitOwnershipHistory, error) {
+	if m.findErr != nil {
+		return nil, m.findErr
+	}
+	var result []org.UnitOwnershipHistory
+	for _, h := range m.ownershipHistory {
+		if h.UnitID == unitID {
+			result = append(result, h)
+		}
+	}
+	if result == nil {
+		return []org.UnitOwnershipHistory{}, nil
+	}
+	return result, nil
 }
 
 // mockUserRepo is a minimal iam.UserRepository for unit tests.
@@ -594,7 +632,7 @@ func TestListOrganizations_UsesClaimsFromContext(t *testing.T) {
 		Name:    "Alice",
 	})
 
-	orgs, err := svc.ListOrganizations(ctx)
+	orgs, _, err := svc.ListOrganizations(ctx, 25, nil)
 
 	require.NoError(t, err)
 	assert.NotEmpty(t, orgs)
@@ -603,7 +641,7 @@ func TestListOrganizations_UsesClaimsFromContext(t *testing.T) {
 func TestListOrganizations_NoClaimsInContext(t *testing.T) {
 	svc, _, _, _, _ := newDefaultTestService()
 
-	_, err := svc.ListOrganizations(context.Background())
+	_, _, err := svc.ListOrganizations(context.Background(), 25, nil)
 
 	require.Error(t, err)
 	var unauthErr *api.UnauthenticatedError
@@ -619,7 +657,7 @@ func TestListOrganizations_UserNotFound(t *testing.T) {
 		Name:    "Ghost",
 	})
 
-	_, err := svc.ListOrganizations(ctx)
+	_, _, err := svc.ListOrganizations(ctx, 25, nil)
 
 	require.Error(t, err)
 	var notFound *api.NotFoundError
@@ -967,7 +1005,7 @@ func TestListUnits_ReturnsUnitsForOrg(t *testing.T) {
 	unitRepo.units[uuid.New()] = &org.Unit{ID: uuid.New(), OrgID: orgID, Label: "Unit A"}
 	unitRepo.units[uuid.New()] = &org.Unit{ID: uuid.New(), OrgID: otherOrgID, Label: "Unit B"}
 
-	units, err := svc.ListUnits(context.Background(), orgID)
+	units, _, err := svc.ListUnits(context.Background(), orgID, 25, nil)
 
 	require.NoError(t, err)
 	require.Len(t, units, 1)
@@ -981,7 +1019,7 @@ func TestUpdateUnit_Success(t *testing.T) {
 	unitRepo.units[id] = &org.Unit{ID: id, Label: "Old Label", VotingWeight: 1.0}
 
 	newLabel := "New Label"
-	updated, err := svc.UpdateUnit(context.Background(), id, &newLabel, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	updated, err := svc.UpdateUnit(context.Background(), id, org.UpdateUnitRequest{Label: &newLabel})
 
 	require.NoError(t, err)
 	assert.Equal(t, "New Label", updated.Label)
@@ -991,7 +1029,7 @@ func TestUpdateUnit_NotFound(t *testing.T) {
 	svc, _, _, _, _ := newDefaultTestService()
 
 	newLabel := "Anything"
-	_, err := svc.UpdateUnit(context.Background(), uuid.New(), &newLabel, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	_, err := svc.UpdateUnit(context.Background(), uuid.New(), org.UpdateUnitRequest{Label: &newLabel})
 
 	require.Error(t, err)
 	var notFound *api.NotFoundError

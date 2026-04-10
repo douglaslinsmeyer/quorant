@@ -10,12 +10,12 @@ import (
 
 // NotificationHandler handles notification preference and push token HTTP requests.
 type NotificationHandler struct {
-	service *ComService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewNotificationHandler constructs a NotificationHandler backed by the given service.
-func NewNotificationHandler(service *ComService, logger *slog.Logger) *NotificationHandler {
+func NewNotificationHandler(service Service, logger *slog.Logger) *NotificationHandler {
 	return &NotificationHandler{service: service, logger: logger}
 }
 

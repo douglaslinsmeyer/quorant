@@ -40,9 +40,10 @@ type AssessmentRepository interface {
 	// if not found or soft-deleted.
 	FindAssessmentByID(ctx context.Context, id uuid.UUID) (*Assessment, error)
 
-	// ListAssessmentsByOrg returns all non-deleted assessments for the given
-	// org ordered by due_date. Returns an empty (non-nil) slice when none exist.
-	ListAssessmentsByOrg(ctx context.Context, orgID uuid.UUID) ([]Assessment, error)
+	// ListAssessmentsByOrg returns non-deleted assessments for the given org,
+	// supporting cursor-based pagination ordered by id.
+	// afterID is the cursor from the previous page; hasMore is true when more items exist.
+	ListAssessmentsByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Assessment, bool, error)
 
 	// ListAssessmentsByUnit returns all non-deleted assessments for the given
 	// unit ordered by due_date. Returns an empty (non-nil) slice when none exist.
@@ -64,10 +65,10 @@ type AssessmentRepository interface {
 	// reflected in the returned row.
 	CreateLedgerEntry(ctx context.Context, entry *LedgerEntry) (*LedgerEntry, error)
 
-	// ListLedgerByUnit returns all ledger entries for a unit ordered by
-	// effective_date ASC, created_at ASC. Returns an empty (non-nil) slice
-	// when none exist.
-	ListLedgerByUnit(ctx context.Context, unitID uuid.UUID) ([]LedgerEntry, error)
+	// ListLedgerByUnit returns ledger entries for a unit, supporting cursor-based
+	// pagination ordered by id.
+	// afterID is the cursor from the previous page; hasMore is true when more items exist.
+	ListLedgerByUnit(ctx context.Context, unitID uuid.UUID, limit int, afterID *uuid.UUID) ([]LedgerEntry, bool, error)
 
 	// ListLedgerByOrg returns all ledger entries for an org ordered by
 	// effective_date ASC, created_at ASC. Returns an empty (non-nil) slice

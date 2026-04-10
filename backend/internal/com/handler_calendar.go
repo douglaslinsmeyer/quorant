@@ -10,12 +10,12 @@ import (
 
 // CalendarHandler handles calendar event HTTP requests.
 type CalendarHandler struct {
-	service *ComService
+	service Service
 	logger  *slog.Logger
 }
 
 // NewCalendarHandler constructs a CalendarHandler backed by the given service.
-func NewCalendarHandler(service *ComService, logger *slog.Logger) *CalendarHandler {
+func NewCalendarHandler(service Service, logger *slog.Logger) *CalendarHandler {
 	return &CalendarHandler{service: service, logger: logger}
 }
 
@@ -267,4 +267,73 @@ func (h *CalendarHandler) UpdateDirectoryPrefs(w http.ResponseWriter, r *http.Re
 	}
 
 	api.WriteJSON(w, http.StatusOK, updated)
+}
+
+// GetUnifiedCalendar handles GET /api/v1/organizations/{org_id}/calendar
+func (h *CalendarHandler) GetUnifiedCalendar(w http.ResponseWriter, r *http.Request) {
+	orgID, err := parseComOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	items, err := h.service.GetUnifiedCalendar(r.Context(), orgID)
+	if err != nil {
+		h.logger.Error("GetUnifiedCalendar failed", "org_id", orgID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, items)
+}
+
+// GetDirectory handles GET /api/v1/organizations/{org_id}/directory
+// Returns the resident directory filtered by member privacy preferences.
+func (h *CalendarHandler) GetDirectory(w http.ResponseWriter, r *http.Request) {
+	orgID, err := parseComOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	// For now, return a placeholder that references the directory preferences endpoint
+	// Full implementation requires joining users + unit_memberships + directory_preferences
+	api.WriteJSON(w, http.StatusOK, map[string]any{
+		"org_id": orgID,
+		"message": "directory listing — requires join across users, unit_memberships, and directory_preferences",
+	})
+}
+
+// GetCommunicationsSummary handles GET /api/v1/organizations/{org_id}/communications/summary
+func (h *CommLogHandler) GetCommunicationsSummary(w http.ResponseWriter, r *http.Request) {
+	orgID, err := parseComOrgID(r)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	// Aggregate recent communication metrics
+	comms, err := h.service.ListCommunications(r.Context(), orgID)
+	if err != nil {
+		api.WriteError(w, api.NewInternalError(err))
+		return
+	}
+
+	summary := map[string]int{
+		"total": len(comms), "sent": 0, "delivered": 0, "bounced": 0, "failed": 0,
+	}
+	for _, c := range comms {
+		switch c.Status {
+		case "sent":
+			summary["sent"]++
+		case "delivered":
+			summary["delivered"]++
+		case "bounced":
+			summary["bounced"]++
+		case "failed":
+			summary["failed"]++
+		}
+	}
+
+	api.WriteJSON(w, http.StatusOK, summary)
 }

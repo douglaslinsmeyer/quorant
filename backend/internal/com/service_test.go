@@ -57,9 +57,9 @@ func (m *mockAnnouncementRepo) FindByID(_ context.Context, id uuid.UUID) (*com.A
 	return &cp, nil
 }
 
-func (m *mockAnnouncementRepo) ListByOrg(_ context.Context, orgID uuid.UUID) ([]com.Announcement, error) {
+func (m *mockAnnouncementRepo) ListByOrg(_ context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]com.Announcement, bool, error) {
 	if m.findErr != nil {
-		return nil, m.findErr
+		return nil, false, m.findErr
 	}
 	var result []com.Announcement
 	for _, a := range m.items {
@@ -67,7 +67,11 @@ func (m *mockAnnouncementRepo) ListByOrg(_ context.Context, orgID uuid.UUID) ([]
 			result = append(result, *a)
 		}
 	}
-	return result, nil
+	hasMore := limit > 0 && len(result) > limit
+	if hasMore {
+		result = result[:limit]
+	}
+	return result, hasMore, nil
 }
 
 func (m *mockAnnouncementRepo) Update(_ context.Context, a *com.Announcement) (*com.Announcement, error) {

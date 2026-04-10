@@ -146,8 +146,10 @@ func (r *PostgresOrgRepository) FindBySlug(ctx context.Context, slug string) (*O
 
 // ─── ListByUserAccess ────────────────────────────────────────────────────────
 
-// ListByUserAccess returns all non-deleted orgs the given user has active memberships in.
-func (r *PostgresOrgRepository) ListByUserAccess(ctx context.Context, userID uuid.UUID) ([]Organization, error) {
+// ListByUserAccess returns non-deleted orgs the given user has active memberships in,
+// supporting cursor-based pagination ordered by id. Fetch limit+1 rows to determine
+// whether more results exist. afterID is the ID of the last item from the previous page.
+func (r *PostgresOrgRepository) ListByUserAccess(ctx context.Context, userID uuid.UUID, limit int, afterID *uuid.UUID) ([]Organization, bool, error) {
 	const q = `
 		SELECT DISTINCT o.id, o.parent_id, o.type, o.name, o.slug, o.path,
 		                o.address_line1, o.address_line2, o.city, o.state, o.zip,
@@ -159,15 +161,26 @@ func (r *PostgresOrgRepository) ListByUserAccess(ctx context.Context, userID uui
 		  AND m.deleted_at IS NULL
 		  AND m.status = 'active'
 		  AND o.deleted_at IS NULL
-		ORDER BY o.name`
+		  AND ($3::uuid IS NULL OR o.id > $3)
+		ORDER BY o.id
+		LIMIT $2`
 
-	rows, err := r.pool.Query(ctx, q, userID)
+	rows, err := r.pool.Query(ctx, q, userID, limit+1, afterID)
 	if err != nil {
-		return nil, fmt.Errorf("org: ListByUserAccess: %w", err)
+		return nil, false, fmt.Errorf("org: ListByUserAccess: %w", err)
 	}
 	defer rows.Close()
 
-	return collectOrgs(rows, "ListByUserAccess")
+	orgs, err := collectOrgs(rows, "ListByUserAccess")
+	if err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(orgs) > limit
+	if hasMore {
+		orgs = orgs[:limit]
+	}
+	return orgs, hasMore, nil
 }
 
 // ─── Update ──────────────────────────────────────────────────────────────────
