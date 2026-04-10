@@ -32,6 +32,7 @@ type Service interface {
 	RecordPayment(ctx context.Context, orgID uuid.UUID, userID uuid.UUID, req CreatePaymentRequest) (*Payment, error)
 	ListPayments(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Payment, bool, error)
 	GetPayment(ctx context.Context, id uuid.UUID) (*Payment, error)
+	VoidPayment(ctx context.Context, id uuid.UUID, voidedBy uuid.UUID) error
 	AddPaymentMethod(ctx context.Context, orgID uuid.UUID, m *PaymentMethod) (*PaymentMethod, error)
 	ListPaymentMethods(ctx context.Context, userID uuid.UUID) ([]PaymentMethod, error)
 	RemovePaymentMethod(ctx context.Context, id uuid.UUID) error

@@ -224,6 +224,24 @@ func (s *AuditedFinService) RemovePaymentMethod(ctx context.Context, id uuid.UUI
 	return nil
 }
 
+func (s *AuditedFinService) VoidPayment(ctx context.Context, id uuid.UUID, voidedBy uuid.UUID) error {
+	// Fetch before-state for audit payload.
+	payment, _ := s.inner.GetPayment(ctx, id)
+
+	if err := s.inner.VoidPayment(ctx, id, voidedBy); err != nil {
+		return err
+	}
+
+	orgID := middleware.OrgIDFromContext(ctx)
+	var before any = map[string]any{"id": id}
+	if payment != nil {
+		orgID = payment.OrgID
+		before = payment
+	}
+	s.emit(ctx, "payment.voided", "payment", id, orgID, before, nil)
+	return nil
+}
+
 // ── Budgets (mutations) ──────────────────────────────────────────────────────
 
 func (s *AuditedFinService) CreateBudget(ctx context.Context, orgID uuid.UUID, createdBy uuid.UUID, req CreateBudgetRequest) (*Budget, error) {

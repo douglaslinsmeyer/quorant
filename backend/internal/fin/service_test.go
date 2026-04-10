@@ -1997,3 +1997,90 @@ func TestVoidAssessment_AlreadyVoid(t *testing.T) {
 	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, valErr.MsgKey(), "already_void")
 }
+
+// ── VoidPayment Tests ───────────────────────────────────────────────────────
+
+// TestVoidPayment verifies the happy-path void of a completed payment:
+// the payment status becomes void, VoidedBy/VoidedAt are set, and the
+// ledger contains the original charge, payment, and reversal of payment.
+func TestVoidPayment(t *testing.T) {
+	svc, assessmentRepo, paymentRepo, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	unitID := uuid.New()
+	userID := uuid.New()
+	voidedBy := uuid.New()
+
+	// Create an assessment (charge entry).
+	assessReq := fin.CreateAssessmentRequest{
+		UnitID:      unitID,
+		Description: "Monthly HOA fee",
+		AmountCents: 15000,
+		DueDate:     time.Now().AddDate(0, 1, 0),
+	}
+	_, err := svc.CreateAssessment(ctx, orgID, assessReq)
+	require.NoError(t, err)
+	require.Len(t, assessmentRepo.ledger, 1) // charge
+
+	// Record a payment (payment entry).
+	payReq := fin.CreatePaymentRequest{
+		UnitID:      unitID,
+		AmountCents: 15000,
+	}
+	payment, err := svc.RecordPayment(ctx, orgID, userID, payReq)
+	require.NoError(t, err)
+	assert.Equal(t, fin.PaymentStatusCompleted, payment.Status)
+	require.Len(t, assessmentRepo.ledger, 2) // charge + payment
+
+	// Void the payment.
+	err = svc.VoidPayment(ctx, payment.ID, voidedBy)
+	require.NoError(t, err)
+
+	// Verify the payment is now void with metadata set.
+	voided := paymentRepo.payments[0]
+	assert.Equal(t, fin.PaymentStatusVoid, voided.Status)
+	require.NotNil(t, voided.VoidedBy)
+	assert.Equal(t, voidedBy, *voided.VoidedBy)
+	require.NotNil(t, voided.VoidedAt)
+
+	// Verify ledger has 3 entries: charge, payment, reversal of payment.
+	require.Len(t, assessmentRepo.ledger, 3)
+	reversal := assessmentRepo.ledger[2]
+	assert.Equal(t, fin.LedgerEntryTypeReversal, reversal.EntryType)
+	assert.Equal(t, int64(15000), reversal.AmountCents) // positive: reverses negative payment
+	assert.Equal(t, int64(15000), reversal.BalanceCents) // back to charge balance
+}
+
+// TestVoidPayment_AlreadyVoid verifies that voiding a payment that is not
+// in "completed" status returns a validation error.
+func TestVoidPayment_AlreadyVoid(t *testing.T) {
+	svc, _, paymentRepo, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	unitID := uuid.New()
+	userID := uuid.New()
+	voidedBy := uuid.New()
+
+	// Record a payment.
+	payReq := fin.CreatePaymentRequest{
+		UnitID:      unitID,
+		AmountCents: 15000,
+	}
+	payment, err := svc.RecordPayment(ctx, orgID, userID, payReq)
+	require.NoError(t, err)
+
+	// Manually set the payment status to void.
+	for i := range paymentRepo.payments {
+		if paymentRepo.payments[i].ID == payment.ID {
+			paymentRepo.payments[i].Status = fin.PaymentStatusVoid
+		}
+	}
+
+	// Attempt to void again should fail.
+	err = svc.VoidPayment(ctx, payment.ID, voidedBy)
+	require.Error(t, err)
+
+	var valErr *api.ValidationError
+	require.ErrorAs(t, err, &valErr)
+	assert.Contains(t, valErr.MsgKey(), "invalid_void_status")
+}

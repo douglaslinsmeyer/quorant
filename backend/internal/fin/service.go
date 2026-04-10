@@ -546,6 +546,51 @@ func (s *FinService) RemovePaymentMethod(ctx context.Context, id uuid.UUID) erro
 	return s.payments.SoftDeletePaymentMethod(ctx, id)
 }
 
+// VoidPayment reverses the payment ledger entry, reverses any associated GL
+// journal entries, and marks the payment as void.
+func (s *FinService) VoidPayment(ctx context.Context, id uuid.UUID, voidedBy uuid.UUID) error {
+	payment, err := s.GetPayment(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if payment.Status != PaymentStatusCompleted {
+		return api.NewValidationError("fin.payment.invalid_void_status", "status",
+			api.P("payment_id", id.String()),
+			api.P("current_status", string(payment.Status)),
+		)
+	}
+
+	// Find and reverse the payment ledger entry.
+	ledgerEntry, err := s.assessments.FindLedgerEntryByPaymentRef(ctx, id)
+	if err != nil {
+		return err
+	}
+	if ledgerEntry != nil && ledgerEntry.ReversedByEntryID == nil {
+		if _, err := s.ReverseLedgerEntry(ctx, ledgerEntry.ID, voidedBy); err != nil {
+			return err
+		}
+	}
+
+	// Reverse associated GL journal entries.
+	if s.gl != nil {
+		glEntries, glErr := s.gl.FindJournalEntriesBySource(ctx, GLSourceTypePayment, id)
+		if glErr == nil {
+			for _, ge := range glEntries {
+				if ge.ReversedBy == nil && !ge.IsReversal {
+					if _, rErr := s.gl.ReverseJournalEntry(ctx, ge.ID, voidedBy); rErr != nil {
+						s.logger.Error("GL: failed to reverse payment journal entry", "journal_entry_id", ge.ID, "error", rErr)
+					}
+				}
+			}
+		}
+	}
+
+	// Mark the payment as void.
+	now := time.Now()
+	return s.payments.UpdatePaymentVoid(ctx, id, voidedBy, now)
+}
+
 // ── Budgets ───────────────────────────────────────────────────────────────────
 
 // CreateBudget validates the request and creates a new budget in "draft" status.
