@@ -508,14 +508,14 @@ func TestPostgresPolicyResolver_GetPolicy_DelegatesToService(t *testing.T) {
 	assert.JSONEq(t, `{"rate": 10}`, string(result.Config))
 }
 
-func TestPostgresPolicyResolver_QueryPolicy_ReturnsNil(t *testing.T) {
+func TestPostgresPolicyResolver_QueryPolicy_WithoutLLM_ReturnsError(t *testing.T) {
 	svc := newTestPolicyService()
-	resolver := ai.NewPostgresPolicyResolver(svc)
+	resolver := ai.NewPostgresPolicyResolver(svc) // no LLM client
 	ctx := context.Background()
 
-	result, err := resolver.QueryPolicy(ctx, uuid.New(), "What is the late fee?", ai.QueryContext{
+	_, err := resolver.QueryPolicy(ctx, uuid.New(), "What is the late fee?", ai.QueryContext{
 		Module: "fin",
 	})
-	require.NoError(t, err)
-	assert.Nil(t, result, "QueryPolicy is a placeholder and should return nil")
+	assert.Error(t, err, "QueryPolicy without LLM should return an error")
+	assert.Contains(t, err.Error(), "not configured")
 }

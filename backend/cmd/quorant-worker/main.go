@@ -15,6 +15,8 @@ import (
 	"github.com/quorant/quorant/internal/platform/db"
 	"github.com/quorant/quorant/internal/platform/logging"
 	"github.com/quorant/quorant/internal/platform/queue"
+
+	"github.com/quorant/quorant/internal/ai"
 	"github.com/quorant/quorant/internal/platform/scheduler"
 	"github.com/quorant/quorant/internal/webhook"
 )
@@ -69,13 +71,20 @@ func run() error {
 		return fmt.Errorf("creating event consumer: %w", err)
 	}
 
-	// 8. Register handlers (modules will register their handlers here in future phases)
-	// Example: consumer.Register(queue.HandlerRegistration{
-	//     Name:    "com.send_violation_notice",
-	//     Subject: "quorant.violation.ViolationCreated.>",
-	//     Handler: comModule.HandleViolationCreated,
-	// })
-	logger.Info("no event handlers registered yet — handlers will be added in future phases")
+	// 8. Register event handlers
+
+	// Context lake ingestion — embeds domain events into the vector store
+	contextChunkRepo := ai.NewPostgresContextChunkRepository(pool)
+	ingestionEmbedFn := ai.EmbeddingFunc(func(ctx context.Context, text string) ([]float32, error) {
+		// Worker uses the same LLM config as the API server
+		// In production, this would be initialized from config
+		// For now, use StubEmbeddingFunc as fallback when LLM is not configured
+		return ai.StubEmbeddingFunc(ctx, text)
+	})
+	ingestionWorker := ai.NewIngestionWorker(contextChunkRepo, ingestionEmbedFn, logger)
+	ingestionWorker.RegisterHandlers(consumer)
+
+	logger.Info("registered event handlers", "count", 5)
 
 	// 9. Start consumer
 	if err := consumer.Start(ctx); err != nil {
