@@ -444,7 +444,7 @@ func (s *FinService) ProposeBudget(ctx context.Context, id uuid.UUID, proposedBy
 		return nil, err
 	}
 	if b.Status != BudgetStatusDraft {
-		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", "draft"), api.P("action", "propose"), api.P("current", string(b.Status)))
+		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", string(BudgetStatusDraft)), api.P("action", "propose"), api.P("current", string(b.Status)))
 	}
 	now := time.Now()
 	b.Status = BudgetStatusProposed
@@ -460,7 +460,7 @@ func (s *FinService) ApproveBudget(ctx context.Context, id uuid.UUID, approvedBy
 		return nil, err
 	}
 	if b.Status != BudgetStatusProposed {
-		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", "proposed"), api.P("action", "approve"), api.P("current", string(b.Status)))
+		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", string(BudgetStatusProposed)), api.P("action", "approve"), api.P("current", string(b.Status)))
 	}
 	now := time.Now()
 	b.Status = BudgetStatusApproved
@@ -583,7 +583,7 @@ func (s *FinService) ApproveExpense(ctx context.Context, id uuid.UUID, approvedB
 		return nil, err
 	}
 	if e.Status != ExpenseStatusPending {
-		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", "pending"), api.P("action", "approve"), api.P("current", string(e.Status)))
+		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", string(ExpenseStatusPending)), api.P("action", "approve"), api.P("current", string(e.Status)))
 	}
 	now := time.Now()
 	e.Status = ExpenseStatusApproved
@@ -599,7 +599,7 @@ func (s *FinService) PayExpense(ctx context.Context, id uuid.UUID) (*Expense, er
 		return nil, err
 	}
 	if e.Status != ExpenseStatusApproved {
-		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", "approved"), api.P("action", "pay"), api.P("current", string(e.Status)))
+		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", string(ExpenseStatusApproved)), api.P("action", "pay"), api.P("current", string(e.Status)))
 	}
 	now := time.Now()
 	e.Status = ExpenseStatusPaid
