@@ -24,7 +24,7 @@ func NewPostgresGLRepository(pool *pgxpool.Pool) *PostgresGLRepository {
 
 // WithTx returns a new PostgresGLRepository scoped to the given transaction,
 // enabling participation in a caller-managed transaction.
-func (r *PostgresGLRepository) WithTx(tx pgx.Tx) GLRepository {
+func (r *PostgresGLRepository) WithTx(tx pgx.Tx) *PostgresGLRepository {
 	return &PostgresGLRepository{db: tx}
 }
 

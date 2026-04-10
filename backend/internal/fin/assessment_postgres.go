@@ -25,7 +25,7 @@ func NewPostgresAssessmentRepository(pool *pgxpool.Pool) *PostgresAssessmentRepo
 
 // WithTx returns a new PostgresAssessmentRepository scoped to the given
 // transaction, enabling participation in a caller-managed transaction.
-func (r *PostgresAssessmentRepository) WithTx(tx pgx.Tx) AssessmentRepository {
+func (r *PostgresAssessmentRepository) WithTx(tx pgx.Tx) *PostgresAssessmentRepository {
 	return &PostgresAssessmentRepository{db: tx}
 }
 
