@@ -48,7 +48,7 @@ func (s *GLService) GetAccount(ctx context.Context, id uuid.UUID) (*GLAccount, e
 		return nil, err
 	}
 	if a == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("gl account %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "gl_account"), api.P("id", id.String()))
 	}
 	return a, nil
 }
@@ -177,7 +177,7 @@ func (s *GLService) GetJournalEntry(ctx context.Context, id uuid.UUID) (*GLJourn
 		return nil, err
 	}
 	if entry == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("journal entry %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "journal_entry"), api.P("id", id.String()))
 	}
 	return entry, nil
 }

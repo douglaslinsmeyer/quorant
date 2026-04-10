@@ -268,36 +268,36 @@ type CreateGLAccountRequest struct {
 // falls within the correct range for the given account_type.
 func (r CreateGLAccountRequest) Validate() error {
 	if r.Name == "" {
-		return api.NewValidationError("name is required", "name")
+		return api.NewValidationError("validation.required", "name", api.P("field", "name"))
 	}
 	if r.AccountNumber <= 0 {
-		return api.NewValidationError("account_number must be greater than zero", "account_number")
+		return api.NewValidationError("validation.constraint", "account_number", api.P("field", "account_number"), api.P("constraint", "greater than zero"))
 	}
 	switch r.AccountType {
 	case "asset":
 		if r.AccountNumber < 1000 || r.AccountNumber > 1999 {
-			return api.NewValidationError("asset account_number must be between 1000 and 1999", "account_number")
+			return api.NewValidationError("validation.constraint", "account_number", api.P("field", "account_number"), api.P("constraint", "between 1000 and 1999 for asset accounts"))
 		}
 	case "liability":
 		if r.AccountNumber < 2000 || r.AccountNumber > 2999 {
-			return api.NewValidationError("liability account_number must be between 2000 and 2999", "account_number")
+			return api.NewValidationError("validation.constraint", "account_number", api.P("field", "account_number"), api.P("constraint", "between 2000 and 2999 for liability accounts"))
 		}
 	case "equity":
 		if r.AccountNumber < 3000 || r.AccountNumber > 3999 {
-			return api.NewValidationError("equity account_number must be between 3000 and 3999", "account_number")
+			return api.NewValidationError("validation.constraint", "account_number", api.P("field", "account_number"), api.P("constraint", "between 3000 and 3999 for equity accounts"))
 		}
 	case "revenue":
 		if r.AccountNumber < 4000 || r.AccountNumber > 4999 {
-			return api.NewValidationError("revenue account_number must be between 4000 and 4999", "account_number")
+			return api.NewValidationError("validation.constraint", "account_number", api.P("field", "account_number"), api.P("constraint", "between 4000 and 4999 for revenue accounts"))
 		}
 	case "expense":
 		if r.AccountNumber < 5000 || r.AccountNumber > 9999 {
-			return api.NewValidationError("expense account_number must be between 5000 and 9999", "account_number")
+			return api.NewValidationError("validation.constraint", "account_number", api.P("field", "account_number"), api.P("constraint", "between 5000 and 9999 for expense accounts"))
 		}
 	case "":
-		return api.NewValidationError("account_type is required", "account_type")
+		return api.NewValidationError("validation.required", "account_type", api.P("field", "account_type"))
 	default:
-		return api.NewValidationError("account_type must be one of: asset, liability, equity, revenue, expense", "account_type")
+		return api.NewValidationError("validation.one_of", "account_type", api.P("field", "account_type"), api.P("values", "asset, liability, equity, revenue, expense"))
 	}
 	return nil
 }
@@ -330,35 +330,35 @@ type CreateJournalEntryRequest struct {
 // and each line has exactly one of debit_cents or credit_cents set.
 func (r CreateJournalEntryRequest) Validate() error {
 	if r.Memo == "" {
-		return api.NewValidationError("memo is required", "memo")
+		return api.NewValidationError("validation.required", "memo", api.P("field", "memo"))
 	}
 	if r.EntryDate.IsZero() {
-		return api.NewValidationError("entry_date is required", "entry_date")
+		return api.NewValidationError("validation.required", "entry_date", api.P("field", "entry_date"))
 	}
 	if len(r.Lines) < 2 {
-		return api.NewValidationError("at least 2 journal lines are required", "lines")
+		return api.NewValidationError("validation.constraint", "lines", api.P("field", "lines"), api.P("constraint", "at least 2 entries"))
 	}
 
 	var totalDebits, totalCredits int64
 	for i, line := range r.Lines {
 		if line.AccountID == (uuid.UUID{}) {
-			return api.NewValidationError("account_id is required on every line", "lines")
+			return api.NewValidationError("validation.required", "lines.account_id", api.P("field", "lines.account_id"))
 		}
 		if line.DebitCents < 0 || line.CreditCents < 0 {
-			return api.NewValidationError("debit_cents and credit_cents must not be negative", "lines")
+			return api.NewValidationError("validation.constraint", "lines", api.P("field", "lines.debit_cents, lines.credit_cents"), api.P("constraint", "must not be negative"))
 		}
 		// Exactly one of debit_cents or credit_cents must be > 0.
 		hasDebit := line.DebitCents > 0
 		hasCredit := line.CreditCents > 0
 		if hasDebit == hasCredit {
 			_ = i // suppress unused hint
-			return api.NewValidationError("each line must have exactly one of debit_cents or credit_cents greater than zero", "lines")
+			return api.NewValidationError("validation.constraint", "lines", api.P("field", "lines.debit_cents, lines.credit_cents"), api.P("constraint", "exactly one of debit_cents or credit_cents must be greater than zero"))
 		}
 		totalDebits += line.DebitCents
 		totalCredits += line.CreditCents
 	}
 	if totalDebits != totalCredits {
-		return api.NewValidationError("total debits must equal total credits", "lines")
+		return api.NewValidationError("validation.constraint", "lines", api.P("field", "lines"), api.P("constraint", "total debits must equal total credits"))
 	}
 	return nil
 }
