@@ -99,6 +99,21 @@ type Payment struct {
 	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
+// PaymentAllocation records how a specific portion of a payment was applied
+// to a specific charge. Links payments to assessments, late fees, etc.
+type PaymentAllocation struct {
+	ID             uuid.UUID  `json:"id"`
+	PaymentID      uuid.UUID  `json:"payment_id"`
+	ChargeType     string     `json:"charge_type"`
+	ChargeID       uuid.UUID  `json:"charge_id"`
+	AllocatedCents int64      `json:"allocated_cents"`
+	ResolutionID   uuid.UUID  `json:"resolution_id"`
+	EstoppelID     *uuid.UUID `json:"estoppel_id,omitempty"`
+	ReversedAt     *time.Time `json:"reversed_at,omitempty"`
+	ReversedByID   *uuid.UUID `json:"reversed_by_id,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+}
+
 // BudgetCategory organizes budget line items.
 type BudgetCategory struct {
 	ID           uuid.UUID  `json:"id"`
