@@ -302,6 +302,7 @@ func run() error {
 	propertyProvider := org.NewEstoppelPropertyAdapter(orgService)
 	narrativeGen := estoppel.NewNoopNarrativeGenerator()
 	pdfGen := estoppel.NewMarotoGenerator()
+	estoppelDocAdapter := doc.NewEstoppelDocumentAdapter(docService)
 	estoppelService := estoppel.NewEstoppelService(
 		estoppelRepo,
 		financialProvider,
@@ -309,6 +310,8 @@ func run() error {
 		propertyProvider,
 		narrativeGen,
 		pdfGen,
+		estoppelDocAdapter,
+		estoppelDocAdapter,
 		auditor,
 		outboxPublisher,
 		logger,

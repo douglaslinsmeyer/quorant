@@ -14,22 +14,26 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+
 // EstoppelService orchestrates all business logic for the Estoppel module:
 // request intake, data aggregation, manager review, PDF generation, and delivery.
 type EstoppelService struct {
-	repo       EstoppelRepository
-	financial  FinancialDataProvider
-	compliance ComplianceDataProvider
-	property   PropertyDataProvider
-	narrative  NarrativeGenerator
-	generator  CertificateGenerator
-	auditor    audit.Auditor
-	publisher  queue.Publisher
-	logger     *slog.Logger
+	repo         EstoppelRepository
+	financial    FinancialDataProvider
+	compliance   ComplianceDataProvider
+	property     PropertyDataProvider
+	narrative    NarrativeGenerator
+	generator    CertificateGenerator
+	docUploader  DocumentUploader
+	docDownloader DocumentDownloader
+	auditor      audit.Auditor
+	publisher    queue.Publisher
+	logger       *slog.Logger
 }
 
 // NewEstoppelService creates a new EstoppelService wired to all required
-// dependencies.
+// dependencies. docUploader and docDownloader may be nil; when nil, PDF bytes
+// are generated but not persisted to document storage.
 func NewEstoppelService(
 	repo EstoppelRepository,
 	financial FinancialDataProvider,
@@ -37,20 +41,24 @@ func NewEstoppelService(
 	property PropertyDataProvider,
 	narrative NarrativeGenerator,
 	generator CertificateGenerator,
+	docUploader DocumentUploader,
+	docDownloader DocumentDownloader,
 	auditor audit.Auditor,
 	publisher queue.Publisher,
 	logger *slog.Logger,
 ) *EstoppelService {
 	return &EstoppelService{
-		repo:       repo,
-		financial:  financial,
-		compliance: compliance,
-		property:   property,
-		narrative:  narrative,
-		generator:  generator,
-		auditor:    auditor,
-		publisher:  publisher,
-		logger:     logger,
+		repo:          repo,
+		financial:     financial,
+		compliance:    compliance,
+		property:      property,
+		narrative:     narrative,
+		generator:     generator,
+		docUploader:   docUploader,
+		docDownloader: docDownloader,
+		auditor:       auditor,
+		publisher:     publisher,
+		logger:        logger,
 	}
 }
 
@@ -361,7 +369,18 @@ func (s *EstoppelService) GenerateCertificate(
 	if err != nil {
 		return nil, fmt.Errorf("generating PDF: %w", err)
 	}
-	_ = pdfBytes // stored externally; for now just validate it was produced
+
+	// Upload PDF to document storage when an uploader is wired in.
+	var docID *uuid.UUID
+	if s.docUploader != nil {
+		fileName := fmt.Sprintf("estoppel-%s.pdf", requestID)
+		title := fmt.Sprintf("Estoppel Certificate - %s", req.OwnerName)
+		id, uploadErr := s.docUploader.UploadFromBytes(ctx, req.OrgID, title, fileName, "application/pdf", pdfBytes, signedBy)
+		if uploadErr != nil {
+			return nil, fmt.Errorf("uploading PDF: %w", uploadErr)
+		}
+		docID = &id
+	}
 
 	// Freeze the data snapshot.
 	snapshotJSON, err := json.Marshal(data)
@@ -390,7 +409,7 @@ func (s *EstoppelService) GenerateCertificate(
 		RequestID:         requestID,
 		OrgID:             req.OrgID,
 		UnitID:            req.UnitID,
-		// DocumentID is nil until document storage is wired (column is nullable).
+		DocumentID:        docID,
 		Jurisdiction:      data.Property.OrgState,
 		EffectiveDate:     now,
 		ExpiresAt:         expiresAt,

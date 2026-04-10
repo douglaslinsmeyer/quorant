@@ -181,6 +181,8 @@ func newTestService() *estoppel.EstoppelService {
 		},
 		estoppel.NewNoopNarrativeGenerator(),
 		&mockCertificateGenerator{},
+		nil, // docUploader — not needed for most tests
+		nil, // docDownloader — not needed for most tests
 		audit.NewNoopAuditor(),
 		queue.NewInMemoryPublisher(),
 		logger,
@@ -207,6 +209,59 @@ func validCreateDTO() estoppel.CreateEstoppelRequestDTO {
 		OwnerName:       "Bob Jones",
 		RushRequested:   false,
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Mock DocumentUploader
+// ---------------------------------------------------------------------------
+
+type mockDocUploader struct {
+	mu         sync.Mutex
+	calls      []mockDocUploaderCall
+	returnID   uuid.UUID
+	returnErr  error
+}
+
+type mockDocUploaderCall struct {
+	OrgID       uuid.UUID
+	Title       string
+	FileName    string
+	ContentType string
+	DataLen     int
+	UploadedBy  uuid.UUID
+}
+
+func newMockDocUploader() *mockDocUploader {
+	return &mockDocUploader{returnID: uuid.New()}
+}
+
+func (m *mockDocUploader) UploadFromBytes(_ context.Context, orgID uuid.UUID, title, fileName, contentType string, data []byte, uploadedBy uuid.UUID) (uuid.UUID, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.calls = append(m.calls, mockDocUploaderCall{
+		OrgID:       orgID,
+		Title:       title,
+		FileName:    fileName,
+		ContentType: contentType,
+		DataLen:     len(data),
+		UploadedBy:  uploadedBy,
+	})
+	if m.returnErr != nil {
+		return uuid.Nil, m.returnErr
+	}
+	return m.returnID, nil
+}
+
+func (m *mockDocUploader) CallCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.calls)
+}
+
+func (m *mockDocUploader) LastCall() mockDocUploaderCall {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.calls[len(m.calls)-1]
 }
 
 // ---------------------------------------------------------------------------
@@ -284,6 +339,8 @@ func TestCreateRequest_WithDelinquency(t *testing.T) {
 		&mockPropertyProvider{snapshot: &estoppel.PropertySnapshot{UnitNumber: "1A"}},
 		estoppel.NewNoopNarrativeGenerator(),
 		&mockCertificateGenerator{},
+		nil, // docUploader
+		nil, // docDownloader
 		audit.NewNoopAuditor(),
 		queue.NewInMemoryPublisher(),
 		logger,
@@ -341,6 +398,8 @@ func TestApproveRequest_Success(t *testing.T) {
 		&mockPropertyProvider{snapshot: &estoppel.PropertySnapshot{UnitNumber: "1A"}},
 		estoppel.NewNoopNarrativeGenerator(),
 		&mockCertificateGenerator{},
+		nil, // docUploader
+		nil, // docDownloader
 		audit.NewNoopAuditor(),
 		publisher,
 		logger,
@@ -431,4 +490,61 @@ func TestListRequests_Empty(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, hasMore)
 	assert.Empty(t, requests)
+}
+
+func TestGenerateCertificate_UploadsDocument(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	repo := newMockRepo()
+	uploader := newMockDocUploader()
+
+	svc := estoppel.NewEstoppelService(
+		repo,
+		&mockFinancialProvider{snapshot: &estoppel.FinancialSnapshot{
+			RegularAssessmentCents: 25000,
+			AssessmentFrequency:    "monthly",
+		}},
+		&mockComplianceProvider{snapshot: &estoppel.ComplianceSnapshot{}},
+		&mockPropertyProvider{snapshot: &estoppel.PropertySnapshot{UnitNumber: "1A", Address: "1 Test Ave"}},
+		estoppel.NewNoopNarrativeGenerator(),
+		&mockCertificateGenerator{},
+		uploader,
+		nil, // docDownloader
+		audit.NewNoopAuditor(),
+		queue.NewInMemoryPublisher(),
+		logger,
+	)
+
+	orgID := uuid.New()
+	signedBy := uuid.New()
+
+	// Create an estoppel request and walk it to the "approved" state.
+	created, err := svc.CreateRequest(context.Background(), orgID, validCreateDTO(), defaultRules(), uuid.New())
+	require.NoError(t, err)
+	_, err = repo.UpdateRequestStatus(context.Background(), created.ID, "data_aggregation")
+	require.NoError(t, err)
+	_, err = repo.UpdateRequestStatus(context.Background(), created.ID, "manager_review")
+	require.NoError(t, err)
+	_, err = repo.UpdateRequestStatus(context.Background(), created.ID, "approved")
+	require.NoError(t, err)
+
+	data := newTestAggregatedData()
+	rules := defaultRules()
+
+	cert, err := svc.GenerateCertificate(context.Background(), created.ID, data, rules, signedBy, "HOA Manager")
+
+	require.NoError(t, err)
+	require.NotNil(t, cert)
+
+	// The certificate must reference the uploaded document ID.
+	require.NotNil(t, cert.DocumentID, "expected DocumentID to be set after upload")
+	assert.Equal(t, uploader.returnID, *cert.DocumentID)
+
+	// The uploader must have been called exactly once with correct metadata.
+	assert.Equal(t, 1, uploader.CallCount())
+	call := uploader.LastCall()
+	assert.Equal(t, orgID, call.OrgID)
+	assert.Equal(t, "application/pdf", call.ContentType)
+	assert.Equal(t, signedBy, call.UploadedBy)
+	assert.Contains(t, call.FileName, created.ID.String())
+	assert.Greater(t, call.DataLen, 0)
 }

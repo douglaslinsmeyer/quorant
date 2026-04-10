@@ -32,6 +32,8 @@ func newTestHandler() (*estoppel.Handler, *mockRepo) {
 		&mockPropertyProvider{snapshot: &estoppel.PropertySnapshot{UnitNumber: "1A"}},
 		estoppel.NewNoopNarrativeGenerator(),
 		&mockCertificateGenerator{},
+		nil, // docUploader
+		nil, // docDownloader
 		audit.NewNoopAuditor(),
 		queue.NewInMemoryPublisher(),
 		logger,
