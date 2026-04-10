@@ -556,7 +556,7 @@ func (r *PostgresAssessmentRepository) FindLedgerEntryByID(ctx context.Context, 
 		FROM ledger_entries
 		WHERE id = $1`
 
-	row := r.pool.QueryRow(ctx, q, id)
+	row := r.db.QueryRow(ctx, q, id)
 	result, err := scanLedgerEntry(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -577,7 +577,7 @@ func (r *PostgresAssessmentRepository) FindLedgerEntriesByAssessment(ctx context
 		WHERE assessment_id = $1
 		ORDER BY effective_date ASC, created_at ASC`
 
-	rows, err := r.pool.Query(ctx, q, assessmentID)
+	rows, err := r.db.Query(ctx, q, assessmentID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: FindLedgerEntriesByAssessment: %w", err)
 	}
@@ -597,7 +597,7 @@ func (r *PostgresAssessmentRepository) FindLedgerEntryByPaymentRef(ctx context.C
 		WHERE reference_type = 'payment' AND reference_id = $1
 		LIMIT 1`
 
-	row := r.pool.QueryRow(ctx, q, paymentID)
+	row := r.db.QueryRow(ctx, q, paymentID)
 	result, err := scanLedgerEntry(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -615,7 +615,7 @@ func (r *PostgresAssessmentRepository) UpdateLedgerEntryReversedBy(ctx context.C
 		SET reversed_by_entry_id = $1
 		WHERE id = $2`
 
-	_, err := r.pool.Exec(ctx, q, reversalEntryID, entryID)
+	_, err := r.db.Exec(ctx, q, reversalEntryID, entryID)
 	if err != nil {
 		return fmt.Errorf("fin: UpdateLedgerEntryReversedBy: %w", err)
 	}
@@ -632,7 +632,7 @@ func (r *PostgresAssessmentRepository) UpdateAssessmentStatus(ctx context.Contex
 		    updated_at = now()
 		WHERE id = $4`
 
-	_, err := r.pool.Exec(ctx, q, status, voidedBy, voidedAt, id)
+	_, err := r.db.Exec(ctx, q, status, voidedBy, voidedAt, id)
 	if err != nil {
 		return fmt.Errorf("fin: UpdateAssessmentStatus: %w", err)
 	}

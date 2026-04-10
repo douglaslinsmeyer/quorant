@@ -166,7 +166,7 @@ func (r *PostgresPaymentRepository) UpdatePaymentVoid(ctx context.Context, id uu
 		    updated_at = now()
 		WHERE id = $3`
 
-	_, err := r.pool.Exec(ctx, q, voidedBy, voidedAt, id)
+	_, err := r.db.Exec(ctx, q, voidedBy, voidedAt, id)
 	if err != nil {
 		return fmt.Errorf("fin: UpdatePaymentVoid: %w", err)
 	}
@@ -236,6 +236,64 @@ func (r *PostgresPaymentRepository) SoftDeletePaymentMethod(ctx context.Context,
 		return fmt.Errorf("fin: SoftDeletePaymentMethod: %w", err)
 	}
 	return nil
+}
+
+// ─── Payment Allocations ──────────────────────────────────────────────────────
+
+func (r *PostgresPaymentRepository) CreatePaymentAllocation(ctx context.Context, a *PaymentAllocation) (*PaymentAllocation, error) {
+	const q = `
+		INSERT INTO payment_allocations (
+			payment_id, charge_type, charge_id, allocated_cents, resolution_id,
+			estoppel_id, reversed_at, reversed_by_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id, payment_id, charge_type, charge_id, allocated_cents, resolution_id,
+		          estoppel_id, reversed_at, reversed_by_id, created_at`
+
+	var out PaymentAllocation
+	err := r.db.QueryRow(ctx, q,
+		a.PaymentID, a.ChargeType, a.ChargeID, a.AllocatedCents,
+		a.ResolutionID, a.EstoppelID, a.ReversedAt, a.ReversedByID,
+	).Scan(
+		&out.ID, &out.PaymentID, &out.ChargeType, &out.ChargeID,
+		&out.AllocatedCents, &out.ResolutionID, &out.EstoppelID,
+		&out.ReversedAt, &out.ReversedByID, &out.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("fin: CreatePaymentAllocation: %w", err)
+	}
+	return &out, nil
+}
+
+func (r *PostgresPaymentRepository) ListAllocationsByPayment(ctx context.Context, paymentID uuid.UUID) ([]PaymentAllocation, error) {
+	const q = `
+		SELECT id, payment_id, charge_type, charge_id, allocated_cents, resolution_id,
+		       estoppel_id, reversed_at, reversed_by_id, created_at
+		FROM payment_allocations
+		WHERE payment_id = $1
+		ORDER BY created_at`
+
+	rows, err := r.db.Query(ctx, q, paymentID)
+	if err != nil {
+		return nil, fmt.Errorf("fin: ListAllocationsByPayment: %w", err)
+	}
+	defer rows.Close()
+
+	var results []PaymentAllocation
+	for rows.Next() {
+		var a PaymentAllocation
+		if err := rows.Scan(
+			&a.ID, &a.PaymentID, &a.ChargeType, &a.ChargeID,
+			&a.AllocatedCents, &a.ResolutionID, &a.EstoppelID,
+			&a.ReversedAt, &a.ReversedByID, &a.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, a)
+	}
+	if results == nil {
+		return []PaymentAllocation{}, nil
+	}
+	return results, nil
 }
 
 // ─── Scan helpers ─────────────────────────────────────────────────────────────

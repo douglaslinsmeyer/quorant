@@ -309,7 +309,7 @@ func (r *PostgresGLRepository) FindJournalEntriesBySource(ctx context.Context, s
 		WHERE source_type = $1 AND source_id = $2
 		ORDER BY entry_number ASC`
 
-	rows, err := r.pool.Query(ctx, headerQ, sourceType, sourceID)
+	rows, err := r.db.Query(ctx, headerQ, sourceType, sourceID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: FindJournalEntriesBySource: %w", err)
 	}
@@ -327,7 +327,7 @@ func (r *PostgresGLRepository) FindJournalEntriesBySource(ctx context.Context, s
 		ORDER BY id`
 
 	for i := range entries {
-		lineRows, err := r.pool.Query(ctx, linesQ, entries[i].ID)
+		lineRows, err := r.db.Query(ctx, linesQ, entries[i].ID)
 		if err != nil {
 			return nil, fmt.Errorf("fin: FindJournalEntriesBySource lines: %w", err)
 		}
@@ -349,7 +349,7 @@ func (r *PostgresGLRepository) UpdateJournalEntryReversedBy(ctx context.Context,
 		SET reversed_by = $1
 		WHERE id = $2`
 
-	_, err := r.pool.Exec(ctx, q, reversalID, entryID)
+	_, err := r.db.Exec(ctx, q, reversalID, entryID)
 	if err != nil {
 		return fmt.Errorf("fin: UpdateJournalEntryReversedBy: %w", err)
 	}
