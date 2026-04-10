@@ -206,3 +206,31 @@ func TestGaapEngine_JournalLines_FundTransfer_MissingMetadata(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "from_fund_type")
 }
+
+func TestGaapEngine_ChartOfAccounts(t *testing.T) {
+	engine := fin.NewGaapEngine()
+	coa := engine.ChartOfAccounts()
+
+	require.Len(t, coa, 26)
+
+	headers := 0
+	for _, a := range coa {
+		if a.IsHeader {
+			headers++
+		}
+	}
+	assert.Equal(t, 5, headers)
+
+	numbers := make(map[int]bool)
+	for _, a := range coa {
+		numbers[a.Number] = true
+	}
+	assert.True(t, numbers[1010], "Cash-Operating")
+	assert.True(t, numbers[1020], "Cash-Reserve")
+	assert.True(t, numbers[1100], "AR-Assessments")
+	assert.True(t, numbers[2100], "AP")
+	assert.True(t, numbers[3100], "Interfund Transfer Out")
+	assert.True(t, numbers[3110], "Interfund Transfer In")
+	assert.True(t, numbers[4010], "Assessment Revenue-Operating")
+	assert.True(t, numbers[5010], "Management Fee")
+}

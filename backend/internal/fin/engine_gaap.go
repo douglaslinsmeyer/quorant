@@ -135,4 +135,42 @@ func (e *GaapEngine) fundTransferLines(ctx context.Context, gl *GLService, tx Fi
 	}, nil
 }
 
-var gaapChartOfAccounts = []GLAccountSeed{}
+var gaapChartOfAccounts = []GLAccountSeed{
+	// Headers
+	{1000, "Assets", GLAccountTypeAsset, true, true, "", 0},
+	{2000, "Liabilities", GLAccountTypeLiability, true, true, "", 0},
+	{3000, "Fund Balances", GLAccountTypeEquity, true, true, "", 0},
+	{4000, "Revenue", GLAccountTypeRevenue, true, true, "", 0},
+	{5000, "Operating Expenses", GLAccountTypeExpense, true, true, "", 0},
+
+	// Under 1000 Assets
+	{1010, "Cash-Operating", GLAccountTypeAsset, false, true, "operating", 1000},
+	{1020, "Cash-Reserve", GLAccountTypeAsset, false, true, "reserve", 1000},
+	{1100, "AR-Assessments", GLAccountTypeAsset, false, true, "operating", 1000},
+	{1110, "AR-Other", GLAccountTypeAsset, false, false, "operating", 1000},
+	{1200, "Prepaid Expenses", GLAccountTypeAsset, false, false, "operating", 1000},
+
+	// Under 2000 Liabilities
+	{2100, "AP", GLAccountTypeLiability, false, true, "operating", 2000},
+	{2200, "Prepaid Assessments", GLAccountTypeLiability, false, false, "operating", 2000},
+
+	// Under 3000 Fund Balances
+	{3010, "Operating Fund Balance", GLAccountTypeEquity, false, true, "operating", 3000},
+	{3020, "Reserve Fund Balance", GLAccountTypeEquity, false, true, "reserve", 3000},
+	{3100, "Interfund Transfer Out", GLAccountTypeEquity, false, true, "", 3000},
+	{3110, "Interfund Transfer In", GLAccountTypeEquity, false, true, "", 3000},
+
+	// Under 4000 Revenue
+	{4010, "Assessment Revenue-Operating", GLAccountTypeRevenue, false, true, "operating", 4000},
+	{4020, "Assessment Revenue-Reserve", GLAccountTypeRevenue, false, true, "reserve", 4000},
+	{4100, "Late Fee Revenue", GLAccountTypeRevenue, false, true, "operating", 4000},
+	{4200, "Interest Income", GLAccountTypeRevenue, false, false, "", 4000},
+
+	// Under 5000 Operating Expenses
+	{5010, "Management Fee", GLAccountTypeExpense, false, false, "operating", 5000},
+	{5020, "Insurance", GLAccountTypeExpense, false, false, "operating", 5000},
+	{5030, "Utilities", GLAccountTypeExpense, false, false, "operating", 5000},
+	{5040, "Landscaping", GLAccountTypeExpense, false, false, "operating", 5000},
+	{5050, "Maintenance and Repairs", GLAccountTypeExpense, false, false, "operating", 5000},
+	{5060, "Professional Services", GLAccountTypeExpense, false, false, "operating", 5000},
+}
