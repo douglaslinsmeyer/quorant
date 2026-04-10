@@ -25,6 +25,8 @@ type mockGLRepo struct {
 	nextEntryNum int
 	// hasPostedLinesOverride allows tests to force HasPostedLines to return true.
 	hasPostedLinesOverride map[uuid.UUID]bool
+	// postErr, when set, causes PostJournalEntry to return this error.
+	postErr error
 }
 
 func newMockGLRepo() *mockGLRepo {
@@ -99,7 +101,18 @@ func (m *mockGLRepo) SoftDeleteAccount(_ context.Context, id uuid.UUID) error {
 	return nil
 }
 
+func (m *mockGLRepo) SetPostError(err error) { m.postErr = err }
+
+func (m *mockGLRepo) SetAccounts(accounts ...*fin.GLAccount) {
+	for _, a := range accounts {
+		m.accounts[a.ID] = a
+	}
+}
+
 func (m *mockGLRepo) PostJournalEntry(_ context.Context, entry *fin.GLJournalEntry) (*fin.GLJournalEntry, error) {
+	if m.postErr != nil {
+		return nil, m.postErr
+	}
 	entry.ID = uuid.New()
 	entry.EntryNumber = m.nextEntryNum
 	m.nextEntryNum++

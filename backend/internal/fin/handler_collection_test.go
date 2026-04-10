@@ -43,6 +43,7 @@ func setupCollectionTestServer(t *testing.T) *collectionTestServer {
 		ai.NewNoopPolicyResolver(),
 		ai.NewNoopComplianceResolver(),
 		logger,
+		nil,
 	)
 	collectionHandler := fin.NewCollectionHandler(service, logger)
 

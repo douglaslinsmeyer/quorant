@@ -45,6 +45,7 @@ func setupBudgetTestServer(t *testing.T) *budgetTestServer {
 		ai.NewNoopPolicyResolver(),
 		ai.NewNoopComplianceResolver(),
 		logger,
+		nil,
 	)
 	budgetHandler := fin.NewBudgetHandler(service, logger)
 

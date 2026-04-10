@@ -2,6 +2,7 @@ package fin_test
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"testing"
@@ -723,7 +724,7 @@ func newTestService() (*fin.FinService, *mockAssessmentRepo, *mockPaymentRepo, *
 	funds := &mockFundRepo{}
 	collections := &mockCollectionRepo{}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger, nil)
 	return svc, assessments, payments, budgets, funds, collections
 }
 
@@ -1079,7 +1080,7 @@ func TestCreateAssessment_PostsJournalEntry(t *testing.T) {
 	glRepo.accounts[arAccount.ID] = arAccount
 	glRepo.accounts[revenueAccount.ID] = revenueAccount
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger, nil)
 
 	unitID := uuid.New()
 	req := fin.CreateAssessmentRequest{
@@ -1106,6 +1107,45 @@ func TestCreateAssessment_PostsJournalEntry(t *testing.T) {
 		assert.Equal(t, int64(0), entry.Lines[1].DebitCents)
 		assert.Equal(t, int64(15000), entry.Lines[1].CreditCents)
 	}
+}
+
+// TestCreateAssessment_GLFailureReturnsError verifies that a GL posting error
+// now propagates to the caller instead of being silently swallowed.
+func TestCreateAssessment_GLFailureReturnsError(t *testing.T) {
+	assessments := &mockAssessmentRepo{}
+	payments := &mockPaymentRepo{}
+	budgets := &mockBudgetRepo{}
+	funds := &mockFundRepo{}
+	collections := &mockCollectionRepo{}
+
+	glRepo := newMockGLRepo()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	glService := fin.NewGLService(glRepo, audit.NewNoopAuditor(), logger)
+
+	orgID := uuid.New()
+
+	arAccount := &fin.GLAccount{
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 1100, Name: "AR",
+		AccountType: fin.GLAccountTypeAsset, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	revenueAccount := &fin.GLAccount{
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 4010, Name: "Revenue",
+		AccountType: fin.GLAccountTypeRevenue, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	glRepo.SetAccounts(arAccount, revenueAccount)
+	glRepo.SetPostError(fmt.Errorf("simulated GL failure"))
+
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger, nil)
+
+	_, err := svc.CreateAssessment(context.Background(), orgID, fin.CreateAssessmentRequest{
+		UnitID:      uuid.New(),
+		Description: "Test assessment",
+		AmountCents: 10000,
+		DueDate:     time.Now().Add(30 * 24 * time.Hour),
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "simulated GL failure")
 }
 
 // TestRecordPayment_PostsJournalEntry verifies that recording a payment
@@ -1135,7 +1175,7 @@ func TestRecordPayment_PostsJournalEntry(t *testing.T) {
 	glRepo.accounts[cashAccount.ID] = cashAccount
 	glRepo.accounts[arAccount.ID] = arAccount
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger, nil)
 
 	unitID := uuid.New()
 	userID := uuid.New()

@@ -46,6 +46,7 @@ func setupAssessmentTestServer(t *testing.T) *assessmentTestServer {
 		ai.NewNoopPolicyResolver(),
 		ai.NewNoopComplianceResolver(),
 		logger,
+		nil,
 	)
 	assessHandler := fin.NewAssessmentHandler(service, logger)
 
