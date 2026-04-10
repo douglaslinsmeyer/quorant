@@ -650,7 +650,9 @@ func (s *FinService) GetFundTransactions(ctx context.Context, fundID uuid.UUID) 
 	return s.funds.ListTransactionsByFund(ctx, fundID)
 }
 
-// CreateFundTransfer validates the request and creates a fund transfer record.
+// CreateFundTransfer validates the request, creates a fund transfer record,
+// and atomically debits the source fund and credits the destination fund
+// by creating two FundTransaction records.
 func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, req CreateFundTransferRequest) (*FundTransfer, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -668,6 +670,39 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 	created, err := s.funds.CreateTransfer(ctx, t)
 	if err != nil {
 		return nil, err
+	}
+
+	// Debit the source fund.
+	refType := "fund_transfer"
+	debitDesc := "Transfer out"
+	if _, err := s.funds.CreateTransaction(ctx, &FundTransaction{
+		FundID:          req.FromFundID,
+		OrgID:           orgID,
+		CurrencyCode:    "USD",
+		TransactionType: "transfer_out",
+		AmountCents:     -req.AmountCents,
+		Description:     &debitDesc,
+		ReferenceType:   &refType,
+		ReferenceID:     &created.ID,
+		EffectiveDate:   now,
+	}); err != nil {
+		return nil, fmt.Errorf("fin: CreateFundTransfer debit source fund: %w", err)
+	}
+
+	// Credit the destination fund.
+	creditDesc := "Transfer in"
+	if _, err := s.funds.CreateTransaction(ctx, &FundTransaction{
+		FundID:          req.ToFundID,
+		OrgID:           orgID,
+		CurrencyCode:    "USD",
+		TransactionType: "transfer_in",
+		AmountCents:     req.AmountCents,
+		Description:     &creditDesc,
+		ReferenceType:   &refType,
+		ReferenceID:     &created.ID,
+		EffectiveDate:   now,
+	}); err != nil {
+		return nil, fmt.Errorf("fin: CreateFundTransfer credit destination fund: %w", err)
 	}
 
 	// Post GL journal entry for both sides of the inter-fund transfer.
