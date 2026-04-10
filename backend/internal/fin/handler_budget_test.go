@@ -371,7 +371,7 @@ func TestCreateExpense_Success(t *testing.T) {
 	assert.Equal(t, orgID, envelope.Data.OrgID)
 	assert.Equal(t, "Landscaping Q1", envelope.Data.Description)
 	assert.Equal(t, int64(75000), envelope.Data.AmountCents)
-	assert.Equal(t, "pending", envelope.Data.Status)
+	assert.Equal(t, "submitted", envelope.Data.Status)
 	assert.NotEqual(t, uuid.Nil, envelope.Data.ID)
 }
 
@@ -391,7 +391,7 @@ func TestCreateExpense_InvalidBody(t *testing.T) {
 func TestApproveExpense_Success(t *testing.T) {
 	ts := setupBudgetTestServer(t)
 	orgID := uuid.New()
-	expense := seedExpense(t, ts.mockBudgetRepo, orgID, "pending")
+	expense := seedExpense(t, ts.mockBudgetRepo, orgID, "submitted")
 
 	resp := doFinRequest(t, ts.server.URL, http.MethodPost,
 		fmt.Sprintf("/organizations/%s/expenses/%s/approve", orgID, expense.ID), nil)
@@ -438,7 +438,7 @@ func TestPayExpense_Success(t *testing.T) {
 func TestPayExpense_WrongStatus(t *testing.T) {
 	ts := setupBudgetTestServer(t)
 	orgID := uuid.New()
-	expense := seedExpense(t, ts.mockBudgetRepo, orgID, "pending")
+	expense := seedExpense(t, ts.mockBudgetRepo, orgID, "submitted")
 
 	resp := doFinRequest(t, ts.server.URL, http.MethodPost,
 		fmt.Sprintf("/organizations/%s/expenses/%s/pay", orgID, expense.ID), nil)
@@ -518,13 +518,13 @@ func TestUpdateCategory_Success(t *testing.T) {
 func TestUpdateExpense_Success(t *testing.T) {
 	ts := setupBudgetTestServer(t)
 	orgID := uuid.New()
-	expense := seedExpense(t, ts.mockBudgetRepo, orgID, "pending")
+	expense := seedExpense(t, ts.mockBudgetRepo, orgID, "submitted")
 
 	body := map[string]any{
 		"description":  "Updated vendor invoice",
 		"amount_cents": 75000,
 		"expense_date": time.Now().Format(time.RFC3339),
-		"status":       "pending",
+		"status":       "submitted",
 	}
 	resp := doFinRequest(t, ts.server.URL, http.MethodPatch,
 		fmt.Sprintf("/organizations/%s/expenses/%s", orgID, expense.ID), body)
@@ -546,7 +546,7 @@ func TestUpdateExpense_NotFound(t *testing.T) {
 		"description":  "Ghost",
 		"amount_cents": 1000,
 		"expense_date": time.Now().Format(time.RFC3339),
-		"status":       "pending",
+		"status":       "submitted",
 	}
 	resp := doFinRequest(t, ts.server.URL, http.MethodPatch,
 		fmt.Sprintf("/organizations/%s/expenses/%s", orgID, uuid.New()), body)

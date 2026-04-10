@@ -521,7 +521,7 @@ func (s *FinService) CreateCategory(ctx context.Context, orgID uuid.UUID, c *Bud
 
 // ── Expenses ──────────────────────────────────────────────────────────────────
 
-// CreateExpense validates the request and creates a new expense in "pending" status.
+// CreateExpense validates the request and creates a new expense in "submitted" status.
 func (s *FinService) CreateExpense(ctx context.Context, orgID uuid.UUID, submittedBy uuid.UUID, req CreateExpenseRequest) (*Expense, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -533,7 +533,7 @@ func (s *FinService) CreateExpense(ctx context.Context, orgID uuid.UUID, submitt
 		AmountCents:  req.AmountCents,
 		TaxCents:     0,
 		TotalCents:   req.AmountCents,
-		Status:       "pending",
+		Status:       "submitted",
 		ExpenseDate:  req.ExpenseDate,
 		DueDate:      req.DueDate,
 		FundType:     req.FundType,
@@ -569,8 +569,8 @@ func (s *FinService) ApproveExpense(ctx context.Context, id uuid.UUID, approvedB
 	if err != nil {
 		return nil, err
 	}
-	if e.Status != "pending" {
-		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", "pending"), api.P("action", "approve"), api.P("current", e.Status))
+	if e.Status != "submitted" {
+		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", "submitted"), api.P("action", "approve"), api.P("current", e.Status))
 	}
 	now := time.Now()
 	e.Status = "approved"

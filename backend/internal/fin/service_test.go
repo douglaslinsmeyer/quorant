@@ -873,7 +873,7 @@ func TestApproveBudget_RejectsWhenNotProposed(t *testing.T) {
 }
 
 // TestApproveExpense_SetsStatus verifies that ApproveExpense transitions from
-// "pending" to "approved".
+// "submitted" to "approved".
 func TestApproveExpense_SetsStatus(t *testing.T) {
 	svc, _, _, _, _, _ := newTestService()
 	ctx := context.Background()
@@ -886,7 +886,7 @@ func TestApproveExpense_SetsStatus(t *testing.T) {
 		ExpenseDate: time.Now(),
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "pending", created.Status)
+	assert.Equal(t, "submitted", created.Status)
 
 	approved, err := svc.ApproveExpense(ctx, created.ID, userID)
 	require.NoError(t, err)
@@ -921,7 +921,7 @@ func TestPayExpense_SetsPaidDate(t *testing.T) {
 	assert.NotNil(t, paid.PaidDate)
 }
 
-// TestPayExpense_RejectsWhenNotApproved ensures that a pending expense cannot be
+// TestPayExpense_RejectsWhenNotApproved ensures that a submitted expense cannot be
 // paid directly.
 func TestPayExpense_RejectsWhenNotApproved(t *testing.T) {
 	svc, _, _, _, _, _ := newTestService()
