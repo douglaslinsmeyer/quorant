@@ -378,38 +378,30 @@ func (r *PostgresBudgetRepository) DeleteLineItem(ctx context.Context, id uuid.U
 
 // RecalculateBudgetTotals recomputes the budget's total_income_cents,
 // total_expense_cents, and net_cents from its line items.
+// Category types: BudgetCategoryTypeIncome ("income"), BudgetCategoryTypeExpense ("expense").
 func (r *PostgresBudgetRepository) RecalculateBudgetTotals(ctx context.Context, budgetID uuid.UUID) error {
 	const q = `
 		UPDATE budgets SET
-			total_income_cents = COALESCE((
-				SELECT SUM(li.planned_cents)
-				FROM budget_line_items li
-				JOIN budget_categories bc ON bc.id = li.category_id
-				WHERE li.budget_id = $1 AND bc.category_type = 'income'
-			), 0),
-			total_expense_cents = COALESCE((
-				SELECT SUM(li.planned_cents)
-				FROM budget_line_items li
-				JOIN budget_categories bc ON bc.id = li.category_id
-				WHERE li.budget_id = $1 AND bc.category_type = 'expense'
-			), 0),
-			net_cents = COALESCE((
-				SELECT SUM(li.planned_cents)
-				FROM budget_line_items li
-				JOIN budget_categories bc ON bc.id = li.category_id
-				WHERE li.budget_id = $1 AND bc.category_type = 'income'
-			), 0) - COALESCE((
-				SELECT SUM(li.planned_cents)
-				FROM budget_line_items li
-				JOIN budget_categories bc ON bc.id = li.category_id
-				WHERE li.budget_id = $1 AND bc.category_type = 'expense'
-			), 0),
-			updated_at = now()
+			total_income_cents  = t.income,
+			total_expense_cents = t.expense,
+			net_cents           = t.income - t.expense,
+			updated_at          = now()
+		FROM (
+			SELECT
+				COALESCE(SUM(li.planned_cents) FILTER (WHERE bc.category_type = 'income'),  0) AS income,
+				COALESCE(SUM(li.planned_cents) FILTER (WHERE bc.category_type = 'expense'), 0) AS expense
+			FROM budget_line_items li
+			JOIN budget_categories bc ON bc.id = li.category_id
+			WHERE li.budget_id = $1
+		) t
 		WHERE id = $1`
 
-	_, err := r.db.Exec(ctx, q, budgetID)
+	tag, err := r.db.Exec(ctx, q, budgetID)
 	if err != nil {
 		return fmt.Errorf("fin: RecalculateBudgetTotals: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("fin: RecalculateBudgetTotals: budget %s not found", budgetID)
 	}
 	return nil
 }

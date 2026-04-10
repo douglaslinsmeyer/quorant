@@ -496,7 +496,7 @@ func (m *mockBudgetRepo) RecalculateBudgetTotals(_ context.Context, budgetID uui
 			return nil
 		}
 	}
-	return nil
+	return fmt.Errorf("fin: RecalculateBudgetTotals: budget %s not found", budgetID)
 }
 
 func (m *mockBudgetRepo) CreateExpense(_ context.Context, e *fin.Expense) (*fin.Expense, error) {

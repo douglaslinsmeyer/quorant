@@ -447,6 +447,16 @@ func TestRecalculateBudgetTotals_NoLineItems(t *testing.T) {
 	assert.Equal(t, int64(0), updated.NetCents)
 }
 
+func TestRecalculateBudgetTotals_BudgetNotFound(t *testing.T) {
+	f := setupBudgetFixture(t)
+	ctx := context.Background()
+
+	err := f.repo.RecalculateBudgetTotals(ctx, uuid.New())
+
+	require.Error(t, err, "should return error for non-existent budget")
+	assert.Contains(t, err.Error(), "not found")
+}
+
 // ─── TestCreateExpense + FindExpenseByID ─────────────────────────────────────
 
 func TestCreateExpense(t *testing.T) {
