@@ -172,6 +172,24 @@ func (s *AuditedFinService) DeleteAssessment(ctx context.Context, id uuid.UUID) 
 	return nil
 }
 
+func (s *AuditedFinService) VoidAssessment(ctx context.Context, id uuid.UUID, voidedBy uuid.UUID) error {
+	// Fetch before-state for audit payload.
+	assessment, _ := s.inner.GetAssessment(ctx, id)
+
+	if err := s.inner.VoidAssessment(ctx, id, voidedBy); err != nil {
+		return err
+	}
+
+	orgID := middleware.OrgIDFromContext(ctx)
+	var before any = map[string]any{"id": id}
+	if assessment != nil {
+		orgID = assessment.OrgID
+		before = assessment
+	}
+	s.emit(ctx, "assessment.voided", "assessment", id, orgID, before, nil)
+	return nil
+}
+
 // ── Payments (mutations) ─────────────────────────────────────────────────────
 
 func (s *AuditedFinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID uuid.UUID, req CreatePaymentRequest) (*Payment, error) {

@@ -1878,3 +1878,122 @@ func TestReverseLedgerEntry_AlreadyReversed(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "already reversed")
 }
+
+// ── VoidAssessment Tests ────────────────────────────────────────────────────
+
+// TestVoidAssessment verifies the happy-path void of a posted assessment:
+// the assessment status becomes void, VoidedBy/VoidedAt are set, and the
+// ledger contains both the original charge and a reversal entry.
+func TestVoidAssessment(t *testing.T) {
+	svc, assessmentRepo, _, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	unitID := uuid.New()
+	voidedBy := uuid.New()
+
+	// Create an assessment (status=posted, charge ledger entry created).
+	req := fin.CreateAssessmentRequest{
+		UnitID:      unitID,
+		Description: "Monthly HOA fee",
+		AmountCents: 15000,
+		DueDate:     time.Now().AddDate(0, 1, 0),
+	}
+	assessment, err := svc.CreateAssessment(ctx, orgID, req)
+	require.NoError(t, err)
+	assert.Equal(t, fin.AssessmentStatusPosted, assessment.Status)
+	require.Len(t, assessmentRepo.ledger, 1)
+
+	// Void the assessment.
+	err = svc.VoidAssessment(ctx, assessment.ID, voidedBy)
+	require.NoError(t, err)
+
+	// Verify the assessment is now void with metadata set.
+	voided, err := svc.GetAssessment(ctx, assessment.ID)
+	require.NoError(t, err)
+	assert.Equal(t, fin.AssessmentStatusVoid, voided.Status)
+	require.NotNil(t, voided.VoidedBy)
+	assert.Equal(t, voidedBy, *voided.VoidedBy)
+	require.NotNil(t, voided.VoidedAt)
+
+	// Verify ledger has 2 entries: original charge + reversal.
+	require.Len(t, assessmentRepo.ledger, 2)
+	reversal := assessmentRepo.ledger[1]
+	assert.Equal(t, fin.LedgerEntryTypeReversal, reversal.EntryType)
+	assert.Equal(t, int64(-15000), reversal.AmountCents)
+	assert.Equal(t, int64(0), reversal.BalanceCents)
+}
+
+// TestVoidAssessment_BlockedByPayments verifies that voiding an assessment
+// with linked payment-type ledger entries returns a validation error.
+func TestVoidAssessment_BlockedByPayments(t *testing.T) {
+	svc, assessmentRepo, _, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	unitID := uuid.New()
+	voidedBy := uuid.New()
+
+	// Create an assessment (charge entry created).
+	req := fin.CreateAssessmentRequest{
+		UnitID:      unitID,
+		Description: "Monthly HOA fee",
+		AmountCents: 15000,
+		DueDate:     time.Now().AddDate(0, 1, 0),
+	}
+	assessment, err := svc.CreateAssessment(ctx, orgID, req)
+	require.NoError(t, err)
+
+	// Manually add a payment-type ledger entry linked to this assessment.
+	paymentEntry := fin.LedgerEntry{
+		OrgID:        orgID,
+		CurrencyCode: "USD",
+		UnitID:       unitID,
+		AssessmentID: &assessment.ID,
+		EntryType:    fin.LedgerEntryTypePayment,
+		AmountCents:  -15000,
+	}
+	_, err = assessmentRepo.CreateLedgerEntry(ctx, &paymentEntry)
+	require.NoError(t, err)
+
+	// Attempt to void should fail because of linked payment entries.
+	err = svc.VoidAssessment(ctx, assessment.ID, voidedBy)
+	require.Error(t, err)
+
+	var valErr *api.ValidationError
+	require.ErrorAs(t, err, &valErr)
+	assert.Contains(t, valErr.MsgKey(), "has_payments")
+}
+
+// TestVoidAssessment_AlreadyVoid verifies that voiding an already-void
+// assessment returns a validation error.
+func TestVoidAssessment_AlreadyVoid(t *testing.T) {
+	svc, assessmentRepo, _, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	unitID := uuid.New()
+	voidedBy := uuid.New()
+
+	// Create an assessment and void it.
+	req := fin.CreateAssessmentRequest{
+		UnitID:      unitID,
+		Description: "Monthly HOA fee",
+		AmountCents: 15000,
+		DueDate:     time.Now().AddDate(0, 1, 0),
+	}
+	assessment, err := svc.CreateAssessment(ctx, orgID, req)
+	require.NoError(t, err)
+
+	// Manually set the assessment status to void.
+	for i := range assessmentRepo.assessments {
+		if assessmentRepo.assessments[i].ID == assessment.ID {
+			assessmentRepo.assessments[i].Status = fin.AssessmentStatusVoid
+		}
+	}
+
+	// Attempt to void again should fail.
+	err = svc.VoidAssessment(ctx, assessment.ID, voidedBy)
+	require.Error(t, err)
+
+	var valErr *api.ValidationError
+	require.ErrorAs(t, err, &valErr)
+	assert.Contains(t, valErr.MsgKey(), "already_void")
+}

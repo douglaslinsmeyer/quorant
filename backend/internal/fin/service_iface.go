@@ -22,6 +22,7 @@ type Service interface {
 	GetAssessment(ctx context.Context, id uuid.UUID) (*Assessment, error)
 	UpdateAssessment(ctx context.Context, id uuid.UUID, a *Assessment) (*Assessment, error)
 	DeleteAssessment(ctx context.Context, id uuid.UUID) error
+	VoidAssessment(ctx context.Context, id uuid.UUID, voidedBy uuid.UUID) error
 
 	// Ledger
 	GetUnitLedger(ctx context.Context, unitID uuid.UUID, limit int, afterID *uuid.UUID) ([]LedgerEntry, bool, error)

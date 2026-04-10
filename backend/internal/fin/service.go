@@ -298,12 +298,61 @@ func (s *FinService) UpdateAssessment(ctx context.Context, id uuid.UUID, a *Asse
 	return s.assessments.UpdateAssessment(ctx, a)
 }
 
-// DeleteAssessment soft-deletes an assessment.
+// DeleteAssessment delegates to VoidAssessment with a nil voided-by user.
 func (s *FinService) DeleteAssessment(ctx context.Context, id uuid.UUID) error {
-	if _, err := s.GetAssessment(ctx, id); err != nil {
+	return s.VoidAssessment(ctx, id, uuid.Nil)
+}
+
+// VoidAssessment reverses the charge ledger entry for the assessment, reverses
+// any associated GL journal entries, and marks the assessment as void.
+func (s *FinService) VoidAssessment(ctx context.Context, id uuid.UUID, voidedBy uuid.UUID) error {
+	assessment, err := s.GetAssessment(ctx, id)
+	if err != nil {
 		return err
 	}
-	return s.assessments.SoftDeleteAssessment(ctx, id)
+
+	if assessment.Status == AssessmentStatusVoid {
+		return api.NewValidationError("fin.assessment.already_void", "status", api.P("assessment_id", id.String()))
+	}
+
+	// Check if any payment-type ledger entries are linked to this assessment.
+	entries, err := s.assessments.FindLedgerEntriesByAssessment(ctx, id)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if e.EntryType == LedgerEntryTypePayment {
+			return api.NewValidationError("fin.assessment.has_payments", "id", api.P("assessment_id", id.String()))
+		}
+	}
+
+	// Find the unreversed charge entry and reverse it.
+	for _, e := range entries {
+		if e.EntryType == LedgerEntryTypeCharge && e.ReversedByEntryID == nil {
+			if _, err := s.ReverseLedgerEntry(ctx, e.ID, voidedBy); err != nil {
+				return err
+			}
+			break
+		}
+	}
+
+	// Reverse associated GL journal entries.
+	if s.gl != nil {
+		glEntries, glErr := s.gl.FindJournalEntriesBySource(ctx, GLSourceTypeAssessment, id)
+		if glErr == nil {
+			for _, ge := range glEntries {
+				if ge.ReversedBy == nil && !ge.IsReversal {
+					if _, rErr := s.gl.ReverseJournalEntry(ctx, ge.ID, voidedBy); rErr != nil {
+						s.logger.Error("GL: failed to reverse assessment journal entry", "journal_entry_id", ge.ID, "error", rErr)
+					}
+				}
+			}
+		}
+	}
+
+	// Mark the assessment as void.
+	now := time.Now()
+	return s.assessments.UpdateAssessmentStatus(ctx, id, AssessmentStatusVoid, &voidedBy, &now)
 }
 
 // ── Ledger ────────────────────────────────────────────────────────────────────
