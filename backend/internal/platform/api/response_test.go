@@ -105,7 +105,7 @@ func TestWriteJSONWithMeta(t *testing.T) {
 func TestWriteError(t *testing.T) {
 	t.Run("uses APIError status and code when err implements APIError", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		apiErr := api.NewNotFoundError("user not found")
+		apiErr := api.NewNotFoundError("resource.not_found")
 		api.WriteError(w, apiErr)
 
 		if w.Code != http.StatusNotFound {
@@ -122,8 +122,8 @@ func TestWriteError(t *testing.T) {
 		if resp.Errors[0].Code != "NOT_FOUND" {
 			t.Errorf("expected error code NOT_FOUND, got %s", resp.Errors[0].Code)
 		}
-		if resp.Errors[0].Message != "user not found" {
-			t.Errorf("expected message 'user not found', got %s", resp.Errors[0].Message)
+		if resp.Errors[0].Message != "resource.not_found" {
+			t.Errorf("expected message 'resource.not_found', got %s", resp.Errors[0].Message)
 		}
 	})
 
@@ -149,7 +149,7 @@ func TestWriteError(t *testing.T) {
 
 	t.Run("includes field in error when ValidationError has field", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		apiErr := api.NewValidationError("email is required", "email")
+		apiErr := api.NewValidationError("validation.required", "email")
 		api.WriteError(w, apiErr)
 
 		var resp api.Response
@@ -166,7 +166,7 @@ func TestWriteError(t *testing.T) {
 
 	t.Run("response has no data field on error", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		api.WriteError(w, api.NewForbiddenError("not allowed"))
+		api.WriteError(w, api.NewForbiddenError("auth.forbidden"))
 
 		var resp api.Response
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
