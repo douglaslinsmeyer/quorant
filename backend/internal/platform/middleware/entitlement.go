@@ -32,7 +32,7 @@ func RequireEntitlement(checker EntitlementChecker, featureKey string) func(http
 				return
 			}
 			if !allowed {
-				api.WriteError(w, api.NewForbiddenError("feature '"+featureKey+"' is not available on your current plan"))
+				api.WriteError(w, api.NewForbiddenError("access.feature_unavailable", api.P("feature", featureKey)))
 				return
 			}
 

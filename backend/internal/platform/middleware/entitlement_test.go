@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -68,8 +67,11 @@ func TestRequireEntitlement_Denied_Returns403WithMessage(t *testing.T) {
 	if resp.Errors[0].Code != "FORBIDDEN" {
 		t.Errorf("expected error code FORBIDDEN, got %q", resp.Errors[0].Code)
 	}
-	if !strings.Contains(resp.Errors[0].Message, "ai.context_lake") {
-		t.Errorf("expected message to contain feature key 'ai.context_lake', got %q", resp.Errors[0].Message)
+	if resp.Errors[0].MessageKey != "access.feature_unavailable" {
+		t.Errorf("expected message_key 'access.feature_unavailable', got %q", resp.Errors[0].MessageKey)
+	}
+	if resp.Errors[0].Params["feature"] != "ai.context_lake" {
+		t.Errorf("expected params.feature 'ai.context_lake', got %v", resp.Errors[0].Params["feature"])
 	}
 }
 
