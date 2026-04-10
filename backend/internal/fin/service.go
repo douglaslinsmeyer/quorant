@@ -991,13 +991,3 @@ func (s *FinService) CheckReconciliation(ctx context.Context, orgID uuid.UUID) (
 		IsReconciled:    unitTotal == fundTotal,
 	}, nil
 }
-
-// cashAccountForFundType returns the standard cash account number for a fund type.
-func cashAccountForFundType(fundType FundType) int {
-	switch fundType {
-	case FundTypeReserve:
-		return 1020
-	default:
-		return 1010 // operating and all others default to operating cash
-	}
-}
