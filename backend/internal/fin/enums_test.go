@@ -293,3 +293,30 @@ func TestPaymentStatus_NewValues(t *testing.T) {
 	assert.True(t, PaymentStatusReversed.IsValid())
 	assert.True(t, PaymentStatusNSF.IsValid())
 }
+
+func TestAssessmentStatus_IsValid(t *testing.T) {
+	valid := []AssessmentStatus{AssessmentStatusPosted, AssessmentStatusVoid}
+	for _, v := range valid {
+		if !v.IsValid() {
+			t.Errorf("expected %q to be valid", v)
+		}
+	}
+	invalid := []AssessmentStatus{"", "unknown", "pending"}
+	for _, v := range invalid {
+		if v.IsValid() {
+			t.Errorf("expected %q to be invalid", v)
+		}
+	}
+}
+
+func TestLedgerEntryType_IsValid_Reversal(t *testing.T) {
+	assert.True(t, LedgerEntryTypeReversal.IsValid())
+}
+
+func TestLedgerReferenceType_IsValid_Reversal(t *testing.T) {
+	assert.True(t, LedgerRefTypeReversal.IsValid())
+}
+
+func TestPaymentStatus_IsValid_Void(t *testing.T) {
+	assert.True(t, PaymentStatusVoid.IsValid())
+}

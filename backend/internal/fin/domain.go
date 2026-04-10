@@ -45,11 +45,14 @@ type Assessment struct {
 	DueDate      time.Time  `json:"due_date"`
 	GraceDays    *int       `json:"grace_days,omitempty"`
 	LateFeeCents *int64     `json:"late_fee_cents,omitempty"`
-	IsRecurring  bool       `json:"is_recurring"`
-	CreatedBy    *uuid.UUID `json:"created_by,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
-	DeletedAt    *time.Time `json:"deleted_at,omitempty"`
+	IsRecurring  bool             `json:"is_recurring"`
+	Status       AssessmentStatus `json:"status"`
+	VoidedBy     *uuid.UUID       `json:"voided_by,omitempty"`
+	VoidedAt     *time.Time       `json:"voided_at,omitempty"`
+	CreatedBy    *uuid.UUID       `json:"created_by,omitempty"`
+	CreatedAt    time.Time        `json:"created_at"`
+	UpdatedAt    time.Time        `json:"updated_at"`
+	DeletedAt    *time.Time       `json:"deleted_at,omitempty"`
 }
 
 // LedgerEntry records a financial event against a unit's balance.
@@ -63,10 +66,11 @@ type LedgerEntry struct {
 	AmountCents   int64                `json:"amount_cents"`
 	BalanceCents  int64                `json:"balance_cents"`
 	Description   *string              `json:"description,omitempty"`
-	ReferenceType *LedgerReferenceType `json:"reference_type,omitempty"`
-	ReferenceID   *uuid.UUID `json:"reference_id,omitempty"`
-	EffectiveDate time.Time  `json:"effective_date"`
-	CreatedAt     time.Time  `json:"created_at"`
+	ReferenceType      *LedgerReferenceType `json:"reference_type,omitempty"`
+	ReferenceID        *uuid.UUID           `json:"reference_id,omitempty"`
+	ReversedByEntryID  *uuid.UUID           `json:"reversed_by_entry_id,omitempty"`
+	EffectiveDate      time.Time            `json:"effective_date"`
+	CreatedAt          time.Time            `json:"created_at"`
 }
 
 // PaymentMethod stores a user's saved payment instrument.
@@ -95,6 +99,8 @@ type Payment struct {
 	ProviderRef     *string       `json:"provider_ref,omitempty"`
 	Description     *string    `json:"description,omitempty"`
 	PaidAt          *time.Time `json:"paid_at,omitempty"`
+	VoidedBy        *uuid.UUID `json:"voided_by,omitempty"`
+	VoidedAt        *time.Time `json:"voided_at,omitempty"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 }

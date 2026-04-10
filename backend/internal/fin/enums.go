@@ -1,5 +1,22 @@
 package fin
 
+// AssessmentStatus represents the lifecycle state of an assessment.
+type AssessmentStatus string
+
+const (
+	AssessmentStatusPosted AssessmentStatus = "posted"
+	AssessmentStatusVoid   AssessmentStatus = "void"
+)
+
+// IsValid returns true if the AssessmentStatus value is one of the defined constants.
+func (s AssessmentStatus) IsValid() bool {
+	switch s {
+	case AssessmentStatusPosted, AssessmentStatusVoid:
+		return true
+	}
+	return false
+}
+
 // BudgetStatus represents the lifecycle state of a budget.
 type BudgetStatus string
 
@@ -43,6 +60,7 @@ const (
 	PaymentStatusPending   PaymentStatus = "pending"
 	PaymentStatusCompleted PaymentStatus = "completed"
 	PaymentStatusFailed    PaymentStatus = "failed"
+	PaymentStatusVoid      PaymentStatus = "void"
 )
 
 const (
@@ -55,7 +73,7 @@ const (
 func (s PaymentStatus) IsValid() bool {
 	switch s {
 	case PaymentStatusPending, PaymentStatusCompleted, PaymentStatusFailed,
-		PaymentStatusPendingReview, PaymentStatusReversed, PaymentStatusNSF:
+		PaymentStatusPendingReview, PaymentStatusReversed, PaymentStatusNSF, PaymentStatusVoid:
 		return true
 	}
 	return false
@@ -135,13 +153,14 @@ const (
 	LedgerEntryTypeCredit     LedgerEntryType = "credit"
 	LedgerEntryTypeAdjustment LedgerEntryType = "adjustment"
 	LedgerEntryTypeLateFee    LedgerEntryType = "late_fee"
+	LedgerEntryTypeReversal   LedgerEntryType = "reversal"
 )
 
 // IsValid returns true if the LedgerEntryType value is one of the defined constants.
 func (s LedgerEntryType) IsValid() bool {
 	switch s {
 	case LedgerEntryTypeCharge, LedgerEntryTypePayment, LedgerEntryTypeCredit,
-		LedgerEntryTypeAdjustment, LedgerEntryTypeLateFee:
+		LedgerEntryTypeAdjustment, LedgerEntryTypeLateFee, LedgerEntryTypeReversal:
 		return true
 	}
 	return false
@@ -170,13 +189,14 @@ func (s GLSourceType) IsValid() bool {
 type LedgerReferenceType string
 
 const (
-	LedgerRefTypePayment LedgerReferenceType = "payment"
+	LedgerRefTypePayment   LedgerReferenceType = "payment"
+	LedgerRefTypeReversal  LedgerReferenceType = "reversal"
 )
 
 // IsValid returns true if the LedgerReferenceType value is one of the defined constants.
 func (s LedgerReferenceType) IsValid() bool {
 	switch s {
-	case LedgerRefTypePayment:
+	case LedgerRefTypePayment, LedgerRefTypeReversal:
 		return true
 	}
 	return false
