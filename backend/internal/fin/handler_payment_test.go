@@ -11,10 +11,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/ai"
-	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/fin"
 	"github.com/quorant/quorant/internal/platform/middleware"
-	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,8 +43,6 @@ func setupPaymentTestServer(t *testing.T) *paymentTestServer {
 		mockFundRepo,
 		mockCollectionRepo,
 		nil,
-		audit.NewNoopAuditor(),
-		queue.NewInMemoryPublisher(),
 		ai.NewNoopPolicyResolver(),
 		ai.NewNoopComplianceResolver(),
 		logger,

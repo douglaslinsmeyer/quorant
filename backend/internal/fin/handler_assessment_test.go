@@ -13,9 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/ai"
-	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/fin"
-	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,8 +43,6 @@ func setupAssessmentTestServer(t *testing.T) *assessmentTestServer {
 		mockFundRepo,
 		mockCollectionRepo,
 		nil,
-		audit.NewNoopAuditor(),
-		queue.NewInMemoryPublisher(),
 		ai.NewNoopPolicyResolver(),
 		ai.NewNoopComplianceResolver(),
 		logger,
