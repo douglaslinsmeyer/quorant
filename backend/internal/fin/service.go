@@ -85,8 +85,8 @@ func (s *FinService) CreateSchedule(ctx context.Context, orgID uuid.UUID, req Cr
 		CurrencyCode:    "USD",
 		Name:            req.Name,
 		Description:     req.Description,
-		Frequency:       req.Frequency,
-		AmountStrategy:  req.AmountStrategy,
+		Frequency:       AssessmentFrequency(req.Frequency),
+		AmountStrategy:  AmountStrategy(req.AmountStrategy),
 		BaseAmountCents: req.BaseAmountCents,
 		AmountRules:     req.AmountRules,
 		DayOfMonth:      req.DayOfMonth,
@@ -129,10 +129,10 @@ func (s *FinService) UpdateSchedule(ctx context.Context, id uuid.UUID, req Updat
 		existing.Description = req.Description
 	}
 	if req.Frequency != nil {
-		existing.Frequency = *req.Frequency
+		existing.Frequency = AssessmentFrequency(*req.Frequency)
 	}
 	if req.AmountStrategy != nil {
-		existing.AmountStrategy = *req.AmountStrategy
+		existing.AmountStrategy = AmountStrategy(*req.AmountStrategy)
 	}
 	if req.BaseAmountCents != nil {
 		existing.BaseAmountCents = *req.BaseAmountCents
@@ -534,6 +534,11 @@ func (s *FinService) CreateExpense(ctx context.Context, orgID uuid.UUID, submitt
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
+	var expenseFundType *FundType
+	if req.FundType != nil {
+		ft := FundType(*req.FundType)
+		expenseFundType = &ft
+	}
 	e := &Expense{
 		OrgID:        orgID,
 		CurrencyCode: "USD",
@@ -544,7 +549,7 @@ func (s *FinService) CreateExpense(ctx context.Context, orgID uuid.UUID, submitt
 		Status:       ExpenseStatusPending,
 		ExpenseDate:  req.ExpenseDate,
 		DueDate:      req.DueDate,
-		FundType:     req.FundType,
+		FundType:     expenseFundType,
 		VendorID:     req.VendorID,
 		CategoryID:   req.CategoryID,
 		BudgetID:     req.BudgetID,
@@ -613,7 +618,7 @@ func (s *FinService) CreateFund(ctx context.Context, orgID uuid.UUID, req Create
 		OrgID:              orgID,
 		CurrencyCode:       "USD",
 		Name:               req.Name,
-		FundType:           req.FundType,
+		FundType:           FundType(req.FundType),
 		BalanceCents:       0,
 		TargetBalanceCents: req.TargetBalanceCents,
 	}
@@ -742,7 +747,7 @@ func (s *FinService) AddCollectionAction(ctx context.Context, caseID uuid.UUID, 
 	}
 	a := &CollectionAction{
 		CaseID:       caseID,
-		ActionType:   req.ActionType,
+		ActionType:   CollectionActionType(req.ActionType),
 		Notes:        req.Notes,
 		DocumentID:   req.DocumentID,
 		ScheduledFor: req.ScheduledFor,
@@ -766,7 +771,7 @@ func (s *FinService) CreatePaymentPlan(ctx context.Context, caseID uuid.UUID, or
 		InstallmentsTotal: req.InstallmentsTotal,
 		InstallmentsPaid:  0,
 		NextDueDate:       req.NextDueDate,
-		Frequency:         req.Frequency,
+		Frequency:         PaymentPlanFrequency(req.Frequency),
 		Status:            PaymentPlanStatusActive,
 	}
 	return s.collections.CreatePaymentPlan(ctx, p)
