@@ -122,8 +122,8 @@ func minimalSchedule(orgID, userID uuid.UUID) *fin.AssessmentSchedule {
 	return &fin.AssessmentSchedule{
 		OrgID:           orgID,
 		Name:            "Monthly HOA Fee",
-		Frequency:       "monthly",
-		AmountStrategy:  "flat",
+		Frequency:       fin.AssessmentFreqMonthly,
+		AmountStrategy:  fin.AmountStrategyFlat,
 		BaseAmountCents: 15000,
 		AmountRules:     map[string]any{},
 		StartsAt:        now,
@@ -152,7 +152,7 @@ func chargeEntry(orgID, unitID uuid.UUID) *fin.LedgerEntry {
 	return &fin.LedgerEntry{
 		OrgID:         orgID,
 		UnitID:        unitID,
-		EntryType:     "charge",
+		EntryType:     fin.LedgerEntryTypeCharge,
 		AmountCents:   15000,
 		EffectiveDate: now,
 		Description:   &desc,
@@ -165,7 +165,7 @@ func paymentEntry(orgID, unitID uuid.UUID, amountCents int64) *fin.LedgerEntry {
 	return &fin.LedgerEntry{
 		OrgID:         orgID,
 		UnitID:        unitID,
-		EntryType:     "payment",
+		EntryType:     fin.LedgerEntryTypePayment,
 		AmountCents:   -amountCents, // payments are negative amounts
 		EffectiveDate: now,
 		Description:   &desc,
@@ -186,8 +186,8 @@ func TestCreateSchedule(t *testing.T) {
 	assert.NotEqual(t, uuid.Nil, got.ID, "should have a generated UUID")
 	assert.Equal(t, f.orgID, got.OrgID)
 	assert.Equal(t, "Monthly HOA Fee", got.Name)
-	assert.Equal(t, "monthly", got.Frequency)
-	assert.Equal(t, "flat", got.AmountStrategy)
+	assert.Equal(t, fin.AssessmentFreqMonthly, got.Frequency)
+	assert.Equal(t, fin.AmountStrategyFlat, got.AmountStrategy)
 	assert.Equal(t, int64(15000), got.BaseAmountCents)
 	assert.True(t, got.IsActive)
 	assert.Equal(t, f.userID, got.CreatedBy)
@@ -326,7 +326,7 @@ func TestCreateLedgerEntry(t *testing.T) {
 	assert.NotEqual(t, uuid.Nil, got.ID)
 	assert.Equal(t, f.orgID, got.OrgID)
 	assert.Equal(t, f.unitID, got.UnitID)
-	assert.Equal(t, "charge", got.EntryType)
+	assert.Equal(t, fin.LedgerEntryTypeCharge, got.EntryType)
 	assert.Equal(t, int64(15000), got.AmountCents)
 	// First entry: balance = 0 + 15000 = 15000
 	assert.Equal(t, int64(15000), got.BalanceCents, "balance should equal amount for first entry")
@@ -410,7 +410,7 @@ func TestListLedgerByUnit_ReturnsInDateOrder(t *testing.T) {
 		e := &fin.LedgerEntry{
 			OrgID:         f.orgID,
 			UnitID:        f.unitID,
-			EntryType:     "charge",
+			EntryType:     fin.LedgerEntryTypeCharge,
 			AmountCents:   1000,
 			EffectiveDate: d,
 			Description:   &desc,

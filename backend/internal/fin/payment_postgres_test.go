@@ -84,7 +84,7 @@ func minimalPayment(orgID, unitID, userID uuid.UUID) *fin.Payment {
 		UnitID:      unitID,
 		UserID:      userID,
 		AmountCents: 15000,
-		Status:      "pending",
+		Status:      fin.PaymentStatus("pending"),
 	}
 }
 
@@ -93,7 +93,7 @@ func minimalPaymentMethod(orgID, userID uuid.UUID) *fin.PaymentMethod {
 	return &fin.PaymentMethod{
 		OrgID:      orgID,
 		UserID:     userID,
-		MethodType: "card",
+		MethodType: fin.PaymentMethodTypeCard,
 		LastFour:   &lastFour,
 		IsDefault:  false,
 	}
@@ -115,7 +115,7 @@ func TestCreatePayment(t *testing.T) {
 	assert.Equal(t, f.unitID, got.UnitID)
 	assert.Equal(t, f.userID, got.UserID)
 	assert.Equal(t, int64(15000), got.AmountCents)
-	assert.Equal(t, "pending", got.Status)
+	assert.Equal(t, fin.PaymentStatus("pending"), got.Status)
 	assert.Nil(t, got.PaidAt)
 	assert.False(t, got.CreatedAt.IsZero())
 	assert.False(t, got.UpdatedAt.IsZero())
@@ -135,7 +135,7 @@ func TestFindPaymentByID(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	assert.Equal(t, created.ID, found.ID)
-	assert.Equal(t, "pending", found.Status)
+	assert.Equal(t, fin.PaymentStatus("pending"), found.Status)
 }
 
 func TestFindPaymentByID_NilWhenNotFound(t *testing.T) {
@@ -234,7 +234,7 @@ func TestUpdatePaymentStatus(t *testing.T) {
 
 	created, err := f.repo.CreatePayment(ctx, minimalPayment(f.orgID, f.unitID, f.userID))
 	require.NoError(t, err)
-	require.Equal(t, "pending", created.Status)
+	require.Equal(t, fin.PaymentStatus("pending"), created.Status)
 
 	paidAt := time.Now().UTC().Truncate(time.Millisecond)
 	err = f.repo.UpdatePaymentStatus(ctx, created.ID, "completed", &paidAt)
@@ -243,7 +243,7 @@ func TestUpdatePaymentStatus(t *testing.T) {
 	updated, err := f.repo.FindPaymentByID(ctx, created.ID)
 	require.NoError(t, err)
 	require.NotNil(t, updated)
-	assert.Equal(t, "completed", updated.Status)
+	assert.Equal(t, fin.PaymentStatusCompleted, updated.Status)
 	require.NotNil(t, updated.PaidAt)
 	assert.WithinDuration(t, paidAt, *updated.PaidAt, time.Second)
 	assert.True(t, updated.UpdatedAt.After(created.UpdatedAt) || updated.UpdatedAt.Equal(created.UpdatedAt),
@@ -263,7 +263,7 @@ func TestUpdatePaymentStatus_NilPaidAt(t *testing.T) {
 	updated, err := f.repo.FindPaymentByID(ctx, created.ID)
 	require.NoError(t, err)
 	require.NotNil(t, updated)
-	assert.Equal(t, "failed", updated.Status)
+	assert.Equal(t, fin.PaymentStatus("failed"), updated.Status)
 	assert.Nil(t, updated.PaidAt)
 }
 
@@ -281,7 +281,7 @@ func TestCreatePaymentMethod(t *testing.T) {
 	assert.NotEqual(t, uuid.Nil, got.ID, "should have a generated UUID")
 	assert.Equal(t, f.orgID, got.OrgID)
 	assert.Equal(t, f.userID, got.UserID)
-	assert.Equal(t, "card", got.MethodType)
+	assert.Equal(t, fin.PaymentMethodTypeCard, got.MethodType)
 	require.NotNil(t, got.LastFour)
 	assert.Equal(t, "4242", *got.LastFour)
 	assert.False(t, got.IsDefault)
@@ -296,12 +296,12 @@ func TestListPaymentMethodsByUser(t *testing.T) {
 	ctx := context.Background()
 
 	m1 := minimalPaymentMethod(f.orgID, f.userID)
-	m1.MethodType = "card"
+	m1.MethodType = fin.PaymentMethodTypeCard
 	_, err := f.repo.CreatePaymentMethod(ctx, m1)
 	require.NoError(t, err)
 
 	m2 := minimalPaymentMethod(f.orgID, f.userID)
-	m2.MethodType = "ach"
+	m2.MethodType = fin.PaymentMethodTypeACH
 	_, err = f.repo.CreatePaymentMethod(ctx, m2)
 	require.NoError(t, err)
 
