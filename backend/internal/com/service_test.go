@@ -411,6 +411,59 @@ func (m *mockTemplateRepo) Delete(_ context.Context, id uuid.UUID) error {
 	return nil
 }
 
+func (m *mockTemplateRepo) ResolveTemplate(_ context.Context, orgID uuid.UUID, key, channel, locale string) (*com.MessageTemplate, error) {
+	// Implement the same fallback logic as the SQL query:
+	//   1. Org-specific + requested locale
+	//   2. Org-specific + en_US
+	//   3. System default (org_id nil) + requested locale
+	//   4. System default (org_id nil) + en_US
+	type candidate struct {
+		template *com.MessageTemplate
+		priority int // lower is better
+	}
+	var best *candidate
+
+	for _, t := range m.items {
+		if t.TemplateKey != key || t.Channel != channel || !t.IsActive {
+			continue
+		}
+		if t.Locale != locale && t.Locale != "en_US" {
+			continue
+		}
+
+		isOrg := t.OrgID != nil && *t.OrgID == orgID
+		isSystem := t.OrgID == nil
+
+		if !isOrg && !isSystem {
+			continue
+		}
+
+		var pri int
+		switch {
+		case isOrg && t.Locale == locale:
+			pri = 0
+		case isOrg && t.Locale == "en_US":
+			pri = 1
+		case isSystem && t.Locale == locale:
+			pri = 2
+		case isSystem && t.Locale == "en_US":
+			pri = 3
+		default:
+			continue
+		}
+
+		if best == nil || pri < best.priority {
+			cp := *t
+			best = &candidate{template: &cp, priority: pri}
+		}
+	}
+
+	if best == nil {
+		return nil, nil
+	}
+	return best.template, nil
+}
+
 // mockDirectoryRepo is an in-memory DirectoryRepository.
 type mockDirectoryRepo struct {
 	items     map[string]*com.DirectoryPreference
@@ -949,6 +1002,241 @@ func TestGetDirectoryPreferences_NotFound(t *testing.T) {
 	assert.False(t, pref.ShowEmail)
 	assert.False(t, pref.ShowPhone)
 	assert.False(t, pref.ShowUnit)
+}
+
+// ─── ResolveTemplate tests ───────────────────────────────────────────────────
+
+func TestResolveTemplate_PrefersOrgSpecificLocale(t *testing.T) {
+	// Given: an org-specific template for es_MX and a system default for es_MX
+	templateRepo := newMockTemplateRepo()
+	svc := newTestService(
+		newMockAnnouncementRepo(),
+		newMockThreadRepo(),
+		newMockNotificationRepo(),
+		newMockCalendarRepo(),
+		templateRepo,
+		newMockDirectoryRepo(),
+		newMockCommLogRepo(),
+	)
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	// System default for es_MX
+	sysID := uuid.New()
+	templateRepo.items[sysID] = &com.MessageTemplate{
+		ID: sysID, OrgID: nil, TemplateKey: "welcome", Channel: "email",
+		Locale: "es_MX", Body: "system es_MX body", IsActive: true,
+	}
+	// Org-specific for es_MX
+	orgTplID := uuid.New()
+	templateRepo.items[orgTplID] = &com.MessageTemplate{
+		ID: orgTplID, OrgID: &orgID, TemplateKey: "welcome", Channel: "email",
+		Locale: "es_MX", Body: "org es_MX body", IsActive: true,
+	}
+
+	// When: ResolveTemplate is called with locale es_MX
+	result, err := svc.ResolveTemplate(ctx, orgID, "welcome", "email", "es_MX")
+
+	// Then: the org-specific es_MX template is returned (priority 1)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, orgTplID, result.ID)
+	assert.Equal(t, "org es_MX body", result.Body)
+}
+
+func TestResolveTemplate_FallsBackToOrgEnUS(t *testing.T) {
+	// Given: an org-specific en_US template but no org-specific es_MX template
+	templateRepo := newMockTemplateRepo()
+	svc := newTestService(
+		newMockAnnouncementRepo(),
+		newMockThreadRepo(),
+		newMockNotificationRepo(),
+		newMockCalendarRepo(),
+		templateRepo,
+		newMockDirectoryRepo(),
+		newMockCommLogRepo(),
+	)
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	// Org-specific for en_US
+	orgEnID := uuid.New()
+	templateRepo.items[orgEnID] = &com.MessageTemplate{
+		ID: orgEnID, OrgID: &orgID, TemplateKey: "welcome", Channel: "email",
+		Locale: "en_US", Body: "org en_US body", IsActive: true,
+	}
+
+	// When: ResolveTemplate is called with locale es_MX
+	result, err := svc.ResolveTemplate(ctx, orgID, "welcome", "email", "es_MX")
+
+	// Then: the org en_US fallback is returned (priority 2)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, orgEnID, result.ID)
+	assert.Equal(t, "org en_US body", result.Body)
+}
+
+func TestResolveTemplate_FallsBackToSystemLocale(t *testing.T) {
+	// Given: no org-specific templates, but a system default for es_MX exists
+	templateRepo := newMockTemplateRepo()
+	svc := newTestService(
+		newMockAnnouncementRepo(),
+		newMockThreadRepo(),
+		newMockNotificationRepo(),
+		newMockCalendarRepo(),
+		templateRepo,
+		newMockDirectoryRepo(),
+		newMockCommLogRepo(),
+	)
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	// System default for es_MX
+	sysID := uuid.New()
+	templateRepo.items[sysID] = &com.MessageTemplate{
+		ID: sysID, OrgID: nil, TemplateKey: "welcome", Channel: "email",
+		Locale: "es_MX", Body: "system es_MX body", IsActive: true,
+	}
+	// System default for en_US
+	sysEnID := uuid.New()
+	templateRepo.items[sysEnID] = &com.MessageTemplate{
+		ID: sysEnID, OrgID: nil, TemplateKey: "welcome", Channel: "email",
+		Locale: "en_US", Body: "system en_US body", IsActive: true,
+	}
+
+	// When: ResolveTemplate is called with locale es_MX
+	result, err := svc.ResolveTemplate(ctx, orgID, "welcome", "email", "es_MX")
+
+	// Then: the system es_MX template is returned (priority 3)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, sysID, result.ID)
+	assert.Equal(t, "system es_MX body", result.Body)
+}
+
+func TestResolveTemplate_FallsBackToSystemEnUS(t *testing.T) {
+	// Given: only a system default for en_US exists
+	templateRepo := newMockTemplateRepo()
+	svc := newTestService(
+		newMockAnnouncementRepo(),
+		newMockThreadRepo(),
+		newMockNotificationRepo(),
+		newMockCalendarRepo(),
+		templateRepo,
+		newMockDirectoryRepo(),
+		newMockCommLogRepo(),
+	)
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	// System default for en_US only
+	sysEnID := uuid.New()
+	templateRepo.items[sysEnID] = &com.MessageTemplate{
+		ID: sysEnID, OrgID: nil, TemplateKey: "welcome", Channel: "email",
+		Locale: "en_US", Body: "system en_US body", IsActive: true,
+	}
+
+	// When: ResolveTemplate is called with locale fr_FR
+	result, err := svc.ResolveTemplate(ctx, orgID, "welcome", "email", "fr_FR")
+
+	// Then: the system en_US fallback is returned (priority 4)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, sysEnID, result.ID)
+	assert.Equal(t, "system en_US body", result.Body)
+}
+
+func TestResolveTemplate_NotFound(t *testing.T) {
+	// Given: no templates exist at all
+	svc := newTestService(
+		newMockAnnouncementRepo(),
+		newMockThreadRepo(),
+		newMockNotificationRepo(),
+		newMockCalendarRepo(),
+		newMockTemplateRepo(),
+		newMockDirectoryRepo(),
+		newMockCommLogRepo(),
+	)
+
+	// When: ResolveTemplate is called
+	result, err := svc.ResolveTemplate(context.Background(), uuid.New(), "nonexistent", "email", "en_US")
+
+	// Then: a NotFoundError is returned
+	require.Error(t, err)
+	assert.Nil(t, result)
+	var notFoundErr *api.NotFoundError
+	assert.ErrorAs(t, err, &notFoundErr)
+}
+
+func TestResolveTemplate_IgnoresInactiveTemplates(t *testing.T) {
+	// Given: an org-specific template that is inactive, and a system en_US that is active
+	templateRepo := newMockTemplateRepo()
+	svc := newTestService(
+		newMockAnnouncementRepo(),
+		newMockThreadRepo(),
+		newMockNotificationRepo(),
+		newMockCalendarRepo(),
+		templateRepo,
+		newMockDirectoryRepo(),
+		newMockCommLogRepo(),
+	)
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	// Org-specific for en_US but inactive
+	inactiveID := uuid.New()
+	templateRepo.items[inactiveID] = &com.MessageTemplate{
+		ID: inactiveID, OrgID: &orgID, TemplateKey: "welcome", Channel: "email",
+		Locale: "en_US", Body: "inactive org body", IsActive: false,
+	}
+	// System default for en_US that is active
+	sysEnID := uuid.New()
+	templateRepo.items[sysEnID] = &com.MessageTemplate{
+		ID: sysEnID, OrgID: nil, TemplateKey: "welcome", Channel: "email",
+		Locale: "en_US", Body: "active system body", IsActive: true,
+	}
+
+	// When: ResolveTemplate is called
+	result, err := svc.ResolveTemplate(ctx, orgID, "welcome", "email", "en_US")
+
+	// Then: the inactive template is skipped, system en_US is returned
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, sysEnID, result.ID)
+	assert.Equal(t, "active system body", result.Body)
+}
+
+func TestResolveTemplate_IgnoresOtherOrgs(t *testing.T) {
+	// Given: a template belonging to a different org
+	templateRepo := newMockTemplateRepo()
+	svc := newTestService(
+		newMockAnnouncementRepo(),
+		newMockThreadRepo(),
+		newMockNotificationRepo(),
+		newMockCalendarRepo(),
+		templateRepo,
+		newMockDirectoryRepo(),
+		newMockCommLogRepo(),
+	)
+	ctx := context.Background()
+	orgID := uuid.New()
+	otherOrgID := uuid.New()
+
+	// Template for a different org
+	otherID := uuid.New()
+	templateRepo.items[otherID] = &com.MessageTemplate{
+		ID: otherID, OrgID: &otherOrgID, TemplateKey: "welcome", Channel: "email",
+		Locale: "en_US", Body: "other org body", IsActive: true,
+	}
+
+	// When: ResolveTemplate is called for our org
+	result, err := svc.ResolveTemplate(ctx, orgID, "welcome", "email", "en_US")
+
+	// Then: template from the other org is not returned
+	require.Error(t, err)
+	assert.Nil(t, result)
+	var notFoundErr *api.NotFoundError
+	assert.ErrorAs(t, err, &notFoundErr)
 }
 
 func TestGetDirectoryPreferences_ExistingPreferences(t *testing.T) {

@@ -122,6 +122,39 @@ func (r *PostgresTemplateRepository) Delete(ctx context.Context, id uuid.UUID) e
 	return nil
 }
 
+// ─── ResolveTemplate ────────────────────────────────────────────────────
+
+// ResolveTemplate finds the best-matching template for the given key, channel, and locale.
+// Fallback order:
+//  1. Org-specific template for the requested locale
+//  2. Org-specific template for en_US
+//  3. System default (org_id IS NULL) for the requested locale
+//  4. System default for en_US
+func (r *PostgresTemplateRepository) ResolveTemplate(ctx context.Context, orgID uuid.UUID, key, channel, locale string) (*MessageTemplate, error) {
+	const q = `
+		SELECT id, org_id, template_key, channel, locale, subject, body, is_active, created_at, updated_at
+		FROM message_templates
+		WHERE template_key = $1
+		  AND channel = $2
+		  AND is_active = TRUE
+		  AND (org_id = $3 OR org_id IS NULL)
+		  AND locale IN ($4, 'en_US')
+		ORDER BY
+		  CASE WHEN org_id = $3 THEN 0 ELSE 1 END,
+		  CASE WHEN locale = $4 THEN 0 ELSE 1 END
+		LIMIT 1`
+
+	row := r.pool.QueryRow(ctx, q, key, channel, orgID, locale)
+	result, err := scanTemplate(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("com: template ResolveTemplate: %w", err)
+	}
+	return result, nil
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 func scanTemplate(row pgx.Row) (*MessageTemplate, error) {
