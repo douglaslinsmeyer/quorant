@@ -76,7 +76,7 @@ func seedFund(t *testing.T, repo *mockFundRepo, orgID uuid.UUID) *fin.Fund {
 		ID:           uuid.New(),
 		OrgID:        orgID,
 		Name:         "Operating Fund",
-		FundType:     "operating",
+		FundType:     fin.FundTypeOperating,
 		BalanceCents: 0,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
@@ -106,7 +106,7 @@ func TestCreateFundHandler_Success(t *testing.T) {
 	require.NotNil(t, envelope.Data)
 	assert.Equal(t, orgID, envelope.Data.OrgID)
 	assert.Equal(t, "Operating Fund", envelope.Data.Name)
-	assert.Equal(t, "operating", envelope.Data.FundType)
+	assert.Equal(t, fin.FundTypeOperating, envelope.Data.FundType)
 	assert.NotEqual(t, uuid.Nil, envelope.Data.ID)
 }
 
@@ -320,7 +320,7 @@ func TestUpdateFund_Success(t *testing.T) {
 	assert.Equal(t, fund.ID, envelope.Data.ID)
 	assert.Equal(t, orgID, envelope.Data.OrgID)
 	assert.Equal(t, "Updated Reserve Fund", envelope.Data.Name)
-	assert.Equal(t, "reserve", envelope.Data.FundType)
+	assert.Equal(t, fin.FundTypeReserve, envelope.Data.FundType)
 }
 
 func TestUpdateFund_NotFound(t *testing.T) {

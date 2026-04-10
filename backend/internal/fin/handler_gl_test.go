@@ -55,7 +55,7 @@ func setupGLTestServer(t *testing.T) *glTestServer {
 
 // ── Seed helpers ─────────────────────────────────────────────────────────────
 
-func seedGLAccount(t *testing.T, repo *mockGLRepo, orgID uuid.UUID, number int, name, acctType string) *fin.GLAccount {
+func seedGLAccount(t *testing.T, repo *mockGLRepo, orgID uuid.UUID, number int, name string, acctType fin.GLAccountType) *fin.GLAccount {
 	t.Helper()
 	a := &fin.GLAccount{
 		ID:            uuid.New(),
@@ -92,7 +92,7 @@ func TestGLHandler_CreateAccount_201(t *testing.T) {
 	require.NotNil(t, envelope.Data)
 	assert.Equal(t, orgID, envelope.Data.OrgID)
 	assert.Equal(t, "Cash-Operating", envelope.Data.Name)
-	assert.Equal(t, "asset", envelope.Data.AccountType)
+	assert.Equal(t, fin.GLAccountTypeAsset, envelope.Data.AccountType)
 	assert.Equal(t, 1010, envelope.Data.AccountNumber)
 	assert.NotEqual(t, uuid.Nil, envelope.Data.ID)
 }
@@ -116,8 +116,8 @@ func TestGLHandler_CreateAccount_400(t *testing.T) {
 func TestGLHandler_ListAccounts_200(t *testing.T) {
 	ts := setupGLTestServer(t)
 	orgID := uuid.New()
-	seedGLAccount(t, ts.mockGLRepo, orgID, 1010, "Cash-Operating", "asset")
-	seedGLAccount(t, ts.mockGLRepo, orgID, 2100, "Accounts Payable", "liability")
+	seedGLAccount(t, ts.mockGLRepo, orgID, 1010, "Cash-Operating", fin.GLAccountTypeAsset)
+	seedGLAccount(t, ts.mockGLRepo, orgID, 2100, "Accounts Payable", fin.GLAccountTypeLiability)
 
 	resp := doFinRequest(t, ts.server.URL, http.MethodGet,
 		fmt.Sprintf("/organizations/%s/gl/accounts", orgID), nil)
@@ -135,7 +135,7 @@ func TestGLHandler_ListAccounts_200(t *testing.T) {
 func TestGLHandler_GetAccount_200(t *testing.T) {
 	ts := setupGLTestServer(t)
 	orgID := uuid.New()
-	acct := seedGLAccount(t, ts.mockGLRepo, orgID, 1010, "Cash-Operating", "asset")
+	acct := seedGLAccount(t, ts.mockGLRepo, orgID, 1010, "Cash-Operating", fin.GLAccountTypeAsset)
 
 	resp := doFinRequest(t, ts.server.URL, http.MethodGet,
 		fmt.Sprintf("/organizations/%s/gl/accounts/%s", orgID, acct.ID), nil)
@@ -164,7 +164,7 @@ func TestGLHandler_GetAccount_404(t *testing.T) {
 func TestGLHandler_DeleteAccount_204(t *testing.T) {
 	ts := setupGLTestServer(t)
 	orgID := uuid.New()
-	acct := seedGLAccount(t, ts.mockGLRepo, orgID, 1110, "AR-Other", "asset")
+	acct := seedGLAccount(t, ts.mockGLRepo, orgID, 1110, "AR-Other", fin.GLAccountTypeAsset)
 
 	resp := doFinRequest(t, ts.server.URL, http.MethodDelete,
 		fmt.Sprintf("/organizations/%s/gl/accounts/%s", orgID, acct.ID), nil)
@@ -180,8 +180,8 @@ func TestGLHandler_DeleteAccount_204(t *testing.T) {
 func TestGLHandler_CreateJournalEntry_201(t *testing.T) {
 	ts := setupGLTestServer(t)
 	orgID := uuid.New()
-	debitAcct := seedGLAccount(t, ts.mockGLRepo, orgID, 1010, "Cash-Operating", "asset")
-	creditAcct := seedGLAccount(t, ts.mockGLRepo, orgID, 4010, "Assessment Revenue", "revenue")
+	debitAcct := seedGLAccount(t, ts.mockGLRepo, orgID, 1010, "Cash-Operating", fin.GLAccountTypeAsset)
+	creditAcct := seedGLAccount(t, ts.mockGLRepo, orgID, 4010, "Assessment Revenue", fin.GLAccountTypeRevenue)
 
 	body := map[string]any{
 		"entry_date": time.Now().Format(time.RFC3339),
@@ -216,8 +216,8 @@ func TestGLHandler_CreateJournalEntry_201(t *testing.T) {
 func TestGLHandler_CreateJournalEntry_400_Unbalanced(t *testing.T) {
 	ts := setupGLTestServer(t)
 	orgID := uuid.New()
-	debitAcct := seedGLAccount(t, ts.mockGLRepo, orgID, 1010, "Cash-Operating", "asset")
-	creditAcct := seedGLAccount(t, ts.mockGLRepo, orgID, 4010, "Assessment Revenue", "revenue")
+	debitAcct := seedGLAccount(t, ts.mockGLRepo, orgID, 1010, "Cash-Operating", fin.GLAccountTypeAsset)
+	creditAcct := seedGLAccount(t, ts.mockGLRepo, orgID, 4010, "Assessment Revenue", fin.GLAccountTypeRevenue)
 
 	body := map[string]any{
 		"entry_date": time.Now().Format(time.RFC3339),

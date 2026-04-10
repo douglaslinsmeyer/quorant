@@ -265,7 +265,7 @@ func (m *mockPaymentRepo) ListPaymentsByUnit(_ context.Context, unitID uuid.UUID
 func (m *mockPaymentRepo) UpdatePaymentStatus(_ context.Context, id uuid.UUID, status string, paidAt *time.Time) error {
 	for i := range m.payments {
 		if m.payments[i].ID == id {
-			m.payments[i].Status = status
+			m.payments[i].Status = fin.PaymentStatus(status)
 			m.payments[i].PaidAt = paidAt
 			return nil
 		}
@@ -746,7 +746,7 @@ func TestCreateAssessment_CreatesLedgerEntry(t *testing.T) {
 	// Verify a ledger entry was created.
 	require.Len(t, assessmentRepo.ledger, 1)
 	entry := assessmentRepo.ledger[0]
-	assert.Equal(t, "charge", entry.EntryType)
+	assert.Equal(t, fin.LedgerEntryTypeCharge, entry.EntryType)
 	assert.Equal(t, int64(15000), entry.AmountCents)
 	assert.Equal(t, unitID, entry.UnitID)
 	assert.Equal(t, orgID, entry.OrgID)
@@ -772,12 +772,12 @@ func TestRecordPayment_CreatesLedgerEntry(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, payment)
 	assert.Equal(t, int64(15000), payment.AmountCents)
-	assert.Equal(t, "completed", payment.Status)
+	assert.Equal(t, fin.PaymentStatusCompleted, payment.Status)
 
 	// Verify a ledger entry was created with negative amount (credit).
 	require.Len(t, assessmentRepo.ledger, 1)
 	entry := assessmentRepo.ledger[0]
-	assert.Equal(t, "payment", entry.EntryType)
+	assert.Equal(t, fin.LedgerEntryTypePayment, entry.EntryType)
 	assert.Equal(t, int64(-15000), entry.AmountCents)
 	assert.Equal(t, unitID, entry.UnitID)
 	assert.Equal(t, orgID, entry.OrgID)
@@ -816,11 +816,11 @@ func TestProposeBudget_SetsStatus(t *testing.T) {
 		Name:       "FY2025 Budget",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "draft", created.Status)
+	assert.Equal(t, fin.BudgetStatusDraft, created.Status)
 
 	proposed, err := svc.ProposeBudget(ctx, created.ID, userID)
 	require.NoError(t, err)
-	assert.Equal(t, "proposed", proposed.Status)
+	assert.Equal(t, fin.BudgetStatusProposed, proposed.Status)
 	assert.NotNil(t, proposed.ProposedAt)
 	assert.NotNil(t, proposed.ProposedBy)
 	assert.Equal(t, userID, *proposed.ProposedBy)
@@ -845,7 +845,7 @@ func TestApproveBudget_SetsStatus(t *testing.T) {
 
 	approved, err := svc.ApproveBudget(ctx, created.ID, userID)
 	require.NoError(t, err)
-	assert.Equal(t, "approved", approved.Status)
+	assert.Equal(t, fin.BudgetStatusApproved, approved.Status)
 	assert.NotNil(t, approved.ApprovedAt)
 	assert.NotNil(t, approved.ApprovedBy)
 	assert.Equal(t, userID, *approved.ApprovedBy)
@@ -864,7 +864,7 @@ func TestApproveBudget_RejectsWhenNotProposed(t *testing.T) {
 		Name:       "FY2025 Budget",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "draft", created.Status)
+	assert.Equal(t, fin.BudgetStatusDraft, created.Status)
 
 	_, err = svc.ApproveBudget(ctx, created.ID, userID)
 	require.Error(t, err)
@@ -887,11 +887,11 @@ func TestApproveExpense_SetsStatus(t *testing.T) {
 		ExpenseDate: time.Now(),
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "pending", created.Status)
+	assert.Equal(t, fin.ExpenseStatusPending, created.Status)
 
 	approved, err := svc.ApproveExpense(ctx, created.ID, userID)
 	require.NoError(t, err)
-	assert.Equal(t, "approved", approved.Status)
+	assert.Equal(t, fin.ExpenseStatusApproved, approved.Status)
 	assert.NotNil(t, approved.ApprovedAt)
 	assert.NotNil(t, approved.ApprovedBy)
 	assert.Equal(t, userID, *approved.ApprovedBy)
@@ -914,11 +914,11 @@ func TestPayExpense_SetsPaidDate(t *testing.T) {
 
 	approved, err := svc.ApproveExpense(ctx, created.ID, userID)
 	require.NoError(t, err)
-	assert.Equal(t, "approved", approved.Status)
+	assert.Equal(t, fin.ExpenseStatusApproved, approved.Status)
 
 	paid, err := svc.PayExpense(ctx, created.ID)
 	require.NoError(t, err)
-	assert.Equal(t, "paid", paid.Status)
+	assert.Equal(t, fin.ExpenseStatusPaid, paid.Status)
 	assert.NotNil(t, paid.PaidDate)
 }
 
@@ -986,7 +986,7 @@ func TestCreateFund_Success(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "Operating Fund", fund.Name)
-	assert.Equal(t, "operating", fund.FundType)
+	assert.Equal(t, fin.FundTypeOperating, fund.FundType)
 	assert.Equal(t, int64(0), fund.BalanceCents)
 	assert.Len(t, fundRepo.funds, 1)
 }
@@ -1063,11 +1063,11 @@ func TestCreateAssessment_PostsJournalEntry(t *testing.T) {
 
 	// Seed the GL accounts the FinService will look up.
 	arAccount := &fin.GLAccount{
-		ID: uuid.New(), OrgID: orgID, AccountNumber: 1100, Name: "AR-Assessments", AccountType: "asset",
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 1100, Name: "AR-Assessments", AccountType: fin.GLAccountTypeAsset,
 		CreatedAt: time.Now(), UpdatedAt: time.Now(),
 	}
 	revenueAccount := &fin.GLAccount{
-		ID: uuid.New(), OrgID: orgID, AccountNumber: 4010, Name: "Assessment Revenue-Operating", AccountType: "revenue",
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 4010, Name: "Assessment Revenue-Operating", AccountType: fin.GLAccountTypeRevenue,
 		CreatedAt: time.Now(), UpdatedAt: time.Now(),
 	}
 	glRepo.accounts[arAccount.ID] = arAccount
@@ -1119,11 +1119,11 @@ func TestRecordPayment_PostsJournalEntry(t *testing.T) {
 
 	// Seed the GL accounts the FinService will look up.
 	cashAccount := &fin.GLAccount{
-		ID: uuid.New(), OrgID: orgID, AccountNumber: 1010, Name: "Cash-Operating", AccountType: "asset",
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 1010, Name: "Cash-Operating", AccountType: fin.GLAccountTypeAsset,
 		CreatedAt: time.Now(), UpdatedAt: time.Now(),
 	}
 	arAccount := &fin.GLAccount{
-		ID: uuid.New(), OrgID: orgID, AccountNumber: 1100, Name: "AR-Assessments", AccountType: "asset",
+		ID: uuid.New(), OrgID: orgID, AccountNumber: 1100, Name: "AR-Assessments", AccountType: fin.GLAccountTypeAsset,
 		CreatedAt: time.Now(), UpdatedAt: time.Now(),
 	}
 	glRepo.accounts[cashAccount.ID] = cashAccount

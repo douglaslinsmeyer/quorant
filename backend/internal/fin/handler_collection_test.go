@@ -77,7 +77,7 @@ func seedCollectionCase(t *testing.T, repo *mockCollectionRepo, orgID, unitID uu
 		ID:               uuid.New(),
 		OrgID:            orgID,
 		UnitID:           unitID,
-		Status:           "active",
+		Status:           fin.CollectionCaseStatusLate,
 		TotalOwedCents:   150000,
 		CurrentOwedCents: 150000,
 		OpenedAt:         time.Now(),
@@ -184,7 +184,7 @@ func TestAddCollectionAction_Success(t *testing.T) {
 	decodeFinBody(t, resp, &envelope)
 	require.NotNil(t, envelope.Data)
 	assert.Equal(t, c.ID, envelope.Data.CaseID)
-	assert.Equal(t, "notice_sent", envelope.Data.ActionType)
+	assert.Equal(t, fin.CollectionActionTypeNoticeSent, envelope.Data.ActionType)
 	assert.NotEqual(t, uuid.Nil, envelope.Data.ID)
 }
 
@@ -231,7 +231,7 @@ func TestCreatePaymentPlan_Success(t *testing.T) {
 	assert.Equal(t, int64(150000), envelope.Data.TotalOwedCents)
 	assert.Equal(t, int64(30000), envelope.Data.InstallmentCents)
 	assert.Equal(t, 5, envelope.Data.InstallmentsTotal)
-	assert.Equal(t, "active", envelope.Data.Status)
+	assert.Equal(t, fin.PaymentPlanStatusActive, envelope.Data.Status)
 	assert.NotEqual(t, uuid.Nil, envelope.Data.ID)
 }
 
@@ -282,8 +282,8 @@ func TestListPaymentPlans_Success(t *testing.T) {
 		InstallmentsTotal: 5,
 		InstallmentsPaid:  0,
 		NextDueDate:       time.Now().Add(30 * 24 * time.Hour),
-		Frequency:         "monthly",
-		Status:            "active",
+		Frequency:         fin.PaymentPlanFreqMonthly,
+		Status:            fin.PaymentPlanStatusActive,
 		CreatedAt:         time.Now(),
 		UpdatedAt:         time.Now(),
 	})
@@ -340,8 +340,8 @@ func TestUpdatePaymentPlan_Success(t *testing.T) {
 		InstallmentsTotal: 5,
 		InstallmentsPaid:  1,
 		NextDueDate:       time.Now().Add(30 * 24 * time.Hour),
-		Frequency:         "monthly",
-		Status:            "active",
+		Frequency:         fin.PaymentPlanFreqMonthly,
+		Status:            fin.PaymentPlanStatusActive,
 		CreatedAt:         time.Now(),
 		UpdatedAt:         time.Now(),
 	}

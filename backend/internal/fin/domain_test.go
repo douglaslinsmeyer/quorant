@@ -1016,7 +1016,7 @@ func TestGLJournalEntry_JSONSerialization_OmitsNilOptionalFields(t *testing.T) {
 
 func TestGLJournalEntry_JSONSerialization_OptionalFieldsIncludedWhenSet(t *testing.T) {
 	now := time.Now().UTC()
-	sourceType := "assessment"
+	sourceType := fin.GLSourceTypeAssessment
 	sourceID := uuid.New()
 	unitID := uuid.New()
 
@@ -1062,7 +1062,7 @@ func TestGLJournalEntry_JSONSerialization_OptionalFieldsIncludedWhenSet(t *testi
 
 func TestGLJournalEntry_JSONSerialization_RoundTrip(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
-	sourceType := "expense"
+	sourceType := fin.GLSourceTypeManual
 	sourceID := uuid.New()
 	lineMemo := "Debit office supplies"
 

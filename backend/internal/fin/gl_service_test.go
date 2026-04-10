@@ -185,7 +185,7 @@ func TestGLService_CreateAccount_Success(t *testing.T) {
 	assert.Equal(t, orgID, acct.OrgID)
 	assert.Equal(t, 1010, acct.AccountNumber)
 	assert.Equal(t, "Cash-Operating", acct.Name)
-	assert.Equal(t, "asset", acct.AccountType)
+	assert.Equal(t, fin.GLAccountTypeAsset, acct.AccountType)
 }
 
 func TestGLService_CreateAccount_ValidationError(t *testing.T) {
@@ -229,7 +229,7 @@ func TestGLService_UpdateAccount_RejectsSystemAccount(t *testing.T) {
 		OrgID:         orgID,
 		AccountNumber: 1010,
 		Name:          "Cash-Operating",
-		AccountType:   "asset",
+		AccountType:   fin.GLAccountTypeAsset,
 		IsSystem:      true,
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
@@ -257,7 +257,7 @@ func TestGLService_DeleteAccount_RejectsSystemAccount(t *testing.T) {
 		OrgID:         orgID,
 		AccountNumber: 1010,
 		Name:          "Cash-Operating",
-		AccountType:   "asset",
+		AccountType:   fin.GLAccountTypeAsset,
 		IsSystem:      true,
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
@@ -282,7 +282,7 @@ func TestGLService_DeleteAccount_RejectsAccountWithLines(t *testing.T) {
 		OrgID:         orgID,
 		AccountNumber: 1010,
 		Name:          "Cash-Operating",
-		AccountType:   "asset",
+		AccountType:   fin.GLAccountTypeAsset,
 		IsSystem:      false,
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
@@ -322,7 +322,7 @@ func TestGLService_PostJournalEntry_BalancedSuccess(t *testing.T) {
 	assert.Equal(t, 1, entry.EntryNumber)
 	assert.Equal(t, "Test entry", entry.Memo)
 	require.NotNil(t, entry.SourceType)
-	assert.Equal(t, "manual", *entry.SourceType)
+	assert.Equal(t, fin.GLSourceTypeManual, *entry.SourceType)
 	require.Len(t, entry.Lines, 2)
 }
 
@@ -374,7 +374,7 @@ func TestGLService_PostSystemJournalEntry_Balanced(t *testing.T) {
 	ctx := context.Background()
 	orgID := uuid.New()
 	postedBy := uuid.New()
-	sourceType := "assessment"
+	sourceType := fin.GLSourceTypeAssessment
 
 	lines := []fin.GLJournalLine{
 		{AccountID: uuid.New(), DebitCents: 15000, CreditCents: 0},
@@ -388,7 +388,7 @@ func TestGLService_PostSystemJournalEntry_Balanced(t *testing.T) {
 	assert.Equal(t, 1, entry.EntryNumber)
 	assert.Equal(t, "Assessment posting", entry.Memo)
 	require.NotNil(t, entry.SourceType)
-	assert.Equal(t, "assessment", *entry.SourceType)
+	assert.Equal(t, fin.GLSourceTypeAssessment, *entry.SourceType)
 	require.Len(t, entry.Lines, 2)
 }
 
