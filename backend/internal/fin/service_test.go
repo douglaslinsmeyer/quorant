@@ -1704,3 +1704,24 @@ func TestDeleteLineItem_RecalculatesTotals(t *testing.T) {
 	assert.Equal(t, int64(0), updated.TotalIncomeCents)
 	assert.Equal(t, int64(0), updated.NetCents)
 }
+
+func TestDeleteLineItem_NotFound(t *testing.T) {
+	budgetRepo := &mockBudgetRepo{}
+	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
+
+	err := svc.DeleteLineItem(context.Background(), uuid.New())
+	require.Error(t, err)
+
+	var notFound *api.NotFoundError
+	require.ErrorAs(t, err, &notFound)
+}
+
+func TestUpdateLineItem_NotFound(t *testing.T) {
+	budgetRepo := &mockBudgetRepo{}
+	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
+
+	_, err := svc.UpdateLineItem(context.Background(), uuid.New(), &fin.BudgetLineItem{
+		PlannedCents: 10000,
+	})
+	require.Error(t, err)
+}
