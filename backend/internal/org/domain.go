@@ -18,6 +18,7 @@ type Organization struct {
 	AddressLine2 *string        `json:"address_line2,omitempty"`
 	City         *string        `json:"city,omitempty"`
 	State        *string        `json:"state,omitempty"`
+	Jurisdiction *string        `json:"jurisdiction,omitempty"`
 	Zip          *string        `json:"zip,omitempty"`
 	Phone        *string        `json:"phone,omitempty"`
 	Email        *string        `json:"email,omitempty"`

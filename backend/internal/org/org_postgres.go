@@ -61,19 +61,19 @@ func (r *PostgresOrgRepository) Create(ctx context.Context, org *Organization) (
 	const q = `
 		INSERT INTO organizations (
 			parent_id, type, name, slug, path,
-			address_line1, address_line2, city, state, zip,
+			address_line1, address_line2, city, state, jurisdiction, zip,
 			phone, email, website, logo_url,
 			locale, timezone, currency_code, country,
 			settings
 		) VALUES (
 			$1, $2, $3, $4, $5,
-			$6, $7, $8, $9, $10,
-			$11, $12, $13, $14,
-			$15, $16, $17, $18,
-			$19
+			$6, $7, $8, $9, $10, $11,
+			$12, $13, $14, $15,
+			$16, $17, $18, $19,
+			$20
 		)
 		RETURNING id, parent_id, type, name, slug, path,
-		          address_line1, address_line2, city, state, zip,
+		          address_line1, address_line2, city, state, jurisdiction, zip,
 		          phone, email, website, logo_url,
 		          locale, timezone, currency_code, country,
 		          settings,
@@ -89,6 +89,7 @@ func (r *PostgresOrgRepository) Create(ctx context.Context, org *Organization) (
 		org.AddressLine2,
 		org.City,
 		org.State,
+		org.Jurisdiction,
 		org.Zip,
 		org.Phone,
 		org.Email,
@@ -114,7 +115,7 @@ func (r *PostgresOrgRepository) Create(ctx context.Context, org *Organization) (
 func (r *PostgresOrgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Organization, error) {
 	const q = `
 		SELECT id, parent_id, type, name, slug, path,
-		       address_line1, address_line2, city, state, zip,
+		       address_line1, address_line2, city, state, jurisdiction, zip,
 		       phone, email, website, logo_url,
 		       locale, timezone, currency_code, country,
 		       settings,
@@ -139,7 +140,7 @@ func (r *PostgresOrgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Or
 func (r *PostgresOrgRepository) FindBySlug(ctx context.Context, slug string) (*Organization, error) {
 	const q = `
 		SELECT id, parent_id, type, name, slug, path,
-		       address_line1, address_line2, city, state, zip,
+		       address_line1, address_line2, city, state, jurisdiction, zip,
 		       phone, email, website, logo_url,
 		       locale, timezone, currency_code, country,
 		       settings,
@@ -166,7 +167,7 @@ func (r *PostgresOrgRepository) FindBySlug(ctx context.Context, slug string) (*O
 func (r *PostgresOrgRepository) ListByUserAccess(ctx context.Context, userID uuid.UUID, limit int, afterID *uuid.UUID) ([]Organization, bool, error) {
 	const q = `
 		SELECT DISTINCT o.id, o.parent_id, o.type, o.name, o.slug, o.path,
-		                o.address_line1, o.address_line2, o.city, o.state, o.zip,
+		                o.address_line1, o.address_line2, o.city, o.state, o.jurisdiction, o.zip,
 		                o.phone, o.email, o.website, o.logo_url,
 		                o.locale, o.timezone, o.currency_code, o.country,
 		                o.settings,
@@ -215,20 +216,21 @@ func (r *PostgresOrgRepository) Update(ctx context.Context, org *Organization) (
 			address_line2 = $3,
 			city          = $4,
 			state         = $5,
-			zip           = $6,
-			phone         = $7,
-			email         = $8,
-			website       = $9,
-			logo_url      = $10,
-			locale        = $11,
-			timezone      = $12,
-			currency_code = $13,
-			country       = $14,
-			settings      = $15,
+			jurisdiction  = $6,
+			zip           = $7,
+			phone         = $8,
+			email         = $9,
+			website       = $10,
+			logo_url      = $11,
+			locale        = $12,
+			timezone      = $13,
+			currency_code = $14,
+			country       = $15,
+			settings      = $16,
 			updated_at    = now()
-		WHERE id = $16 AND deleted_at IS NULL
+		WHERE id = $17 AND deleted_at IS NULL
 		RETURNING id, parent_id, type, name, slug, path,
-		          address_line1, address_line2, city, state, zip,
+		          address_line1, address_line2, city, state, jurisdiction, zip,
 		          phone, email, website, logo_url,
 		          locale, timezone, currency_code, country,
 		          settings,
@@ -240,6 +242,7 @@ func (r *PostgresOrgRepository) Update(ctx context.Context, org *Organization) (
 		org.AddressLine2,
 		org.City,
 		org.State,
+		org.Jurisdiction,
 		org.Zip,
 		org.Phone,
 		org.Email,
@@ -281,7 +284,7 @@ func (r *PostgresOrgRepository) SoftDelete(ctx context.Context, id uuid.UUID) er
 func (r *PostgresOrgRepository) ListChildren(ctx context.Context, parentID uuid.UUID) ([]Organization, error) {
 	const q = `
 		SELECT id, parent_id, type, name, slug, path,
-		       address_line1, address_line2, city, state, zip,
+		       address_line1, address_line2, city, state, jurisdiction, zip,
 		       phone, email, website, logo_url,
 		       locale, timezone, currency_code, country,
 		       settings,
@@ -297,6 +300,29 @@ func (r *PostgresOrgRepository) ListChildren(ctx context.Context, parentID uuid.
 	defer rows.Close()
 
 	return collectOrgs(rows, "ListChildren")
+}
+
+// ─── ListByJurisdiction ──────────────────────────────────────────────────────
+
+// ListByJurisdiction returns all non-deleted orgs in the given jurisdiction, ordered by name.
+func (r *PostgresOrgRepository) ListByJurisdiction(ctx context.Context, jurisdiction string) ([]Organization, error) {
+	const q = `
+		SELECT id, parent_id, type, name, slug, path,
+		       address_line1, address_line2, city, state, jurisdiction, zip,
+		       phone, email, website, logo_url,
+		       locale, timezone, currency_code, country,
+		       settings,
+		       created_at, updated_at, deleted_at
+		FROM organizations
+		WHERE jurisdiction = $1 AND deleted_at IS NULL
+		ORDER BY name`
+
+	rows, err := r.pool.Query(ctx, q, jurisdiction)
+	if err != nil {
+		return nil, fmt.Errorf("org: ListByJurisdiction: %w", err)
+	}
+	defer rows.Close()
+	return collectOrgs(rows, "ListByJurisdiction")
 }
 
 // ─── ConnectManagement ───────────────────────────────────────────────────────
@@ -447,6 +473,7 @@ func scanOrg(row pgx.Row) (*Organization, error) {
 		&o.AddressLine2,
 		&o.City,
 		&o.State,
+		&o.Jurisdiction,
 		&o.Zip,
 		&o.Phone,
 		&o.Email,
@@ -492,6 +519,7 @@ func collectOrgs(rows pgx.Rows, op string) ([]Organization, error) {
 			&o.AddressLine2,
 			&o.City,
 			&o.State,
+			&o.Jurisdiction,
 			&o.Zip,
 			&o.Phone,
 			&o.Email,

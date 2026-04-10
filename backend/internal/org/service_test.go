@@ -180,6 +180,19 @@ func (m *mockOrgRepo) FindActiveManagement(_ context.Context, hoaOrgID uuid.UUID
 	return nil, nil
 }
 
+func (m *mockOrgRepo) ListByJurisdiction(_ context.Context, jurisdiction string) ([]org.Organization, error) {
+	if m.findErr != nil {
+		return nil, m.findErr
+	}
+	result := []org.Organization{}
+	for _, o := range m.orgs {
+		if o.Jurisdiction != nil && *o.Jurisdiction == jurisdiction {
+			result = append(result, *o)
+		}
+	}
+	return result, nil
+}
+
 // mockMembershipRepo is an in-memory MembershipRepository for unit tests.
 type mockMembershipRepo struct {
 	memberships map[uuid.UUID]*iam.Membership

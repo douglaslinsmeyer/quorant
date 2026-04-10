@@ -82,6 +82,7 @@ func (s *OrgService) CreateOrganization(ctx context.Context, req CreateOrgReques
 		AddressLine2: req.AddressLine2,
 		City:         req.City,
 		State:        req.State,
+		Jurisdiction: req.Jurisdiction,
 		Zip:          req.Zip,
 		Phone:        req.Phone,
 		Email:        req.Email,
@@ -167,6 +168,9 @@ func (s *OrgService) UpdateOrganization(ctx context.Context, id uuid.UUID, req U
 	}
 	if req.State != nil {
 		org.State = req.State
+	}
+	if req.Jurisdiction != nil {
+		org.Jurisdiction = req.Jurisdiction
 	}
 	if req.Zip != nil {
 		org.Zip = req.Zip

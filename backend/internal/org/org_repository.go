@@ -26,4 +26,7 @@ type OrgRepository interface {
 	ListManagementHistory(ctx context.Context, hoaOrgID uuid.UUID) ([]OrgManagement, error)
 	// FindActiveManagement returns the active management firm for an HOA (nil if self-managed).
 	FindActiveManagement(ctx context.Context, hoaOrgID uuid.UUID) (*OrgManagement, error)
+
+	// ListByJurisdiction returns all non-deleted orgs in the given jurisdiction.
+	ListByJurisdiction(ctx context.Context, jurisdiction string) ([]Organization, error)
 }

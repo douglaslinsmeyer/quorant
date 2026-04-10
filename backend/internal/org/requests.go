@@ -208,6 +208,7 @@ type CreateOrgRequest struct {
 	AddressLine2 *string        `json:"address_line2,omitempty"`
 	City         *string        `json:"city,omitempty"`
 	State        *string        `json:"state,omitempty"`
+	Jurisdiction *string        `json:"jurisdiction,omitempty"`
 	Zip          *string        `json:"zip,omitempty"`
 	Phone        *string        `json:"phone,omitempty"`
 	Email        *string        `json:"email,omitempty"`
@@ -263,6 +264,7 @@ type UpdateOrgRequest struct {
 	AddressLine2 *string        `json:"address_line2,omitempty"`
 	City         *string        `json:"city,omitempty"`
 	State        *string        `json:"state,omitempty"`
+	Jurisdiction *string        `json:"jurisdiction,omitempty"`
 	Zip          *string        `json:"zip,omitempty"`
 	Phone        *string        `json:"phone,omitempty"`
 	Email        *string        `json:"email,omitempty"`
@@ -282,6 +284,7 @@ func (r UpdateOrgRequest) Validate() error {
 		r.AddressLine2 == nil &&
 		r.City == nil &&
 		r.State == nil &&
+		r.Jurisdiction == nil &&
 		r.Zip == nil &&
 		r.Phone == nil &&
 		r.Email == nil &&
