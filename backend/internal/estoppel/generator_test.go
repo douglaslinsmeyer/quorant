@@ -66,6 +66,134 @@ func TestMarotoGenerator_GenerateLenderQuestionnaire_ProducesValidPDF(t *testing
 }
 
 // ---------------------------------------------------------------------------
+// TestMarotoGenerator_FloridaTemplate
+// ---------------------------------------------------------------------------
+
+// TestMarotoGenerator_FloridaTemplate verifies that the Florida-specific
+// estoppel template produces a valid PDF.
+func TestMarotoGenerator_FloridaTemplate(t *testing.T) {
+	gen := estoppel.NewMarotoGenerator()
+	data := newTestAggregatedData()
+	rules := &estoppel.EstoppelRules{
+		StatutoryFormID: "fl_720_30851",
+		StatuteRef:      "§720.30851",
+	}
+
+	pdf, err := gen.GenerateEstoppel(data, rules)
+
+	require.NoError(t, err, "Florida GenerateEstoppel should not return an error")
+	require.NotEmpty(t, pdf, "Florida GenerateEstoppel should return non-empty bytes")
+	assert.Equal(t, "%PDF", string(pdf[:4]), "PDF bytes should start with %%PDF header")
+}
+
+// ---------------------------------------------------------------------------
+// TestMarotoGenerator_CaliforniaTemplate
+// ---------------------------------------------------------------------------
+
+// TestMarotoGenerator_CaliforniaTemplate verifies that the California-specific
+// estoppel template produces a valid PDF, including required attachments.
+func TestMarotoGenerator_CaliforniaTemplate(t *testing.T) {
+	gen := estoppel.NewMarotoGenerator()
+	data := newTestAggregatedData()
+	rules := &estoppel.EstoppelRules{
+		StatutoryFormID:     "ca_4528",
+		StatuteRef:          "CA Civil Code §4525",
+		RequiredAttachments: []string{"Governing Documents", "CC&Rs", "Bylaws"},
+	}
+
+	pdf, err := gen.GenerateEstoppel(data, rules)
+
+	require.NoError(t, err, "California GenerateEstoppel should not return an error")
+	require.NotEmpty(t, pdf, "California GenerateEstoppel should return non-empty bytes")
+	assert.Equal(t, "%PDF", string(pdf[:4]), "PDF bytes should start with %%PDF header")
+}
+
+// ---------------------------------------------------------------------------
+// TestMarotoGenerator_TexasTemplate
+// ---------------------------------------------------------------------------
+
+// TestMarotoGenerator_TexasTemplate verifies that the Texas-specific estoppel
+// template produces a valid PDF.
+func TestMarotoGenerator_TexasTemplate(t *testing.T) {
+	gen := estoppel.NewMarotoGenerator()
+	data := newTestAggregatedData()
+	rules := &estoppel.EstoppelRules{
+		StatutoryFormID: "tx_207",
+		StatuteRef:      "TX Property Code §207.003",
+	}
+
+	pdf, err := gen.GenerateEstoppel(data, rules)
+
+	require.NoError(t, err, "Texas GenerateEstoppel should not return an error")
+	require.NotEmpty(t, pdf, "Texas GenerateEstoppel should return non-empty bytes")
+	assert.Equal(t, "%PDF", string(pdf[:4]), "PDF bytes should start with %%PDF header")
+}
+
+// ---------------------------------------------------------------------------
+// TestMarotoGenerator_NevadaTemplate
+// ---------------------------------------------------------------------------
+
+// TestMarotoGenerator_NevadaTemplate verifies that the Nevada-specific estoppel
+// template produces a valid PDF.
+func TestMarotoGenerator_NevadaTemplate(t *testing.T) {
+	gen := estoppel.NewMarotoGenerator()
+	data := newTestAggregatedData()
+	rules := &estoppel.EstoppelRules{
+		StatutoryFormID: "nv_116",
+		StatuteRef:      "NRS 116.4109",
+	}
+
+	pdf, err := gen.GenerateEstoppel(data, rules)
+
+	require.NoError(t, err, "Nevada GenerateEstoppel should not return an error")
+	require.NotEmpty(t, pdf, "Nevada GenerateEstoppel should return non-empty bytes")
+	assert.Equal(t, "%PDF", string(pdf[:4]), "PDF bytes should start with %%PDF header")
+}
+
+// ---------------------------------------------------------------------------
+// TestMarotoGenerator_VirginiaTemplate
+// ---------------------------------------------------------------------------
+
+// TestMarotoGenerator_VirginiaTemplate verifies that the Virginia-specific
+// estoppel template produces a valid PDF.
+func TestMarotoGenerator_VirginiaTemplate(t *testing.T) {
+	gen := estoppel.NewMarotoGenerator()
+	data := newTestAggregatedData()
+	rules := &estoppel.EstoppelRules{
+		StatutoryFormID: "va_55_1",
+		StatuteRef:      "§55.1-1808",
+	}
+
+	pdf, err := gen.GenerateEstoppel(data, rules)
+
+	require.NoError(t, err, "Virginia GenerateEstoppel should not return an error")
+	require.NotEmpty(t, pdf, "Virginia GenerateEstoppel should return non-empty bytes")
+	assert.Equal(t, "%PDF", string(pdf[:4]), "PDF bytes should start with %%PDF header")
+}
+
+// ---------------------------------------------------------------------------
+// TestMarotoGenerator_UnknownFormIDFallsBackToGeneric
+// ---------------------------------------------------------------------------
+
+// TestMarotoGenerator_UnknownFormIDFallsBackToGeneric verifies that an
+// unrecognised StatutoryFormID falls back to the generic estoppel template
+// and still produces a valid PDF.
+func TestMarotoGenerator_UnknownFormIDFallsBackToGeneric(t *testing.T) {
+	gen := estoppel.NewMarotoGenerator()
+	data := newTestAggregatedData()
+	rules := &estoppel.EstoppelRules{
+		StatutoryFormID: "zz_unknown_form",
+		StatuteRef:      "Unknown Statute §0",
+	}
+
+	pdf, err := gen.GenerateEstoppel(data, rules)
+
+	require.NoError(t, err, "Fallback GenerateEstoppel should not return an error")
+	require.NotEmpty(t, pdf, "Fallback GenerateEstoppel should return non-empty bytes")
+	assert.Equal(t, "%PDF", string(pdf[:4]), "PDF bytes should start with %%PDF header")
+}
+
+// ---------------------------------------------------------------------------
 // TestMarotoGenerator_InterfaceCompliance
 // ---------------------------------------------------------------------------
 

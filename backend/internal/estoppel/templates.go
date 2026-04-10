@@ -103,6 +103,276 @@ func buildEstoppelPDF(data *AggregatedData, rules *EstoppelRules) ([]byte, error
 }
 
 // ---------------------------------------------------------------------------
+// State-specific estoppel templates
+// ---------------------------------------------------------------------------
+
+// buildFloridaEstoppelPDF constructs a Florida-specific estoppel certificate
+// per §720.30851 / §718.116(8), including 19 statutory disclosure questions.
+func buildFloridaEstoppelPDF(data *AggregatedData, rules *EstoppelRules) ([]byte, error) {
+	m := newMarotoDoc()
+
+	addSectionHeader(m, "FLORIDA ESTOPPEL CERTIFICATE")
+	addSpacer(m, 2)
+	m.AddRow(6,
+		text.NewCol(12, "Pursuant to §720.30851 / §718.116(8)", props.Text{
+			Style: fontstyle.Italic,
+			Size:  9,
+			Align: align.Left,
+		}),
+	)
+	addSpacer(m, 5)
+
+	addCommonEstoppelSections(m, data, rules)
+
+	addSectionHeader(m, "STATUTORY DISCLOSURE QUESTIONS")
+	disclosures := []string{
+		"1. Regular assessment amount and frequency",
+		"2. Paid-through date",
+		"3. Special assessments",
+		"4. Capital contribution fee",
+		"5. Transfer fee",
+		"6. Reserve fund contribution",
+		"7. Past-due balance itemization",
+		"8. Late fees",
+		"9. Interest charges",
+		"10. Collection costs",
+		"11. Attorney/collection agent info",
+		"12. Lien status",
+		"13. Open violations",
+		"14. Pending fines",
+		"15. Pending litigation",
+		"16. Right of first refusal",
+		"17. Board approval requirements",
+		"18. Rental restrictions",
+		"19. Insurance coverage summary",
+	}
+	for _, item := range disclosures {
+		m.AddRow(5,
+			text.NewCol(12, item, props.Text{Size: 9}),
+		)
+	}
+	addSpacer(m, 3)
+
+	m.AddRow(6,
+		text.NewCol(12, "Effective for 30 days from date of issuance", props.Text{
+			Style: fontstyle.Italic,
+			Size:  9,
+			Align: align.Left,
+		}),
+	)
+	addSpacer(m, 5)
+
+	doc, err := m.Generate()
+	if err != nil {
+		return nil, fmt.Errorf("florida estoppel pdf: generate: %w", err)
+	}
+	return doc.GetBytes(), nil
+}
+
+// buildCaliforniaEstoppelPDF constructs a California-specific estoppel
+// certificate per Civil Code §4525–4530.
+func buildCaliforniaEstoppelPDF(data *AggregatedData, rules *EstoppelRules) ([]byte, error) {
+	m := newMarotoDoc()
+
+	addSectionHeader(m, "COMMON INTEREST DEVELOPMENT DISCLOSURE")
+	addSpacer(m, 2)
+	m.AddRow(6,
+		text.NewCol(12, "Pursuant to California Civil Code §4525–4530", props.Text{
+			Style: fontstyle.Italic,
+			Size:  9,
+			Align: align.Left,
+		}),
+	)
+	addSpacer(m, 5)
+
+	addCommonEstoppelSections(m, data, rules)
+
+	addSectionHeader(m, "REQUIRED DOCUMENT ATTACHMENTS")
+	for _, attachment := range rules.RequiredAttachments {
+		m.AddRow(5,
+			text.NewCol(12, attachment, props.Text{Size: 9}),
+		)
+	}
+	addSpacer(m, 5)
+
+	doc, err := m.Generate()
+	if err != nil {
+		return nil, fmt.Errorf("california estoppel pdf: generate: %w", err)
+	}
+	return doc.GetBytes(), nil
+}
+
+// buildTexasEstoppelPDF constructs a Texas-specific estoppel certificate per
+// Property Code §207.003.
+func buildTexasEstoppelPDF(data *AggregatedData, rules *EstoppelRules) ([]byte, error) {
+	m := newMarotoDoc()
+
+	addSectionHeader(m, "TEXAS ESTOPPEL CERTIFICATE")
+	addSpacer(m, 2)
+	m.AddRow(6,
+		text.NewCol(12,
+			"VALIDITY NOTICE: This certificate is valid for 60 days from the date of issuance per Texas Property Code §207.003",
+			props.Text{
+				Style: fontstyle.Bold,
+				Size:  9,
+				Align: align.Left,
+			}),
+	)
+	addSpacer(m, 5)
+
+	addCommonEstoppelSections(m, data, rules)
+
+	m.AddRow(6,
+		text.NewCol(12,
+			"DAMAGES DISCLOSURE: The association may be liable for up to $5,000 in damages for non-compliance with Property Code §207.003",
+			props.Text{Size: 9}),
+	)
+	addSpacer(m, 5)
+
+	doc, err := m.Generate()
+	if err != nil {
+		return nil, fmt.Errorf("texas estoppel pdf: generate: %w", err)
+	}
+	return doc.GetBytes(), nil
+}
+
+// buildNevadaEstoppelPDF constructs a Nevada-specific estoppel certificate per
+// NRS 116.4109.
+func buildNevadaEstoppelPDF(data *AggregatedData, rules *EstoppelRules) ([]byte, error) {
+	m := newMarotoDoc()
+
+	addSectionHeader(m, "NEVADA ESTOPPEL CERTIFICATE")
+	addSpacer(m, 2)
+	m.AddRow(6,
+		text.NewCol(12, "Pursuant to NRS 116.4109", props.Text{
+			Style: fontstyle.Italic,
+			Size:  9,
+			Align: align.Left,
+		}),
+	)
+	addSpacer(m, 5)
+
+	addCommonEstoppelSections(m, data, rules)
+
+	m.AddRow(6,
+		text.NewCol(12,
+			"FEE NOTICE: Fees are subject to annual CPI adjustment with a 3% cap per NRS 116.4109",
+			props.Text{Size: 9}),
+	)
+	addSpacer(m, 2)
+	m.AddRow(6,
+		text.NewCol(12,
+			"ELECTRONIC FORMAT: This certificate is provided in electronic format as required by Nevada law",
+			props.Text{Size: 9}),
+	)
+	addSpacer(m, 5)
+
+	doc, err := m.Generate()
+	if err != nil {
+		return nil, fmt.Errorf("nevada estoppel pdf: generate: %w", err)
+	}
+	return doc.GetBytes(), nil
+}
+
+// buildVirginiaEstoppelPDF constructs a Virginia-specific estoppel certificate
+// per §55.1-1808.
+func buildVirginiaEstoppelPDF(data *AggregatedData, rules *EstoppelRules) ([]byte, error) {
+	m := newMarotoDoc()
+
+	addSectionHeader(m, "VIRGINIA ESTOPPEL CERTIFICATE")
+	addSpacer(m, 2)
+	m.AddRow(6,
+		text.NewCol(12, "Pursuant to §55.1-1808", props.Text{
+			Style: fontstyle.Italic,
+			Size:  9,
+			Align: align.Left,
+		}),
+	)
+	addSpacer(m, 5)
+
+	addCommonEstoppelSections(m, data, rules)
+
+	m.AddRow(6,
+		text.NewCol(12,
+			"BUYER RESCISSION NOTICE: The buyer has a 3-day right of rescission from receipt of this certificate",
+			props.Text{Size: 9}),
+	)
+	addSpacer(m, 2)
+	m.AddRow(6,
+		text.NewCol(12,
+			"CIC BOARD REGISTRATION: This association is registered with the Common Interest Community Board as required",
+			props.Text{Size: 9}),
+	)
+	addSpacer(m, 5)
+
+	doc, err := m.Generate()
+	if err != nil {
+		return nil, fmt.Errorf("virginia estoppel pdf: generate: %w", err)
+	}
+	return doc.GetBytes(), nil
+}
+
+// addCommonEstoppelSections adds the standard property, financial, compliance,
+// and narrative sections shared by all state-specific estoppel builders.
+func addCommonEstoppelSections(m core.Maroto, data *AggregatedData, rules *EstoppelRules) {
+	// ── Property information ──────────────────────────────────────────────────
+	addSectionHeader(m, "Property Information")
+	addLabelValue(m, "Unit Number", data.Property.UnitNumber)
+	addLabelValue(m, "Address", data.Property.Address)
+	addLabelValue(m, "Parcel Number", data.Property.ParcelNumber)
+	addLabelValue(m, "Unit Type", data.Property.UnitType)
+	addSpacer(m, 3)
+
+	// ── Financial information ─────────────────────────────────────────────────
+	addSectionHeader(m, "Financial Information")
+	addLabelValue(m, "Regular Assessment", formatCents(data.Financial.RegularAssessmentCents))
+	addLabelValue(m, "Assessment Frequency", data.Financial.AssessmentFrequency)
+	addLabelValue(m, "Current Balance", formatCents(data.Financial.CurrentBalanceCents))
+	addLabelValue(m, "Transfer Fee", formatCents(data.Financial.TransferFeeCents))
+	addLabelValue(m, "Capital Contribution", formatCents(data.Financial.CapitalContributionCents))
+	addLabelValue(m, "Reserve Fund Fee", formatCents(data.Financial.ReserveFundFeeCents))
+	addSpacer(m, 3)
+
+	// Delinquency section
+	if data.Financial.HasActiveCollection {
+		addSectionHeader(m, "Delinquency Information")
+		addLabelValue(m, "Collection Status", data.Financial.CollectionStatus)
+		addLabelValue(m, "Total Delinquent Amount", formatCents(data.Financial.TotalDelinquentCents))
+		addLabelValue(m, "Late Fees", formatCents(data.Financial.LateFeesCents))
+		addLabelValue(m, "Interest", formatCents(data.Financial.InterestCents))
+		addSpacer(m, 3)
+	}
+
+	// ── Compliance information ────────────────────────────────────────────────
+	addSectionHeader(m, "Compliance Information")
+	addLabelValue(m, "Open Violations", fmt.Sprintf("%d", data.Compliance.Violations.OpenCount))
+	addLabelValue(m, "Active Fines", fmt.Sprintf("%v", data.Compliance.Violations.HasActiveFine))
+	addLabelValue(m, "Total Fines", formatCents(data.Compliance.Violations.TotalFinesCents))
+	addSpacer(m, 3)
+
+	// ── Narrative sections ────────────────────────────────────────────────────
+	if data.Narratives != nil {
+		addSectionHeader(m, "Assessment Summary")
+		for _, f := range data.Narratives.AssessmentSummary {
+			addNarrativeField(m, f)
+		}
+		addSpacer(m, 3)
+
+		addSectionHeader(m, "Additional Disclosures")
+		for _, f := range data.Narratives.AdditionalDisclosures {
+			addNarrativeField(m, f)
+		}
+		addSpacer(m, 3)
+	}
+
+	// ── Rules & effective information ─────────────────────────────────────────
+	addSectionHeader(m, "Certificate Information")
+	addLabelValue(m, "As of Date", data.AsOfTime.Format(time.DateOnly))
+	addLabelValue(m, "Statute Reference", rules.StatuteRef)
+	addSpacer(m, 5)
+}
+
+// ---------------------------------------------------------------------------
 // Lender questionnaire template
 // ---------------------------------------------------------------------------
 
