@@ -25,14 +25,15 @@ func NewPostgresTemplateRepository(pool *pgxpool.Pool) *PostgresTemplateReposito
 // Create inserts a new message template and returns the fully-populated row.
 func (r *PostgresTemplateRepository) Create(ctx context.Context, t *MessageTemplate) (*MessageTemplate, error) {
 	const q = `
-		INSERT INTO message_templates (org_id, template_key, channel, subject, body, is_active)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, org_id, template_key, channel, subject, body, is_active, created_at, updated_at`
+		INSERT INTO message_templates (org_id, template_key, channel, locale, subject, body, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id, org_id, template_key, channel, locale, subject, body, is_active, created_at, updated_at`
 
 	row := r.pool.QueryRow(ctx, q,
 		t.OrgID,
 		t.TemplateKey,
 		t.Channel,
+		t.Locale,
 		t.Subject,
 		t.Body,
 		t.IsActive,
@@ -49,7 +50,7 @@ func (r *PostgresTemplateRepository) Create(ctx context.Context, t *MessageTempl
 // ListByOrg returns templates belonging to the given org plus system defaults (org_id IS NULL).
 func (r *PostgresTemplateRepository) ListByOrg(ctx context.Context, orgID uuid.UUID) ([]MessageTemplate, error) {
 	const q = `
-		SELECT id, org_id, template_key, channel, subject, body, is_active, created_at, updated_at
+		SELECT id, org_id, template_key, channel, locale, subject, body, is_active, created_at, updated_at
 		FROM message_templates
 		WHERE org_id = $1 OR org_id IS NULL
 		ORDER BY org_id NULLS LAST, template_key, channel`
@@ -82,16 +83,18 @@ func (r *PostgresTemplateRepository) Update(ctx context.Context, t *MessageTempl
 		UPDATE message_templates SET
 			template_key = $1,
 			channel      = $2,
-			subject      = $3,
-			body         = $4,
-			is_active    = $5,
+			locale       = $3,
+			subject      = $4,
+			body         = $5,
+			is_active    = $6,
 			updated_at   = now()
-		WHERE id = $6
-		RETURNING id, org_id, template_key, channel, subject, body, is_active, created_at, updated_at`
+		WHERE id = $7
+		RETURNING id, org_id, template_key, channel, locale, subject, body, is_active, created_at, updated_at`
 
 	row := r.pool.QueryRow(ctx, q,
 		t.TemplateKey,
 		t.Channel,
+		t.Locale,
 		t.Subject,
 		t.Body,
 		t.IsActive,
@@ -124,7 +127,7 @@ func (r *PostgresTemplateRepository) Delete(ctx context.Context, id uuid.UUID) e
 func scanTemplate(row pgx.Row) (*MessageTemplate, error) {
 	var t MessageTemplate
 	err := row.Scan(
-		&t.ID, &t.OrgID, &t.TemplateKey, &t.Channel,
+		&t.ID, &t.OrgID, &t.TemplateKey, &t.Channel, &t.Locale,
 		&t.Subject, &t.Body, &t.IsActive, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
@@ -136,7 +139,7 @@ func scanTemplate(row pgx.Row) (*MessageTemplate, error) {
 func scanTemplateRow(rows pgx.Rows) (*MessageTemplate, error) {
 	var t MessageTemplate
 	err := rows.Scan(
-		&t.ID, &t.OrgID, &t.TemplateKey, &t.Channel,
+		&t.ID, &t.OrgID, &t.TemplateKey, &t.Channel, &t.Locale,
 		&t.Subject, &t.Body, &t.IsActive, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {

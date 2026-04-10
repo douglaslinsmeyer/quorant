@@ -384,6 +384,7 @@ func (s *ComService) CreateTemplate(ctx context.Context, orgID uuid.UUID, req Cr
 		OrgID:       &orgID,
 		TemplateKey: req.TemplateKey,
 		Channel:     req.Channel,
+		Locale:      req.Locale,
 		Body:        req.Body,
 		Subject:     req.Subject,
 		IsActive:    true,

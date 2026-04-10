@@ -103,10 +103,12 @@ type CreateTemplateRequest struct {
 	Channel     string  `json:"channel"`      // required
 	Body        string  `json:"body"`         // required
 	Subject     *string `json:"subject,omitempty"`
+	Locale      string  `json:"locale,omitempty"` // defaults to "en_US"
 }
 
 // Validate checks that TemplateKey, Channel, and Body are present.
-func (r CreateTemplateRequest) Validate() error {
+// If Locale is empty it defaults to "en_US".
+func (r *CreateTemplateRequest) Validate() error {
 	if r.TemplateKey == "" {
 		return api.NewValidationError("template_key is required", "template_key")
 	}
@@ -115,6 +117,9 @@ func (r CreateTemplateRequest) Validate() error {
 	}
 	if r.Body == "" {
 		return api.NewValidationError("body is required", "body")
+	}
+	if r.Locale == "" {
+		r.Locale = "en_US"
 	}
 	return nil
 }
