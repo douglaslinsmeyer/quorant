@@ -569,6 +569,9 @@ func (s *FinService) UpdateLineItem(ctx context.Context, id uuid.UUID, item *Bud
 	if err != nil {
 		return nil, err
 	}
+	if updated == nil {
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "line_item"), api.P("id", id.String()))
+	}
 	if err := s.budgets.RecalculateBudgetTotals(ctx, updated.BudgetID); err != nil {
 		return nil, err
 	}
@@ -582,7 +585,7 @@ func (s *FinService) DeleteLineItem(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 	if item == nil {
-		return api.NewNotFoundError("budget.line_item.not_found")
+		return api.NewNotFoundError("resource.not_found", api.P("resource", "line_item"), api.P("id", id.String()))
 	}
 	if err := s.budgets.DeleteLineItem(ctx, id); err != nil {
 		return err
