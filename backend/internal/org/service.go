@@ -2,6 +2,7 @@ package org
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 
@@ -208,6 +209,12 @@ func (s *OrgService) UpdateOrganization(ctx context.Context, id uuid.UUID, req U
 		return nil, fmt.Errorf("org service: UpdateOrganization: %w", err)
 	}
 
+	payload, _ := json.Marshal(map[string]any{"org_id": updated.ID, "name": updated.Name})
+	evt := queue.NewBaseEvent("quorant.org.OrganizationUpdated", "organization", updated.ID, updated.ID, payload)
+	if err := s.publisher.Publish(ctx, evt); err != nil {
+		s.logger.Error("failed to publish OrganizationUpdated", "org_id", updated.ID, "error", err)
+	}
+
 	s.logger.InfoContext(ctx, "organization updated", "org_id", updated.ID)
 	return updated, nil
 }
@@ -406,6 +413,12 @@ func (s *OrgService) CreateUnit(ctx context.Context, orgID uuid.UUID, req Create
 		return nil, fmt.Errorf("org service: CreateUnit: %w", err)
 	}
 
+	payload, _ := json.Marshal(map[string]any{"org_id": created.OrgID, "unit_id": created.ID})
+	evt := queue.NewBaseEvent("quorant.org.UnitCreated", "unit", created.ID, created.OrgID, payload)
+	if err := s.publisher.Publish(ctx, evt); err != nil {
+		s.logger.Error("failed to publish UnitCreated", "unit_id", created.ID, "error", err)
+	}
+
 	s.logger.InfoContext(ctx, "unit created", "unit_id", created.ID, "org_id", orgID)
 	return created, nil
 }
@@ -489,9 +502,23 @@ func (s *OrgService) UpdateUnit(ctx context.Context, id uuid.UUID, req UpdateUni
 
 // DeleteUnit soft-deletes a unit by ID.
 func (s *OrgService) DeleteUnit(ctx context.Context, id uuid.UUID) error {
+	unit, err := s.unitRepo.FindUnitByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("org service: DeleteUnit lookup: %w", err)
+	}
+
 	if err := s.unitRepo.SoftDeleteUnit(ctx, id); err != nil {
 		return fmt.Errorf("org service: DeleteUnit: %w", err)
 	}
+
+	if unit != nil {
+		payload, _ := json.Marshal(map[string]any{"org_id": unit.OrgID, "unit_id": id})
+		evt := queue.NewBaseEvent("quorant.org.UnitDeleted", "unit", id, unit.OrgID, payload)
+		if err := s.publisher.Publish(ctx, evt); err != nil {
+			s.logger.Error("failed to publish UnitDeleted", "unit_id", id, "error", err)
+		}
+	}
+
 	s.logger.InfoContext(ctx, "unit deleted", "unit_id", id)
 	return nil
 }
