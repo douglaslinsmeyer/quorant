@@ -48,7 +48,7 @@ func (s *GLService) GetAccount(ctx context.Context, id uuid.UUID) (*GLAccount, e
 		return nil, err
 	}
 	if a == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("gl account %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "gl_account"), api.P("id", id.String()))
 	}
 	return a, nil
 }
@@ -65,7 +65,7 @@ func (s *GLService) UpdateAccount(ctx context.Context, id uuid.UUID, req UpdateG
 		return nil, err
 	}
 	if existing.IsSystem && req.Name != nil {
-		return nil, api.NewUnprocessableError("cannot modify system account")
+		return nil, api.NewUnprocessableError("gl.cannot_modify_system_account")
 	}
 	if req.Name != nil {
 		existing.Name = *req.Name
@@ -86,14 +86,14 @@ func (s *GLService) DeleteAccount(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 	if existing.IsSystem {
-		return api.NewUnprocessableError("cannot delete system account")
+		return api.NewUnprocessableError("gl.cannot_delete_system_account")
 	}
 	hasLines, err := s.gl.HasPostedLines(ctx, id)
 	if err != nil {
 		return err
 	}
 	if hasLines {
-		return api.NewUnprocessableError("cannot delete account with posted journal lines")
+		return api.NewUnprocessableError("gl.cannot_delete_account_with_entries")
 	}
 	return s.gl.SoftDeleteAccount(ctx, id)
 }
@@ -177,7 +177,7 @@ func (s *GLService) GetJournalEntry(ctx context.Context, id uuid.UUID) (*GLJourn
 		return nil, err
 	}
 	if entry == nil {
-		return nil, api.NewNotFoundError(fmt.Sprintf("journal entry %s not found", id))
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "journal_entry"), api.P("id", id.String()))
 	}
 	return entry, nil
 }

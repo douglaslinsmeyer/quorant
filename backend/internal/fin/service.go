@@ -82,6 +82,7 @@ func (s *FinService) CreateSchedule(ctx context.Context, orgID uuid.UUID, req Cr
 	}
 	schedule := &AssessmentSchedule{
 		OrgID:           orgID,
+		CurrencyCode:    "USD",
 		Name:            req.Name,
 		Description:     req.Description,
 		Frequency:       req.Frequency,
@@ -170,12 +171,13 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 	}
 
 	a := &Assessment{
-		OrgID:       orgID,
-		UnitID:      req.UnitID,
-		Description: req.Description,
-		AmountCents: req.AmountCents,
-		DueDate:     req.DueDate,
-		GraceDays:   req.GraceDays,
+		OrgID:        orgID,
+		CurrencyCode: "USD",
+		UnitID:       req.UnitID,
+		Description:  req.Description,
+		AmountCents:  req.AmountCents,
+		DueDate:      req.DueDate,
+		GraceDays:    req.GraceDays,
 	}
 
 	// Optional: look up late fee policy to set late_fee_cents if not provided.
@@ -200,6 +202,7 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 	desc := created.Description
 	entry := &LedgerEntry{
 		OrgID:         orgID,
+		CurrencyCode:  "USD",
 		UnitID:        req.UnitID,
 		AssessmentID:  &created.ID,
 		EntryType:     "charge",
@@ -295,6 +298,7 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 	now := time.Now()
 	p := &Payment{
 		OrgID:           orgID,
+		CurrencyCode:    "USD",
 		UnitID:          req.UnitID,
 		UserID:          userID,
 		PaymentMethodID: req.PaymentMethodID,
@@ -312,6 +316,7 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 	refType := "payment"
 	entry := &LedgerEntry{
 		OrgID:         orgID,
+		CurrencyCode:  "USD",
 		UnitID:        req.UnitID,
 		EntryType:     "payment",
 		AmountCents:   -created.AmountCents,
@@ -530,20 +535,21 @@ func (s *FinService) CreateExpense(ctx context.Context, orgID uuid.UUID, submitt
 		return nil, err
 	}
 	e := &Expense{
-		OrgID:       orgID,
-		Description: req.Description,
-		AmountCents: req.AmountCents,
-		TaxCents:    0,
-		TotalCents:  req.AmountCents,
-		Status:      "pending",
-		ExpenseDate: req.ExpenseDate,
-		DueDate:     req.DueDate,
-		FundType:    req.FundType,
-		VendorID:    req.VendorID,
-		CategoryID:  req.CategoryID,
-		BudgetID:    req.BudgetID,
-		SubmittedBy: submittedBy,
-		Metadata:    map[string]any{},
+		OrgID:        orgID,
+		CurrencyCode: "USD",
+		Description:  req.Description,
+		AmountCents:  req.AmountCents,
+		TaxCents:     0,
+		TotalCents:   req.AmountCents,
+		Status:       "pending",
+		ExpenseDate:  req.ExpenseDate,
+		DueDate:      req.DueDate,
+		FundType:     req.FundType,
+		VendorID:     req.VendorID,
+		CategoryID:   req.CategoryID,
+		BudgetID:     req.BudgetID,
+		SubmittedBy:  submittedBy,
+		Metadata:     map[string]any{},
 	}
 	return s.budgets.CreateExpense(ctx, e)
 }
@@ -605,6 +611,7 @@ func (s *FinService) CreateFund(ctx context.Context, orgID uuid.UUID, req Create
 	}
 	f := &Fund{
 		OrgID:              orgID,
+		CurrencyCode:       "USD",
 		Name:               req.Name,
 		FundType:           req.FundType,
 		BalanceCents:       0,
@@ -654,6 +661,7 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 	now := time.Now()
 	t := &FundTransfer{
 		OrgID:         orgID,
+		CurrencyCode:  "USD",
 		FromFundID:    req.FromFundID,
 		ToFundID:      req.ToFundID,
 		AmountCents:   req.AmountCents,

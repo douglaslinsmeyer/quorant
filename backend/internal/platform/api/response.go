@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 )
 
 // Response is the standard JSON envelope for all API responses.
@@ -70,9 +71,31 @@ func ReadJSON(r *http.Request, dst any) error {
 	dec.DisallowUnknownFields()
 
 	if err := dec.Decode(dst); err != nil {
-		return NewValidationError("validation.invalid_body", "", P("detail", err.Error()))
+		return NewValidationError("validation.invalid_body", "", P("detail", sanitizeJSONError(err)))
 	}
 	return nil
+}
+
+// sanitizeJSONError classifies a json.Decoder error and returns a safe message
+// that does not leak Go internal struct names or field paths.
+func sanitizeJSONError(err error) string {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "unknown field"):
+		// Extract field name safely: json: unknown field "foo"
+		if i := strings.Index(msg, `"`); i >= 0 {
+			if j := strings.LastIndex(msg, `"`); j > i {
+				return "unknown field " + msg[i:j+1]
+			}
+		}
+		return "unknown field in request body"
+	case strings.Contains(msg, "cannot unmarshal"):
+		return "invalid field type in request body"
+	case strings.Contains(msg, "EOF"):
+		return "empty request body"
+	default:
+		return "malformed JSON"
+	}
 }
 
 // writeJSON is the internal helper that marshals the envelope and writes it.

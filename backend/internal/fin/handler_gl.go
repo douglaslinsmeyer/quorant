@@ -227,7 +227,7 @@ func (h *GLHandler) GetTrialBalance(w http.ResponseWriter, r *http.Request) {
 	if asOfStr != "" {
 		asOfDate, err = time.Parse("2006-01-02", asOfStr)
 		if err != nil {
-			api.WriteError(w, api.NewValidationError("invalid as_of_date format, expected YYYY-MM-DD", "as_of_date"))
+			api.WriteError(w, api.NewValidationError("validation.constraint", "as_of_date", api.P("field", "as_of_date"), api.P("constraint", "YYYY-MM-DD format")))
 			return
 		}
 	} else {
@@ -256,23 +256,23 @@ func (h *GLHandler) GetAccountBalances(w http.ResponseWriter, r *http.Request) {
 	toStr := r.URL.Query().Get("to")
 
 	if fromStr == "" {
-		api.WriteError(w, api.NewValidationError("from is required", "from"))
+		api.WriteError(w, api.NewValidationError("validation.required", "from", api.P("field", "from")))
 		return
 	}
 	if toStr == "" {
-		api.WriteError(w, api.NewValidationError("to is required", "to"))
+		api.WriteError(w, api.NewValidationError("validation.required", "to", api.P("field", "to")))
 		return
 	}
 
 	from, err := time.Parse("2006-01-02", fromStr)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid from format, expected YYYY-MM-DD", "from"))
+		api.WriteError(w, api.NewValidationError("validation.constraint", "from", api.P("field", "from"), api.P("constraint", "YYYY-MM-DD format")))
 		return
 	}
 
 	to, err := time.Parse("2006-01-02", toStr)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid to format, expected YYYY-MM-DD", "to"))
+		api.WriteError(w, api.NewValidationError("validation.constraint", "to", api.P("field", "to"), api.P("constraint", "YYYY-MM-DD format")))
 		return
 	}
 

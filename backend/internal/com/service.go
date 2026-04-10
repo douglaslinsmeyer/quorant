@@ -419,6 +419,19 @@ func (s *ComService) DeleteTemplate(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// ResolveTemplate finds the best-matching template for the given key, channel, and locale,
+// using a fallback chain: org+locale -> org+en_US -> system+locale -> system+en_US.
+func (s *ComService) ResolveTemplate(ctx context.Context, orgID uuid.UUID, key, channel, locale string) (*MessageTemplate, error) {
+	t, err := s.templates.ResolveTemplate(ctx, orgID, key, channel, locale)
+	if err != nil {
+		return nil, fmt.Errorf("com service: ResolveTemplate: %w", err)
+	}
+	if t == nil {
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "message_template"), api.P("key", key), api.P("channel", channel), api.P("locale", locale))
+	}
+	return t, nil
+}
+
 // ─── Directory ────────────────────────────────────────────────────────────────
 
 // GetDirectoryPreferences returns the directory preferences for a user in an org.

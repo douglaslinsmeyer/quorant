@@ -45,6 +45,7 @@ type Service interface {
 	CreateTemplate(ctx context.Context, orgID uuid.UUID, req CreateTemplateRequest) (*MessageTemplate, error)
 	UpdateTemplate(ctx context.Context, id uuid.UUID, t *MessageTemplate) (*MessageTemplate, error)
 	DeleteTemplate(ctx context.Context, id uuid.UUID) error
+	ResolveTemplate(ctx context.Context, orgID uuid.UUID, key, channel, locale string) (*MessageTemplate, error)
 
 	// Directory Preferences
 	GetDirectoryPreferences(ctx context.Context, userID, orgID uuid.UUID) (*DirectoryPreference, error)

@@ -247,13 +247,30 @@ func (r *CreateOrgRequest) Validate() error {
 		r.Country = "US"
 	}
 
-	// Validate field lengths.
-	if len(r.CurrencyCode) != 3 {
-		return api.NewValidationError("validation.constraint", "currency_code", api.P("field", "currency_code"), api.P("constraint", "must be 3 characters"))
+	// Validate locale format.
+	if !isValidLocaleFormat(r.Locale) {
+		return api.NewValidationError("validation.constraint", "locale",
+			api.P("field", "locale"), api.P("constraint", "a valid locale (e.g., en_US)"))
 	}
-	if len(r.Country) != 2 {
-		return api.NewValidationError("validation.constraint", "country", api.P("field", "country"), api.P("constraint", "must be 2 characters"))
+
+	// Validate timezone.
+	if _, err := time.LoadLocation(r.Timezone); err != nil {
+		return api.NewValidationError("validation.constraint", "timezone",
+			api.P("field", "timezone"), api.P("constraint", "a valid IANA timezone"))
 	}
+
+	// Validate currency code.
+	if len(r.CurrencyCode) != 3 || !isUpperAlpha(r.CurrencyCode) {
+		return api.NewValidationError("validation.constraint", "currency_code",
+			api.P("field", "currency_code"), api.P("constraint", "a 3-letter ISO 4217 code"))
+	}
+
+	// Validate country code.
+	if len(r.Country) != 2 || !isUpperAlpha(r.Country) {
+		return api.NewValidationError("validation.constraint", "country",
+			api.P("field", "country"), api.P("constraint", "a 2-letter ISO 3166-1 code"))
+	}
+
 	return nil
 }
 
@@ -297,11 +314,23 @@ func (r UpdateOrgRequest) Validate() error {
 		r.Settings == nil {
 		return api.NewValidationError("validation.at_least_one", "")
 	}
-	if r.CurrencyCode != nil && len(*r.CurrencyCode) != 3 {
-		return api.NewValidationError("validation.constraint", "currency_code", api.P("field", "currency_code"), api.P("constraint", "must be 3 characters"))
+	if r.Locale != nil && !isValidLocaleFormat(*r.Locale) {
+		return api.NewValidationError("validation.constraint", "locale",
+			api.P("field", "locale"), api.P("constraint", "a valid locale (e.g., en_US)"))
 	}
-	if r.Country != nil && len(*r.Country) != 2 {
-		return api.NewValidationError("validation.constraint", "country", api.P("field", "country"), api.P("constraint", "must be 2 characters"))
+	if r.Timezone != nil {
+		if _, err := time.LoadLocation(*r.Timezone); err != nil {
+			return api.NewValidationError("validation.constraint", "timezone",
+				api.P("field", "timezone"), api.P("constraint", "a valid IANA timezone"))
+		}
+	}
+	if r.CurrencyCode != nil && (len(*r.CurrencyCode) != 3 || !isUpperAlpha(*r.CurrencyCode)) {
+		return api.NewValidationError("validation.constraint", "currency_code",
+			api.P("field", "currency_code"), api.P("constraint", "a 3-letter ISO 4217 code"))
+	}
+	if r.Country != nil && (len(*r.Country) != 2 || !isUpperAlpha(*r.Country)) {
+		return api.NewValidationError("validation.constraint", "country",
+			api.P("field", "country"), api.P("constraint", "a 2-letter ISO 3166-1 code"))
 	}
 	return nil
 }
@@ -454,4 +483,33 @@ func (r ConnectManagementRequest) Validate() error {
 		return api.NewValidationError("validation.required", "firm_org_id", api.P("field", "firm_org_id"))
 	}
 	return nil
+}
+
+// isValidLocaleFormat checks that the string matches the pattern ll_CC
+// (2 lowercase letters + underscore + 2 uppercase letters), e.g. "en_US".
+func isValidLocaleFormat(locale string) bool {
+	if len(locale) != 5 || locale[2] != '_' {
+		return false
+	}
+	for i := 0; i < 2; i++ {
+		if locale[i] < 'a' || locale[i] > 'z' {
+			return false
+		}
+	}
+	for i := 3; i < 5; i++ {
+		if locale[i] < 'A' || locale[i] > 'Z' {
+			return false
+		}
+	}
+	return true
+}
+
+// isUpperAlpha returns true when every character in s is an uppercase ASCII letter.
+func isUpperAlpha(s string) bool {
+	for _, c := range s {
+		if c < 'A' || c > 'Z' {
+			return false
+		}
+	}
+	return true
 }

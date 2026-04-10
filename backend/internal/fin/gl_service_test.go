@@ -244,7 +244,7 @@ func TestGLService_UpdateAccount_RejectsSystemAccount(t *testing.T) {
 
 	var unproc *api.UnprocessableError
 	require.ErrorAs(t, err, &unproc)
-	assert.Contains(t, unproc.Error(), "cannot modify system account")
+	assert.Contains(t, unproc.Error(), "gl.cannot_modify_system_account")
 }
 
 func TestGLService_DeleteAccount_RejectsSystemAccount(t *testing.T) {
@@ -269,7 +269,7 @@ func TestGLService_DeleteAccount_RejectsSystemAccount(t *testing.T) {
 
 	var unproc *api.UnprocessableError
 	require.ErrorAs(t, err, &unproc)
-	assert.Contains(t, unproc.Error(), "cannot delete system account")
+	assert.Contains(t, unproc.Error(), "gl.cannot_delete_system_account")
 }
 
 func TestGLService_DeleteAccount_RejectsAccountWithLines(t *testing.T) {
@@ -295,7 +295,7 @@ func TestGLService_DeleteAccount_RejectsAccountWithLines(t *testing.T) {
 
 	var unproc *api.UnprocessableError
 	require.ErrorAs(t, err, &unproc)
-	assert.Contains(t, unproc.Error(), "cannot delete account with posted journal lines")
+	assert.Contains(t, unproc.Error(), "gl.cannot_delete_account_with_entries")
 }
 
 func TestGLService_PostJournalEntry_BalancedSuccess(t *testing.T) {

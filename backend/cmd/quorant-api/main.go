@@ -32,12 +32,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/quorant/quorant/internal/platform/auth"
-	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/quorant/quorant/internal/platform/config"
 	"github.com/quorant/quorant/internal/platform/db"
 	"github.com/quorant/quorant/internal/platform/health"
+	"github.com/quorant/quorant/internal/platform/i18n"
 	"github.com/quorant/quorant/internal/platform/logging"
 	"github.com/quorant/quorant/internal/platform/middleware"
+	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/quorant/quorant/internal/platform/storage"
 	"github.com/quorant/quorant/internal/platform/telemetry"
 )
@@ -148,6 +149,16 @@ func run() error {
 
 	// Metrics endpoint (no auth — for Prometheus scraper)
 	mux.Handle("GET /metrics", promhttp.Handler())
+
+	// i18n module (unauthenticated — language packs are public)
+	i18nRegistry, err := i18n.NewRegistry()
+	if err != nil {
+		logger.Error("failed to load i18n packs", "error", err)
+		os.Exit(1)
+	}
+	i18nHandler := i18n.NewHandler(i18nRegistry)
+	mux.HandleFunc("GET /api/v1/i18n/{locale}", i18nHandler.GetPack)
+	mux.HandleFunc("GET /api/v1/i18n", i18nHandler.ListLocales)
 
 	// IAM module
 	userRepo := iam.NewPostgresUserRepository(pool)
