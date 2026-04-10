@@ -1178,3 +1178,133 @@ func TestCreateAssessment_NilGLService_StillWorks(t *testing.T) {
 	assert.Equal(t, int64(15000), assessment.AmountCents)
 	assert.Equal(t, unitID, assessment.UnitID)
 }
+
+// ── CurrencyCode Tests ──────────────────────────────────────────────────────
+
+// TestCreateSchedule_SetsCurrencyCode verifies that CurrencyCode is explicitly
+// set to "USD" when creating a schedule.
+func TestCreateSchedule_SetsCurrencyCode(t *testing.T) {
+	svc, _, _, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	req := fin.CreateAssessmentScheduleRequest{
+		Name:            "Monthly HOA",
+		Frequency:       "monthly",
+		AmountStrategy:  "flat",
+		BaseAmountCents: 15000,
+		StartsAt:        time.Now(),
+	}
+
+	schedule, err := svc.CreateSchedule(ctx, orgID, req)
+	require.NoError(t, err)
+	assert.Equal(t, "USD", schedule.CurrencyCode)
+}
+
+// TestCreateAssessment_SetsCurrencyCode verifies that CurrencyCode is explicitly
+// set to "USD" on both the assessment and the charge ledger entry.
+func TestCreateAssessment_SetsCurrencyCode(t *testing.T) {
+	svc, assessmentRepo, _, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	unitID := uuid.New()
+
+	req := fin.CreateAssessmentRequest{
+		UnitID:      unitID,
+		Description: "Monthly HOA fee",
+		AmountCents: 15000,
+		DueDate:     time.Now().AddDate(0, 1, 0),
+	}
+
+	assessment, err := svc.CreateAssessment(ctx, orgID, req)
+	require.NoError(t, err)
+	assert.Equal(t, "USD", assessment.CurrencyCode)
+
+	// Verify ledger entry also has CurrencyCode set.
+	require.Len(t, assessmentRepo.ledger, 1)
+	assert.Equal(t, "USD", assessmentRepo.ledger[0].CurrencyCode)
+}
+
+// TestRecordPayment_SetsCurrencyCode verifies that CurrencyCode is explicitly
+// set to "USD" on both the payment and the payment ledger entry.
+func TestRecordPayment_SetsCurrencyCode(t *testing.T) {
+	svc, assessmentRepo, _, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	unitID := uuid.New()
+	userID := uuid.New()
+
+	req := fin.CreatePaymentRequest{
+		UnitID:      unitID,
+		AmountCents: 15000,
+	}
+
+	payment, err := svc.RecordPayment(ctx, orgID, userID, req)
+	require.NoError(t, err)
+	assert.Equal(t, "USD", payment.CurrencyCode)
+
+	// Verify ledger entry also has CurrencyCode set.
+	require.Len(t, assessmentRepo.ledger, 1)
+	assert.Equal(t, "USD", assessmentRepo.ledger[0].CurrencyCode)
+}
+
+// TestCreateExpense_SetsCurrencyCode verifies that CurrencyCode is explicitly
+// set to "USD" when creating an expense.
+func TestCreateExpense_SetsCurrencyCode(t *testing.T) {
+	svc, _, _, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	userID := uuid.New()
+
+	req := fin.CreateExpenseRequest{
+		Description: "Landscaping",
+		AmountCents: 50000,
+		ExpenseDate: time.Now(),
+	}
+
+	expense, err := svc.CreateExpense(ctx, orgID, userID, req)
+	require.NoError(t, err)
+	assert.Equal(t, "USD", expense.CurrencyCode)
+}
+
+// TestCreateFund_SetsCurrencyCode verifies that CurrencyCode is explicitly
+// set to "USD" when creating a fund.
+func TestCreateFund_SetsCurrencyCode(t *testing.T) {
+	svc, _, _, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	req := fin.CreateFundRequest{
+		Name:     "Operating Fund",
+		FundType: "operating",
+	}
+
+	fund, err := svc.CreateFund(ctx, orgID, req)
+	require.NoError(t, err)
+	assert.Equal(t, "USD", fund.CurrencyCode)
+}
+
+// TestCreateFundTransfer_SetsCurrencyCode verifies that CurrencyCode is explicitly
+// set to "USD" when creating a fund transfer.
+func TestCreateFundTransfer_SetsCurrencyCode(t *testing.T) {
+	svc, _, _, _, fundRepo, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	// Create two funds to transfer between.
+	from, err := svc.CreateFund(ctx, orgID, fin.CreateFundRequest{Name: "From Fund", FundType: "operating"})
+	require.NoError(t, err)
+	to, err := svc.CreateFund(ctx, orgID, fin.CreateFundRequest{Name: "To Fund", FundType: "reserve"})
+	require.NoError(t, err)
+
+	req := fin.CreateFundTransferRequest{
+		FromFundID:  from.ID,
+		ToFundID:    to.ID,
+		AmountCents: 5000,
+	}
+
+	transfer, err := svc.CreateFundTransfer(ctx, orgID, req)
+	require.NoError(t, err)
+	assert.Equal(t, "USD", transfer.CurrencyCode)
+	assert.Len(t, fundRepo.transfers, 1)
+}
