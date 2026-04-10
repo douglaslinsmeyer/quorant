@@ -295,8 +295,12 @@ func TestReadJSON(t *testing.T) {
 		if params == nil {
 			t.Fatal("expected params to be non-nil")
 		}
-		if _, ok := params["detail"]; !ok {
-			t.Error("expected 'detail' key in params")
+		detail, ok := params["detail"]
+		if !ok {
+			t.Fatal("expected 'detail' key in params")
+		}
+		if detail != "malformed JSON" {
+			t.Errorf("expected sanitized detail 'malformed JSON', got %v", detail)
 		}
 	})
 
@@ -312,7 +316,18 @@ func TestReadJSON(t *testing.T) {
 
 		var valErr *api.ValidationError
 		if !errors.As(err, &valErr) {
-			t.Errorf("expected *api.ValidationError, got %T", err)
+			t.Fatalf("expected *api.ValidationError, got %T", err)
+		}
+		params := valErr.MsgParams()
+		if params == nil {
+			t.Fatal("expected params to be non-nil")
+		}
+		detail, ok := params["detail"]
+		if !ok {
+			t.Fatal("expected 'detail' key in params")
+		}
+		if detail != "empty request body" {
+			t.Errorf("expected sanitized detail 'empty request body', got %v", detail)
 		}
 	})
 
@@ -332,7 +347,52 @@ func TestReadJSON(t *testing.T) {
 
 		var valErr *api.ValidationError
 		if !errors.As(err, &valErr) {
-			t.Errorf("expected *api.ValidationError, got %T", err)
+			t.Fatalf("expected *api.ValidationError, got %T", err)
+		}
+		params := valErr.MsgParams()
+		if params == nil {
+			t.Fatal("expected params to be non-nil")
+		}
+		detail, ok := params["detail"]
+		if !ok {
+			t.Fatal("expected 'detail' key in params")
+		}
+		detailStr, ok := detail.(string)
+		if !ok {
+			t.Fatalf("expected detail to be a string, got %T", detail)
+		}
+		if detailStr != `unknown field "unknown"` {
+			t.Errorf("expected sanitized detail %q, got %q", `unknown field "unknown"`, detailStr)
+		}
+	})
+
+	t.Run("returns sanitized detail for type mismatch", func(t *testing.T) {
+		type typedPayload struct {
+			Amount int64 `json:"amount"`
+		}
+		r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"amount":"not-a-number"}`))
+		r.Header.Set("Content-Type", "application/json")
+
+		var dst typedPayload
+		err := api.ReadJSON(r, &dst)
+		if err == nil {
+			t.Fatal("expected error for type mismatch, got nil")
+		}
+
+		var valErr *api.ValidationError
+		if !errors.As(err, &valErr) {
+			t.Fatalf("expected *api.ValidationError, got %T", err)
+		}
+		params := valErr.MsgParams()
+		if params == nil {
+			t.Fatal("expected params to be non-nil")
+		}
+		detail, ok := params["detail"]
+		if !ok {
+			t.Fatal("expected 'detail' key in params")
+		}
+		if detail != "invalid field type in request body" {
+			t.Errorf("expected sanitized detail 'invalid field type in request body', got %v", detail)
 		}
 	})
 }
