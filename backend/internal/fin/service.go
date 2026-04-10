@@ -319,6 +319,54 @@ func (s *FinService) GetOrgLedger(ctx context.Context, orgID uuid.UUID) ([]Ledge
 	return s.assessments.ListLedgerByOrg(ctx, orgID)
 }
 
+// ReverseLedgerEntry creates a reversal entry that negates the original entry's
+// amount and links the two entries together. The original entry is marked as
+// reversed by the new entry.
+func (s *FinService) ReverseLedgerEntry(ctx context.Context, entryID, reversedBy uuid.UUID) (*LedgerEntry, error) {
+	original, err := s.assessments.FindLedgerEntryByID(ctx, entryID)
+	if err != nil {
+		return nil, err
+	}
+	if original == nil {
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "ledger_entry"), api.P("id", entryID.String()))
+	}
+
+	if original.ReversedByEntryID != nil {
+		return nil, fmt.Errorf("fin: ledger entry %s already reversed", entryID)
+	}
+
+	// Build description from original.
+	desc := "Reversal"
+	if original.Description != nil {
+		desc = "Reversal: " + *original.Description
+	}
+
+	refType := LedgerRefTypeReversal
+	reversal := &LedgerEntry{
+		OrgID:         original.OrgID,
+		CurrencyCode:  original.CurrencyCode,
+		UnitID:        original.UnitID,
+		AssessmentID:  original.AssessmentID,
+		EntryType:     LedgerEntryTypeReversal,
+		AmountCents:   -original.AmountCents,
+		Description:   &desc,
+		ReferenceType: &refType,
+		ReferenceID:   &entryID,
+		EffectiveDate: time.Now(),
+	}
+
+	created, err := s.assessments.CreateLedgerEntry(ctx, reversal)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.assessments.UpdateLedgerEntryReversedBy(ctx, entryID, created.ID); err != nil {
+		return nil, err
+	}
+
+	return created, nil
+}
+
 // ── Payments ──────────────────────────────────────────────────────────────────
 
 // RecordPayment validates the request, records the payment, and creates a

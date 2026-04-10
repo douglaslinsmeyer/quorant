@@ -1654,7 +1654,7 @@ func TestCreateFundTransfer_CreatesFundTransactions(t *testing.T) {
 
 func TestCreateLineItem_RecalculatesTotals(t *testing.T) {
 	budgetRepo := &mockBudgetRepo{}
-	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
+	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
 
 	ctx := context.Background()
 	orgID := testutil.TestOrgID()
@@ -1693,7 +1693,7 @@ func TestCreateLineItem_RecalculatesTotals(t *testing.T) {
 
 func TestUpdateLineItem_RecalculatesTotals(t *testing.T) {
 	budgetRepo := &mockBudgetRepo{}
-	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
+	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
 
 	ctx := context.Background()
 	orgID := testutil.TestOrgID()
@@ -1733,7 +1733,7 @@ func TestUpdateLineItem_RecalculatesTotals(t *testing.T) {
 
 func TestDeleteLineItem_RecalculatesTotals(t *testing.T) {
 	budgetRepo := &mockBudgetRepo{}
-	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
+	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
 
 	ctx := context.Background()
 	orgID := testutil.TestOrgID()
@@ -1776,7 +1776,7 @@ func TestDeleteLineItem_RecalculatesTotals(t *testing.T) {
 
 func TestDeleteLineItem_NotFound(t *testing.T) {
 	budgetRepo := &mockBudgetRepo{}
-	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
+	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
 
 	err := svc.DeleteLineItem(context.Background(), uuid.New())
 	require.Error(t, err)
@@ -1787,10 +1787,94 @@ func TestDeleteLineItem_NotFound(t *testing.T) {
 
 func TestUpdateLineItem_NotFound(t *testing.T) {
 	budgetRepo := &mockBudgetRepo{}
-	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
+	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
 
 	_, err := svc.UpdateLineItem(context.Background(), uuid.New(), &fin.BudgetLineItem{
 		PlannedCents: 10000,
 	})
 	require.Error(t, err)
+}
+
+// ── ReverseLedgerEntry Tests ────────────────────────────────────────────────
+
+// TestReverseLedgerEntry verifies the happy-path reversal of a charge ledger
+// entry: the reversal has the correct type, negated amount, reference back to
+// the original, and the unit balance returns to zero.
+func TestReverseLedgerEntry(t *testing.T) {
+	svc, assessmentRepo, _, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	unitID := uuid.New()
+	reversedBy := uuid.New()
+
+	// Create an assessment which also creates a charge ledger entry.
+	req := fin.CreateAssessmentRequest{
+		UnitID:      unitID,
+		Description: "Monthly HOA fee",
+		AmountCents: 15000,
+		DueDate:     time.Now().AddDate(0, 1, 0),
+	}
+	_, err := svc.CreateAssessment(ctx, orgID, req)
+	require.NoError(t, err)
+	require.Len(t, assessmentRepo.ledger, 1)
+
+	originalEntry := assessmentRepo.ledger[0]
+	assert.Equal(t, int64(15000), originalEntry.BalanceCents)
+
+	// Reverse the charge entry.
+	reversal, err := svc.ReverseLedgerEntry(ctx, originalEntry.ID, reversedBy)
+	require.NoError(t, err)
+	require.NotNil(t, reversal)
+
+	// Verify reversal fields.
+	assert.Equal(t, fin.LedgerEntryTypeReversal, reversal.EntryType)
+	assert.Equal(t, int64(-15000), reversal.AmountCents)
+	assert.Equal(t, unitID, reversal.UnitID)
+	assert.Equal(t, orgID, reversal.OrgID)
+
+	// Verify reference points back to the original entry.
+	require.NotNil(t, reversal.ReferenceType)
+	assert.Equal(t, fin.LedgerRefTypeReversal, *reversal.ReferenceType)
+	require.NotNil(t, reversal.ReferenceID)
+	assert.Equal(t, originalEntry.ID, *reversal.ReferenceID)
+
+	// Verify the original entry's ReversedByEntryID points to the reversal.
+	updated := assessmentRepo.ledger[0]
+	require.NotNil(t, updated.ReversedByEntryID)
+	assert.Equal(t, reversal.ID, *updated.ReversedByEntryID)
+
+	// Verify balance is back to zero.
+	assert.Equal(t, int64(0), reversal.BalanceCents)
+}
+
+// TestReverseLedgerEntry_AlreadyReversed verifies that attempting to reverse a
+// ledger entry that has already been reversed returns an error.
+func TestReverseLedgerEntry_AlreadyReversed(t *testing.T) {
+	svc, assessmentRepo, _, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	unitID := uuid.New()
+	reversedBy := uuid.New()
+
+	// Create an assessment which also creates a charge ledger entry.
+	req := fin.CreateAssessmentRequest{
+		UnitID:      unitID,
+		Description: "Monthly HOA fee",
+		AmountCents: 15000,
+		DueDate:     time.Now().AddDate(0, 1, 0),
+	}
+	_, err := svc.CreateAssessment(ctx, orgID, req)
+	require.NoError(t, err)
+	require.Len(t, assessmentRepo.ledger, 1)
+
+	originalEntry := assessmentRepo.ledger[0]
+
+	// First reversal should succeed.
+	_, err = svc.ReverseLedgerEntry(ctx, originalEntry.ID, reversedBy)
+	require.NoError(t, err)
+
+	// Second reversal should fail.
+	_, err = svc.ReverseLedgerEntry(ctx, originalEntry.ID, reversedBy)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "already reversed")
 }
