@@ -108,6 +108,17 @@ func (s FundType) IsValid() bool {
 	return false
 }
 
+// FundTransactionType constants classify the type of fund transaction.
+const (
+	FundTxTypeTransferOut = "transfer_out"
+	FundTxTypeTransferIn  = "transfer_in"
+)
+
+// FundTransactionRefType constants identify the source entity for a fund transaction.
+const (
+	FundTxRefTypeTransfer = "fund_transfer"
+)
+
 // LedgerEntryType classifies a ledger entry's financial effect.
 type LedgerEntryType string
 
