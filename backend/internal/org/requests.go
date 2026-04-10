@@ -26,10 +26,10 @@ type CreateAmenityRequest struct {
 // Validate checks that required fields are present.
 func (r CreateAmenityRequest) Validate() error {
 	if r.Name == "" {
-		return api.NewValidationError("name is required", "name")
+		return api.NewValidationError("validation.required", "name", api.P("field", "name"))
 	}
 	if r.AmenityType == "" {
-		return api.NewValidationError("amenity_type is required", "amenity_type")
+		return api.NewValidationError("validation.required", "amenity_type", api.P("field", "amenity_type"))
 	}
 	return nil
 }
@@ -63,16 +63,16 @@ type CreateReservationRequest struct {
 // Validate checks that required fields are present.
 func (r CreateReservationRequest) Validate() error {
 	if r.UserID == (uuid.UUID{}) {
-		return api.NewValidationError("user_id is required", "user_id")
+		return api.NewValidationError("validation.required", "user_id", api.P("field", "user_id"))
 	}
 	if r.UnitID == (uuid.UUID{}) {
-		return api.NewValidationError("unit_id is required", "unit_id")
+		return api.NewValidationError("validation.required", "unit_id", api.P("field", "unit_id"))
 	}
 	if r.StartsAt.IsZero() {
-		return api.NewValidationError("starts_at is required", "starts_at")
+		return api.NewValidationError("validation.required", "starts_at", api.P("field", "starts_at"))
 	}
 	if r.EndsAt.IsZero() {
-		return api.NewValidationError("ends_at is required", "ends_at")
+		return api.NewValidationError("validation.required", "ends_at", api.P("field", "ends_at"))
 	}
 	return nil
 }
@@ -102,7 +102,7 @@ type CreateVendorRequest struct {
 // Validate checks that required fields are present.
 func (r CreateVendorRequest) Validate() error {
 	if r.Name == "" {
-		return api.NewValidationError("name is required", "name")
+		return api.NewValidationError("validation.required", "name", api.P("field", "name"))
 	}
 	return nil
 }
@@ -129,10 +129,10 @@ type CreateVendorAssignmentRequest struct {
 // Validate checks that required fields are present.
 func (r CreateVendorAssignmentRequest) Validate() error {
 	if r.VendorID == (uuid.UUID{}) {
-		return api.NewValidationError("vendor_id is required", "vendor_id")
+		return api.NewValidationError("validation.required", "vendor_id", api.P("field", "vendor_id"))
 	}
 	if r.ServiceScope == "" {
-		return api.NewValidationError("service_scope is required", "service_scope")
+		return api.NewValidationError("validation.required", "service_scope", api.P("field", "service_scope"))
 	}
 	return nil
 }
@@ -152,10 +152,10 @@ type CreateRegistrationTypeRequest struct {
 // Validate checks that required fields are present.
 func (r CreateRegistrationTypeRequest) Validate() error {
 	if r.Name == "" {
-		return api.NewValidationError("name is required", "name")
+		return api.NewValidationError("validation.required", "name", api.P("field", "name"))
 	}
 	if r.Slug == "" {
-		return api.NewValidationError("slug is required", "slug")
+		return api.NewValidationError("validation.required", "slug", api.P("field", "slug"))
 	}
 	return nil
 }
@@ -183,10 +183,10 @@ type CreateRegistrationRequest struct {
 // Validate checks that required fields are present.
 func (r CreateRegistrationRequest) Validate() error {
 	if r.UserID == (uuid.UUID{}) {
-		return api.NewValidationError("user_id is required", "user_id")
+		return api.NewValidationError("validation.required", "user_id", api.P("field", "user_id"))
 	}
 	if r.RegistrationTypeID == (uuid.UUID{}) {
-		return api.NewValidationError("registration_type_id is required", "registration_type_id")
+		return api.NewValidationError("validation.required", "registration_type_id", api.P("field", "registration_type_id"))
 	}
 	return nil
 }
@@ -212,19 +212,46 @@ type CreateOrgRequest struct {
 	Phone        *string        `json:"phone,omitempty"`
 	Email        *string        `json:"email,omitempty"`
 	Website      *string        `json:"website,omitempty"`
+	Locale       string         `json:"locale,omitempty"`
+	Timezone     string         `json:"timezone,omitempty"`
+	CurrencyCode string         `json:"currency_code,omitempty"`
+	Country      string         `json:"country,omitempty"`
 	Settings     map[string]any `json:"settings,omitempty"`
 }
 
 // Validate checks that Name and Type are present and Type is a valid value.
-func (r CreateOrgRequest) Validate() error {
+// It also applies defaults for Locale, Timezone, CurrencyCode, and Country.
+func (r *CreateOrgRequest) Validate() error {
 	if r.Name == "" {
-		return api.NewValidationError("name is required", "name")
+		return api.NewValidationError("validation.required", "name", api.P("field", "name"))
 	}
 	if r.Type == "" {
-		return api.NewValidationError("type is required", "type")
+		return api.NewValidationError("validation.required", "type", api.P("field", "type"))
 	}
 	if r.Type != "firm" && r.Type != "hoa" {
-		return api.NewValidationError(`type must be "firm" or "hoa"`, "type")
+		return api.NewValidationError("validation.one_of", "type", api.P("field", "type"), api.P("values", "firm, hoa"))
+	}
+
+	// Apply defaults.
+	if r.Locale == "" {
+		r.Locale = "en_US"
+	}
+	if r.Timezone == "" {
+		r.Timezone = "UTC"
+	}
+	if r.CurrencyCode == "" {
+		r.CurrencyCode = "USD"
+	}
+	if r.Country == "" {
+		r.Country = "US"
+	}
+
+	// Validate field lengths.
+	if len(r.CurrencyCode) != 3 {
+		return api.NewValidationError("validation.constraint", "currency_code", api.P("field", "currency_code"), api.P("constraint", "must be 3 characters"))
+	}
+	if len(r.Country) != 2 {
+		return api.NewValidationError("validation.constraint", "country", api.P("field", "country"), api.P("constraint", "must be 2 characters"))
 	}
 	return nil
 }
@@ -241,10 +268,14 @@ type UpdateOrgRequest struct {
 	Email        *string        `json:"email,omitempty"`
 	Website      *string        `json:"website,omitempty"`
 	LogoURL      *string        `json:"logo_url,omitempty"`
+	Locale       *string        `json:"locale,omitempty"`
+	Timezone     *string        `json:"timezone,omitempty"`
+	CurrencyCode *string        `json:"currency_code,omitempty"`
+	Country      *string        `json:"country,omitempty"`
 	Settings     map[string]any `json:"settings,omitempty"`
 }
 
-// Validate checks that at least one field is set.
+// Validate checks that at least one field is set and validates field constraints.
 func (r UpdateOrgRequest) Validate() error {
 	if r.Name == nil &&
 		r.AddressLine1 == nil &&
@@ -256,8 +287,18 @@ func (r UpdateOrgRequest) Validate() error {
 		r.Email == nil &&
 		r.Website == nil &&
 		r.LogoURL == nil &&
+		r.Locale == nil &&
+		r.Timezone == nil &&
+		r.CurrencyCode == nil &&
+		r.Country == nil &&
 		r.Settings == nil {
-		return api.NewValidationError("at least one field must be provided", "")
+		return api.NewValidationError("validation.at_least_one", "")
+	}
+	if r.CurrencyCode != nil && len(*r.CurrencyCode) != 3 {
+		return api.NewValidationError("validation.constraint", "currency_code", api.P("field", "currency_code"), api.P("constraint", "must be 3 characters"))
+	}
+	if r.Country != nil && len(*r.Country) != 2 {
+		return api.NewValidationError("validation.constraint", "country", api.P("field", "country"), api.P("constraint", "must be 2 characters"))
 	}
 	return nil
 }
@@ -272,10 +313,10 @@ type CreateMembershipRequest struct {
 // Validate checks that UserID and RoleID are non-zero.
 func (r CreateMembershipRequest) Validate() error {
 	if r.UserID == (uuid.UUID{}) {
-		return api.NewValidationError("user_id is required", "user_id")
+		return api.NewValidationError("validation.required", "user_id", api.P("field", "user_id"))
 	}
 	if r.RoleID == (uuid.UUID{}) {
-		return api.NewValidationError("role_id is required", "role_id")
+		return api.NewValidationError("validation.required", "role_id", api.P("field", "role_id"))
 	}
 	return nil
 }
@@ -297,15 +338,19 @@ type CreateUnitRequest struct {
 	City         *string        `json:"city,omitempty"`
 	State        *string        `json:"state,omitempty"`
 	Zip          *string        `json:"zip,omitempty"`
+	Country      string         `json:"country,omitempty"`
 	LotSizeSqft  *int           `json:"lot_size_sqft,omitempty"`
 	VotingWeight *float64       `json:"voting_weight,omitempty"` // default 1.00
 	Metadata     map[string]any `json:"metadata,omitempty"`
 }
 
-// Validate checks that Label is present.
-func (r CreateUnitRequest) Validate() error {
+// Validate checks that Label is present and applies defaults.
+func (r *CreateUnitRequest) Validate() error {
 	if r.Label == "" {
-		return api.NewValidationError("label is required", "label")
+		return api.NewValidationError("validation.required", "label", api.P("field", "label"))
+	}
+	if r.Country == "" {
+		r.Country = "US"
 	}
 	return nil
 }
@@ -347,13 +392,13 @@ type CreateUnitMembershipRequest struct {
 // Validate checks that UserID is non-zero and Relationship is valid.
 func (r CreateUnitMembershipRequest) Validate() error {
 	if r.UserID == (uuid.UUID{}) {
-		return api.NewValidationError("user_id is required", "user_id")
+		return api.NewValidationError("validation.required", "user_id", api.P("field", "user_id"))
 	}
 	switch r.Relationship {
 	case "owner", "tenant", "resident", "emergency_contact":
 		// valid
 	default:
-		return api.NewValidationError(`relationship must be one of: owner, tenant, resident, emergency_contact`, "relationship")
+		return api.NewValidationError("validation.one_of", "relationship", api.P("field", "relationship"), api.P("values", "owner, tenant, resident, emergency_contact"))
 	}
 	return nil
 }
@@ -383,13 +428,13 @@ type TransferOwnershipRequest struct {
 // Validate checks that the required fields are present.
 func (r TransferOwnershipRequest) Validate() error {
 	if r.ToUserID == (uuid.UUID{}) {
-		return api.NewValidationError("to_user_id is required", "to_user_id")
+		return api.NewValidationError("validation.required", "to_user_id", api.P("field", "to_user_id"))
 	}
 	if r.TransferType == "" {
-		return api.NewValidationError("transfer_type is required", "transfer_type")
+		return api.NewValidationError("validation.required", "transfer_type", api.P("field", "transfer_type"))
 	}
 	if r.TransferDate.IsZero() {
-		return api.NewValidationError("transfer_date is required", "transfer_date")
+		return api.NewValidationError("validation.required", "transfer_date", api.P("field", "transfer_date"))
 	}
 	return nil
 }
@@ -403,7 +448,7 @@ type ConnectManagementRequest struct {
 // Validate checks that FirmOrgID is non-zero.
 func (r ConnectManagementRequest) Validate() error {
 	if r.FirmOrgID == (uuid.UUID{}) {
-		return api.NewValidationError("firm_org_id is required", "firm_org_id")
+		return api.NewValidationError("validation.required", "firm_org_id", api.P("field", "firm_org_id"))
 	}
 	return nil
 }

@@ -58,7 +58,7 @@ func (h *UnitHandler) ListUnits(w http.ResponseWriter, r *http.Request) {
 
 	afterID, err := parseCursorID(page.Cursor)
 	if err != nil {
-		api.WriteError(w, api.NewValidationError("invalid cursor", "cursor"))
+		api.WriteError(w, api.NewValidationError("validation.invalid_cursor", "cursor"))
 		return
 	}
 
@@ -345,11 +345,11 @@ func (h *UnitHandler) GetOwnershipHistory(w http.ResponseWriter, r *http.Request
 func parseUnitID(r *http.Request) (uuid.UUID, error) {
 	raw := r.PathValue("unit_id")
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError("unit_id is required", "unit_id")
+		return uuid.Nil, api.NewValidationError("validation.required", "unit_id", api.P("field", "unit_id"))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError("unit_id must be a valid UUID", "unit_id")
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", "unit_id", api.P("field", "unit_id"))
 	}
 	return id, nil
 }
@@ -359,11 +359,11 @@ func parseUnitID(r *http.Request) (uuid.UUID, error) {
 func parseUnitMembershipID(r *http.Request) (uuid.UUID, error) {
 	raw := r.PathValue("id")
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError("id is required", "id")
+		return uuid.Nil, api.NewValidationError("validation.required", "id", api.P("field", "id"))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError("id must be a valid UUID", "id")
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", "id", api.P("field", "id"))
 	}
 	return id, nil
 }

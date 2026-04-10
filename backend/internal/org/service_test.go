@@ -550,7 +550,7 @@ func TestCreateOrganization_ValidationFails_MissingName(t *testing.T) {
 	_, err := svc.CreateOrganization(context.Background(), req)
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "name is required")
+	assert.Contains(t, err.Error(), "validation.required")
 	assert.Empty(t, orgRepo.orgs, "repo.Create should not be called on validation failure")
 }
 
@@ -565,7 +565,7 @@ func TestCreateOrganization_ValidationFails_InvalidType(t *testing.T) {
 	_, err := svc.CreateOrganization(context.Background(), req)
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "type must be")
+	assert.Contains(t, err.Error(), "validation.one_of")
 	assert.Empty(t, orgRepo.orgs)
 }
 
@@ -690,7 +690,7 @@ func TestUpdateOrganization_ValidationFails(t *testing.T) {
 	_, err := svc.UpdateOrganization(context.Background(), uuid.New(), org.UpdateOrgRequest{})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "at least one field must be provided")
+	assert.Contains(t, err.Error(), "validation.at_least_one")
 }
 
 func TestUpdateOrganization_NotFound(t *testing.T) {
@@ -766,7 +766,7 @@ func TestConnectManagement_ValidatesOrgTypes_HOANotHOA(t *testing.T) {
 	require.Error(t, err)
 	var valErr *api.ValidationError
 	assert.True(t, errors.As(err, &valErr), "expected ValidationError, got: %T: %v", err, err)
-	assert.Contains(t, err.Error(), "not of type 'hoa'")
+	assert.Contains(t, err.Error(), "validation.constraint")
 }
 
 func TestConnectManagement_ValidatesOrgTypes_FirmNotFirm(t *testing.T) {
@@ -784,7 +784,7 @@ func TestConnectManagement_ValidatesOrgTypes_FirmNotFirm(t *testing.T) {
 	require.Error(t, err)
 	var valErr *api.ValidationError
 	assert.True(t, errors.As(err, &valErr))
-	assert.Contains(t, err.Error(), "not of type 'firm'")
+	assert.Contains(t, err.Error(), "validation.constraint")
 }
 
 func TestConnectManagement_ValidationFails_ZeroFirmOrgID(t *testing.T) {
@@ -798,7 +798,7 @@ func TestConnectManagement_ValidationFails_ZeroFirmOrgID(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "firm_org_id is required")
+	assert.Contains(t, err.Error(), "validation.required")
 }
 
 func TestDisconnectManagement_Success(t *testing.T) {
@@ -862,7 +862,7 @@ func TestCreateMembership_ValidationFails(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "user_id is required")
+	assert.Contains(t, err.Error(), "validation.required")
 	assert.Empty(t, memberRepo.memberships)
 }
 
@@ -971,7 +971,7 @@ func TestCreateUnit_ValidationFails_MissingLabel(t *testing.T) {
 	_, err := svc.CreateUnit(context.Background(), uuid.New(), org.CreateUnitRequest{})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "label is required")
+	assert.Contains(t, err.Error(), "validation.required")
 	assert.Empty(t, unitRepo.units)
 }
 

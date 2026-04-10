@@ -205,11 +205,11 @@ func (h *RegistrationHandler) RevokeRegistration(w http.ResponseWriter, r *http.
 func parseRegistrationTypeID(r *http.Request) (uuid.UUID, error) {
 	raw := r.PathValue("id")
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError("id is required", "id")
+		return uuid.Nil, api.NewValidationError("validation.required", "id", api.P("field", "id"))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError("id must be a valid UUID", "id")
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", "id", api.P("field", "id"))
 	}
 	return id, nil
 }
@@ -218,11 +218,11 @@ func parseRegistrationTypeID(r *http.Request) (uuid.UUID, error) {
 func parseRegistrationID(r *http.Request) (uuid.UUID, error) {
 	raw := r.PathValue("id")
 	if raw == "" {
-		return uuid.Nil, api.NewValidationError("id is required", "id")
+		return uuid.Nil, api.NewValidationError("validation.required", "id", api.P("field", "id"))
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, api.NewValidationError("id must be a valid UUID", "id")
+		return uuid.Nil, api.NewValidationError("validation.invalid_uuid", "id", api.P("field", "id"))
 	}
 	return id, nil
 }
