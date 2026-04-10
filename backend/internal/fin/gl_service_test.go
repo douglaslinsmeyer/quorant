@@ -489,3 +489,104 @@ func TestGLService_SeedDefaultAccounts(t *testing.T) {
 		}
 	}
 }
+
+// ── ReverseJournalEntry Tests ───────────────────────────────────────────────
+
+func TestGLService_ReverseJournalEntry(t *testing.T) {
+	svc, _ := newTestGLService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	postedBy := uuid.New()
+	acct1 := uuid.New()
+	acct2 := uuid.New()
+	sourceType := fin.GLSourceTypeAssessment
+	sourceID := uuid.New()
+	unitID := uuid.New()
+
+	// Post an original entry: Debit acct1 50000, Credit acct2 50000.
+	original, err := svc.PostSystemJournalEntry(
+		ctx, orgID, postedBy, time.Now(),
+		"Assessment charge",
+		&sourceType, &sourceID, &unitID,
+		[]fin.GLJournalLine{
+			{AccountID: acct1, DebitCents: 50000, CreditCents: 0},
+			{AccountID: acct2, DebitCents: 0, CreditCents: 50000},
+		},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, original)
+
+	// Reverse the entry.
+	reversedBy := uuid.New()
+	reversal, err := svc.ReverseJournalEntry(ctx, original.ID, reversedBy)
+	require.NoError(t, err)
+	require.NotNil(t, reversal)
+
+	// Verify reversal metadata.
+	assert.True(t, reversal.IsReversal)
+	assert.Equal(t, "Reversal: Assessment charge", reversal.Memo)
+	require.NotNil(t, reversal.SourceType)
+	assert.Equal(t, sourceType, *reversal.SourceType)
+	require.NotNil(t, reversal.SourceID)
+	assert.Equal(t, sourceID, *reversal.SourceID)
+	require.NotNil(t, reversal.UnitID)
+	assert.Equal(t, unitID, *reversal.UnitID)
+	assert.Equal(t, orgID, reversal.OrgID)
+	assert.Equal(t, reversedBy, reversal.PostedBy)
+
+	// Verify lines are swapped: acct1 now Credit, acct2 now Debit.
+	require.Len(t, reversal.Lines, 2)
+	for _, line := range reversal.Lines {
+		switch line.AccountID {
+		case acct1:
+			assert.Equal(t, int64(0), line.DebitCents)
+			assert.Equal(t, int64(50000), line.CreditCents)
+		case acct2:
+			assert.Equal(t, int64(50000), line.DebitCents)
+			assert.Equal(t, int64(0), line.CreditCents)
+		default:
+			t.Fatalf("unexpected account ID in reversal line: %s", line.AccountID)
+		}
+	}
+
+	// Verify original entry's ReversedBy is set.
+	updated, err := svc.GetJournalEntry(ctx, original.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updated.ReversedBy)
+	assert.Equal(t, reversal.ID, *updated.ReversedBy)
+}
+
+func TestGLService_ReverseJournalEntry_AlreadyReversed(t *testing.T) {
+	svc, _ := newTestGLService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	postedBy := uuid.New()
+
+	// Post and reverse an entry.
+	original, err := svc.PostSystemJournalEntry(
+		ctx, orgID, postedBy, time.Now(),
+		"Already reversed test",
+		nil, nil, nil,
+		[]fin.GLJournalLine{
+			{AccountID: uuid.New(), DebitCents: 10000, CreditCents: 0},
+			{AccountID: uuid.New(), DebitCents: 0, CreditCents: 10000},
+		},
+	)
+	require.NoError(t, err)
+
+	_, err = svc.ReverseJournalEntry(ctx, original.ID, uuid.New())
+	require.NoError(t, err)
+
+	// Attempt to reverse again — should fail.
+	_, err = svc.ReverseJournalEntry(ctx, original.ID, uuid.New())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "already reversed")
+}
+
+func TestGLService_ReverseJournalEntry_NotFound(t *testing.T) {
+	svc, _ := newTestGLService()
+	ctx := context.Background()
+
+	_, err := svc.ReverseJournalEntry(ctx, uuid.New(), uuid.New())
+	require.Error(t, err)
+}

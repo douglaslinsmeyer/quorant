@@ -181,6 +181,64 @@ func (s *GLService) FindAccountByOrgAndNumber(ctx context.Context, orgID uuid.UU
 	return s.gl.FindAccountByOrgAndNumber(ctx, orgID, number)
 }
 
+// FindJournalEntriesBySource returns all journal entries matching the given
+// source_type and source_id. This is a pass-through to the repository, used
+// by higher-level services (e.g. VoidAssessment, VoidPayment).
+func (s *GLService) FindJournalEntriesBySource(ctx context.Context, sourceType GLSourceType, sourceID uuid.UUID) ([]GLJournalEntry, error) {
+	return s.gl.FindJournalEntriesBySource(ctx, sourceType, sourceID)
+}
+
+// ReverseJournalEntry creates a new journal entry that exactly reverses the
+// original (swapping debits and credits on every line), marks the original as
+// reversed, and returns the reversal entry.
+func (s *GLService) ReverseJournalEntry(ctx context.Context, entryID, reversedBy uuid.UUID) (*GLJournalEntry, error) {
+	original, err := s.gl.FindJournalEntryByID(ctx, entryID)
+	if err != nil {
+		return nil, err
+	}
+	if original == nil {
+		return nil, fmt.Errorf("gl: journal entry %s not found", entryID)
+	}
+
+	if original.ReversedBy != nil {
+		return nil, fmt.Errorf("gl: journal entry %s already reversed", entryID)
+	}
+
+	// Build reversal lines by swapping debits and credits.
+	reversalLines := make([]GLJournalLine, len(original.Lines))
+	for i, line := range original.Lines {
+		reversalLines[i] = GLJournalLine{
+			AccountID:   line.AccountID,
+			DebitCents:  line.CreditCents,
+			CreditCents: line.DebitCents,
+			Memo:        line.Memo,
+		}
+	}
+
+	reversal := &GLJournalEntry{
+		OrgID:      original.OrgID,
+		EntryDate:  time.Now(),
+		Memo:       "Reversal: " + original.Memo,
+		SourceType: original.SourceType,
+		SourceID:   original.SourceID,
+		UnitID:     original.UnitID,
+		PostedBy:   reversedBy,
+		IsReversal: true,
+		Lines:      reversalLines,
+	}
+
+	posted, err := s.gl.PostJournalEntry(ctx, reversal)
+	if err != nil {
+		return nil, fmt.Errorf("gl: post reversal entry: %w", err)
+	}
+
+	if err := s.gl.UpdateJournalEntryReversedBy(ctx, entryID, posted.ID); err != nil {
+		return nil, fmt.Errorf("gl: update reversed_by on original entry: %w", err)
+	}
+
+	return posted, nil
+}
+
 // GetJournalEntry returns the journal entry with the given id, or a 404 error.
 func (s *GLService) GetJournalEntry(ctx context.Context, id uuid.UUID) (*GLJournalEntry, error) {
 	entry, err := s.gl.FindJournalEntryByID(ctx, id)
