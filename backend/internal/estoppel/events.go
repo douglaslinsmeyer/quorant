@@ -37,6 +37,10 @@ const (
 
 	// EventRequestCancelled is published when an estoppel request is cancelled.
 	EventRequestCancelled = "estoppel_request.cancelled"
+
+	// EventCertificateAmended is published when an amendment request is created
+	// to correct a previously issued certificate.
+	EventCertificateAmended = "estoppel_certificate.amended"
 )
 
 // aggregateType is the aggregate type label used for all estoppel events.

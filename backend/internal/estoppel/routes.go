@@ -44,4 +44,16 @@ func RegisterRoutes(
 
 	mux.Handle("POST /api/v1/organizations/{org_id}/estoppel/requests/{id}/reject",
 		permMw("estoppel.request.approve", handler.RejectRequest))
+
+	mux.Handle("PATCH /api/v1/organizations/{org_id}/estoppel/requests/{id}/narratives",
+		permMw("estoppel.request.approve", handler.UpdateNarratives))
+
+	mux.Handle("GET /api/v1/organizations/{org_id}/estoppel/requests/{id}/preview",
+		permMw("estoppel.request.approve", handler.PreviewCertificate))
+
+	mux.Handle("GET /api/v1/organizations/{org_id}/estoppel/certificates/{id}/download",
+		permMw("estoppel.certificate.download", handler.DownloadCertificate))
+
+	mux.Handle("POST /api/v1/organizations/{org_id}/estoppel/certificates/{id}/amend",
+		permMw("estoppel.request.approve", handler.AmendCertificate))
 }

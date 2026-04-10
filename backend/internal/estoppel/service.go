@@ -381,6 +381,205 @@ func (s *EstoppelService) RejectRequest(
 	return updated, nil
 }
 
+// UpdateNarratives stores edited narrative sections on a request that is in
+// "manager_review" status. It marshals the narratives to JSON, updates the
+// repository, records an audit entry, and returns the updated request.
+func (s *EstoppelService) UpdateNarratives(
+	ctx context.Context,
+	requestID uuid.UUID,
+	dto UpdateNarrativesDTO,
+	editedBy uuid.UUID,
+) (*EstoppelRequest, error) {
+	req, err := s.GetRequest(ctx, requestID)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.Status != "manager_review" {
+		return nil, api.NewValidationError(
+			fmt.Sprintf("narratives can only be edited when request is in manager_review status; current status is %q", req.Status),
+			"status",
+		)
+	}
+
+	narrativeJSON, err := json.Marshal(dto.Narratives)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling narratives: %w", err)
+	}
+
+	updated, err := s.repo.UpdateRequestNarratives(ctx, requestID, narrativeJSON)
+	if err != nil {
+		return nil, fmt.Errorf("updating request narratives: %w", err)
+	}
+
+	_ = s.auditor.Record(ctx, audit.AuditEntry{
+		OrgID:        req.OrgID,
+		ActorID:      editedBy,
+		Action:       "estoppel_request.narratives_edited",
+		ResourceType: "estoppel_request",
+		ResourceID:   requestID,
+		Module:       "estoppel",
+		OccurredAt:   time.Now(),
+	})
+
+	return updated, nil
+}
+
+// GeneratePreviewPDF produces an in-memory PDF preview without persisting
+// anything. It aggregates data for the request and runs the PDF generator,
+// returning raw PDF bytes suitable for streaming to the caller.
+func (s *EstoppelService) GeneratePreviewPDF(
+	ctx context.Context,
+	requestID uuid.UUID,
+	rules *EstoppelRules,
+) ([]byte, error) {
+	req, err := s.GetRequest(ctx, requestID)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := s.AggregateData(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("aggregating data for preview: %w", err)
+	}
+
+	var pdfBytes []byte
+	if req.RequestType == "lender_questionnaire" {
+		pdfBytes, err = s.generator.GenerateLenderQuestionnaire(data, rules)
+	} else {
+		pdfBytes, err = s.generator.GenerateEstoppel(data, rules)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("generating preview PDF: %w", err)
+	}
+
+	return pdfBytes, nil
+}
+
+// GetCertificate returns the EstoppelCertificate with the given ID, or a 404
+// error if not found.
+func (s *EstoppelService) GetCertificate(ctx context.Context, id uuid.UUID) (*EstoppelCertificate, error) {
+	cert, err := s.repo.FindCertificateByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("finding estoppel certificate: %w", err)
+	}
+	if cert == nil {
+		return nil, api.NewNotFoundError(fmt.Sprintf("estoppel certificate %s not found", id))
+	}
+	return cert, nil
+}
+
+// GetCertificateDownloadURL retrieves a pre-signed download URL for the PDF
+// document attached to the given certificate. It records an audit entry and
+// returns the URL string.
+func (s *EstoppelService) GetCertificateDownloadURL(
+	ctx context.Context,
+	certID uuid.UUID,
+	downloadedBy uuid.UUID,
+) (string, error) {
+	cert, err := s.GetCertificate(ctx, certID)
+	if err != nil {
+		return "", err
+	}
+
+	if cert.DocumentID == nil {
+		return "", api.NewUnprocessableError(
+			fmt.Sprintf("certificate %s has no associated document; it may have been generated without document storage", certID),
+		)
+	}
+
+	if s.docDownloader == nil {
+		return "", api.NewUnprocessableError("document downloader is not configured")
+	}
+
+	url, err := s.docDownloader.GetDownloadURL(ctx, *cert.DocumentID)
+	if err != nil {
+		return "", fmt.Errorf("getting download URL for certificate %s: %w", certID, err)
+	}
+
+	_ = s.auditor.Record(ctx, audit.AuditEntry{
+		OrgID:        cert.OrgID,
+		ActorID:      downloadedBy,
+		Action:       "estoppel_certificate.downloaded",
+		ResourceType: "estoppel_certificate",
+		ResourceID:   certID,
+		Module:       "estoppel",
+		OccurredAt:   time.Now(),
+	})
+
+	return url, nil
+}
+
+// AmendCertificate creates a new estoppel request that is an amendment of
+// an existing certificate. Fee calculation respects FreeAmendmentOnError.
+func (s *EstoppelService) AmendCertificate(
+	ctx context.Context,
+	certID uuid.UUID,
+	rules *EstoppelRules,
+	createdBy uuid.UUID,
+) (*EstoppelRequest, error) {
+	cert, err := s.GetCertificate(ctx, certID)
+	if err != nil {
+		return nil, err
+	}
+
+	origReq, err := s.GetRequest(ctx, cert.RequestID)
+	if err != nil {
+		return nil, fmt.Errorf("fetching original request for amendment: %w", err)
+	}
+
+	// Determine fee breakdown for the amendment.
+	var fees FeeBreakdown
+	if rules.FreeAmendmentOnError {
+		// All fees are zero for error-based amendments.
+		fees = FeeBreakdown{}
+	} else {
+		fees = CalculateFees(rules, origReq.RushRequested, false)
+	}
+
+	deadline := CalculateDeadline(rules, origReq.RushRequested, time.Now())
+
+	newReq := &EstoppelRequest{
+		OrgID:                    origReq.OrgID,
+		UnitID:                   origReq.UnitID,
+		RequestType:              origReq.RequestType,
+		RequestorType:            origReq.RequestorType,
+		RequestorName:            origReq.RequestorName,
+		RequestorEmail:           origReq.RequestorEmail,
+		RequestorPhone:           origReq.RequestorPhone,
+		RequestorCompany:         origReq.RequestorCompany,
+		PropertyAddress:          origReq.PropertyAddress,
+		OwnerName:                origReq.OwnerName,
+		ClosingDate:              origReq.ClosingDate,
+		RushRequested:            origReq.RushRequested,
+		Status:                   "submitted",
+		FeeCents:                 fees.FeeCents,
+		RushFeeCents:             fees.RushFeeCents,
+		DelinquentSurchargeCents: fees.DelinquentSurchargeCents,
+		TotalFeeCents:            fees.TotalFeeCents,
+		DeadlineAt:               deadline,
+		AmendmentOf:              &certID,
+		Metadata:                 map[string]any{},
+		CreatedBy:                createdBy,
+	}
+
+	created, err := s.repo.CreateRequest(ctx, newReq)
+	if err != nil {
+		return nil, fmt.Errorf("creating amendment request: %w", err)
+	}
+
+	evt := newEstoppelEvent(EventCertificateAmended, certID, origReq.OrgID, map[string]any{
+		"amendment_request_id": created.ID,
+		"original_request_id":  cert.RequestID,
+	})
+	if err := s.publisher.Publish(ctx, evt); err != nil {
+		s.logger.Warn("failed to publish estoppel_certificate.amended event",
+			"cert_id", certID, "error", err)
+	}
+
+	return created, nil
+}
+
 // GenerateCertificate produces the PDF, freezes the data snapshot as JSON,
 // and persists a new EstoppelCertificate record linked to the request.
 func (s *EstoppelService) GenerateCertificate(

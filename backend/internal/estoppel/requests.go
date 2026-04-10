@@ -125,3 +125,13 @@ func (d *RejectRequestDTO) Validate() error {
 type UpdateNarrativesDTO struct {
 	Narratives NarrativeSections `json:"narratives"`
 }
+
+// ---------------------------------------------------------------------------
+// AmendCertificateDTO
+// ---------------------------------------------------------------------------
+
+// AmendCertificateDTO carries the optional reason for amending a previously
+// issued estoppel certificate.
+type AmendCertificateDTO struct {
+	Reason string `json:"reason,omitempty"`
+}

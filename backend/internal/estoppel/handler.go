@@ -1,6 +1,7 @@
 package estoppel
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -164,6 +165,164 @@ func (h *Handler) RejectRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	api.WriteJSON(w, http.StatusOK, updated)
+}
+
+// UpdateNarratives handles PATCH /organizations/{org_id}/estoppel/requests/{id}/narratives.
+func (h *Handler) UpdateNarratives(w http.ResponseWriter, r *http.Request) {
+	_, err := parseEstoppelPathUUID(r, "org_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	id, err := parseEstoppelPathUUID(r, "id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	userID := middleware.UserIDFromContext(r.Context())
+	if userID == uuid.Nil {
+		api.WriteError(w, api.NewUnauthenticatedError("user identity required"))
+		return
+	}
+
+	var dto UpdateNarrativesDTO
+	if err := api.ReadJSON(r, &dto); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	updated, err := h.service.UpdateNarratives(r.Context(), id, dto, userID)
+	if err != nil {
+		h.logger.Error("UpdateNarratives failed", "id", id, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, updated)
+}
+
+// PreviewCertificate handles GET /organizations/{org_id}/estoppel/requests/{id}/preview.
+// It generates an in-memory PDF preview and streams it directly to the client.
+func (h *Handler) PreviewCertificate(w http.ResponseWriter, r *http.Request) {
+	orgID, err := parseEstoppelPathUUID(r, "org_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	id, err := parseEstoppelPathUUID(r, "id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	req, err := h.service.GetRequest(r.Context(), id)
+	if err != nil {
+		h.logger.Error("PreviewCertificate: GetRequest failed", "id", id, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	rules, err := h.service.ResolveRules(r.Context(), orgID, req.UnitID)
+	if err != nil {
+		h.logger.Error("PreviewCertificate: ResolveRules failed", "org_id", orgID, "unit_id", req.UnitID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	pdfBytes, err := h.service.GeneratePreviewPDF(r.Context(), id, rules)
+	if err != nil {
+		h.logger.Error("PreviewCertificate: GeneratePreviewPDF failed", "id", id, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="preview-%s.pdf"`, id))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(pdfBytes)
+}
+
+// DownloadCertificate handles GET /organizations/{org_id}/estoppel/certificates/{id}/download.
+// It returns a pre-signed URL for the certificate's stored PDF document.
+func (h *Handler) DownloadCertificate(w http.ResponseWriter, r *http.Request) {
+	id, err := parseEstoppelPathUUID(r, "id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	userID := middleware.UserIDFromContext(r.Context())
+	if userID == uuid.Nil {
+		api.WriteError(w, api.NewUnauthenticatedError("user identity required"))
+		return
+	}
+
+	downloadURL, err := h.service.GetCertificateDownloadURL(r.Context(), id, userID)
+	if err != nil {
+		h.logger.Error("DownloadCertificate failed", "id", id, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusOK, map[string]string{"url": downloadURL})
+}
+
+// AmendCertificate handles POST /organizations/{org_id}/estoppel/certificates/{id}/amend.
+// It creates a new estoppel request that amends the given certificate.
+func (h *Handler) AmendCertificate(w http.ResponseWriter, r *http.Request) {
+	orgID, err := parseEstoppelPathUUID(r, "org_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	id, err := parseEstoppelPathUUID(r, "id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	userID := middleware.UserIDFromContext(r.Context())
+	if userID == uuid.Nil {
+		api.WriteError(w, api.NewUnauthenticatedError("user identity required"))
+		return
+	}
+
+	// Parse optional body; tolerate empty bodies by not enforcing ReadJSON.
+	var dto AmendCertificateDTO
+	// Only decode if there is a body to read.
+	if r.ContentLength != 0 {
+		if decErr := api.ReadJSON(r, &dto); decErr != nil {
+			api.WriteError(w, decErr)
+			return
+		}
+	}
+
+	cert, err := h.service.GetCertificate(r.Context(), id)
+	if err != nil {
+		h.logger.Error("AmendCertificate: GetCertificate failed", "id", id, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	rules, err := h.service.ResolveRules(r.Context(), orgID, cert.UnitID)
+	if err != nil {
+		h.logger.Error("AmendCertificate: ResolveRules failed", "org_id", orgID, "unit_id", cert.UnitID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	newReq, err := h.service.AmendCertificate(r.Context(), id, rules, userID)
+	if err != nil {
+		h.logger.Error("AmendCertificate failed", "id", id, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusCreated, newReq)
 }
 
 // ---------------------------------------------------------------------------
