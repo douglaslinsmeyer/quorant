@@ -20,16 +20,16 @@ type CreateViolationRequest struct {
 // Validate checks that all required fields are present and applies defaults.
 func (r *CreateViolationRequest) Validate() error {
 	if r.UnitID == (uuid.UUID{}) {
-		return api.NewValidationError("unit_id is required", "unit_id")
+		return api.NewValidationError("validation.required", "unit_id", api.P("field", "unit_id"))
 	}
 	if r.Title == "" {
-		return api.NewValidationError("title is required", "title")
+		return api.NewValidationError("validation.required", "title", api.P("field", "title"))
 	}
 	if r.Description == "" {
-		return api.NewValidationError("description is required", "description")
+		return api.NewValidationError("validation.required", "description", api.P("field", "description"))
 	}
 	if r.Category == "" {
-		return api.NewValidationError("category is required", "category")
+		return api.NewValidationError("validation.required", "category", api.P("field", "category"))
 	}
 	if r.Severity == 0 {
 		r.Severity = 1
@@ -48,16 +48,16 @@ type CreateARBRequestRequest struct {
 // Validate checks that all required fields are present.
 func (r CreateARBRequestRequest) Validate() error {
 	if r.UnitID == (uuid.UUID{}) {
-		return api.NewValidationError("unit_id is required", "unit_id")
+		return api.NewValidationError("validation.required", "unit_id", api.P("field", "unit_id"))
 	}
 	if r.Title == "" {
-		return api.NewValidationError("title is required", "title")
+		return api.NewValidationError("validation.required", "title", api.P("field", "title"))
 	}
 	if r.Description == "" {
-		return api.NewValidationError("description is required", "description")
+		return api.NewValidationError("validation.required", "description", api.P("field", "description"))
 	}
 	if r.Category == "" {
-		return api.NewValidationError("category is required", "category")
+		return api.NewValidationError("validation.required", "category", api.P("field", "category"))
 	}
 	return nil
 }
@@ -74,19 +74,19 @@ type CreateBallotRequest struct {
 // Validate checks that all required fields are present.
 func (r CreateBallotRequest) Validate() error {
 	if r.Title == "" {
-		return api.NewValidationError("title is required", "title")
+		return api.NewValidationError("validation.required", "title", api.P("field", "title"))
 	}
 	if r.Description == "" {
-		return api.NewValidationError("description is required", "description")
+		return api.NewValidationError("validation.required", "description", api.P("field", "description"))
 	}
 	if r.BallotType == "" {
-		return api.NewValidationError("ballot_type is required", "ballot_type")
+		return api.NewValidationError("validation.required", "ballot_type", api.P("field", "ballot_type"))
 	}
 	if r.OpensAt.IsZero() {
-		return api.NewValidationError("opens_at is required", "opens_at")
+		return api.NewValidationError("validation.required", "opens_at", api.P("field", "opens_at"))
 	}
 	if r.ClosesAt.IsZero() {
-		return api.NewValidationError("closes_at is required", "closes_at")
+		return api.NewValidationError("validation.required", "closes_at", api.P("field", "closes_at"))
 	}
 	return nil
 }
@@ -100,10 +100,10 @@ type CastBallotVoteRequest struct {
 // Validate checks that unit_id and selection are present.
 func (r CastBallotVoteRequest) Validate() error {
 	if r.UnitID == (uuid.UUID{}) {
-		return api.NewValidationError("unit_id is required", "unit_id")
+		return api.NewValidationError("validation.required", "unit_id", api.P("field", "unit_id"))
 	}
 	if len(r.Selection) == 0 {
-		return api.NewValidationError("selection is required", "selection")
+		return api.NewValidationError("validation.required", "selection", api.P("field", "selection"))
 	}
 	return nil
 }
@@ -117,10 +117,10 @@ type FileProxyRequest struct {
 // Validate checks that both unit_id and proxy_id are present.
 func (r FileProxyRequest) Validate() error {
 	if r.UnitID == (uuid.UUID{}) {
-		return api.NewValidationError("unit_id is required", "unit_id")
+		return api.NewValidationError("validation.required", "unit_id", api.P("field", "unit_id"))
 	}
 	if r.ProxyID == (uuid.UUID{}) {
-		return api.NewValidationError("proxy_id is required", "proxy_id")
+		return api.NewValidationError("validation.required", "proxy_id", api.P("field", "proxy_id"))
 	}
 	return nil
 }
@@ -135,13 +135,13 @@ type CreateMeetingRequest struct {
 // Validate checks that title, meeting_type, and scheduled_at are present.
 func (r CreateMeetingRequest) Validate() error {
 	if r.Title == "" {
-		return api.NewValidationError("title is required", "title")
+		return api.NewValidationError("validation.required", "title", api.P("field", "title"))
 	}
 	if r.MeetingType == "" {
-		return api.NewValidationError("meeting_type is required", "meeting_type")
+		return api.NewValidationError("validation.required", "meeting_type", api.P("field", "meeting_type"))
 	}
 	if r.ScheduledAt.IsZero() {
-		return api.NewValidationError("scheduled_at is required", "scheduled_at")
+		return api.NewValidationError("validation.required", "scheduled_at", api.P("field", "scheduled_at"))
 	}
 	return nil
 }
@@ -155,10 +155,10 @@ type RecordMotionRequest struct {
 // Validate checks that title and moved_by are present.
 func (r RecordMotionRequest) Validate() error {
 	if r.Title == "" {
-		return api.NewValidationError("title is required", "title")
+		return api.NewValidationError("validation.required", "title", api.P("field", "title"))
 	}
 	if r.MovedBy == (uuid.UUID{}) {
-		return api.NewValidationError("moved_by is required", "moved_by")
+		return api.NewValidationError("validation.required", "moved_by", api.P("field", "moved_by"))
 	}
 	return nil
 }
@@ -172,7 +172,7 @@ type CreateViolationActionRequest struct {
 // Validate checks that action_type is present.
 func (r CreateViolationActionRequest) Validate() error {
 	if r.ActionType == "" {
-		return api.NewValidationError("action_type is required", "action_type")
+		return api.NewValidationError("validation.required", "action_type", api.P("field", "action_type"))
 	}
 	return nil
 }
@@ -188,9 +188,9 @@ func (r CastARBVoteRequest) Validate() error {
 	case "approve", "deny", "abstain", "conditional_approve":
 		// valid
 	case "":
-		return api.NewValidationError("vote is required", "vote")
+		return api.NewValidationError("validation.required", "vote", api.P("field", "vote"))
 	default:
-		return api.NewValidationError("vote must be one of: approve, deny, abstain, conditional_approve", "vote")
+		return api.NewValidationError("validation.one_of", "vote", api.P("field", "vote"), api.P("values", "approve, deny, abstain, conditional_approve"))
 	}
 	return nil
 }

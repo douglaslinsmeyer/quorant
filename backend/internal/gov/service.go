@@ -114,7 +114,7 @@ func (s *GovService) GetViolation(ctx context.Context, id uuid.UUID) (*Violation
 		return nil, err
 	}
 	if v == nil {
-		return nil, api.NewNotFoundError("violation not found")
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "violation"))
 	}
 	return v, nil
 }
@@ -179,7 +179,7 @@ func (s *GovService) GetHearing(ctx context.Context, violationID uuid.UUID) (*He
 		return nil, err
 	}
 	if h == nil {
-		return nil, api.NewNotFoundError("hearing not found")
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "hearing"))
 	}
 	return h, nil
 }
@@ -229,7 +229,7 @@ func (s *GovService) GetARBRequest(ctx context.Context, id uuid.UUID) (*ARBReque
 		return nil, err
 	}
 	if r == nil {
-		return nil, api.NewNotFoundError("ARB request not found")
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "ARB request"))
 	}
 	return r, nil
 }
@@ -312,7 +312,7 @@ func (s *GovService) GetBallot(ctx context.Context, id uuid.UUID) (*Ballot, erro
 		return nil, err
 	}
 	if b == nil {
-		return nil, api.NewNotFoundError("ballot not found")
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "ballot"))
 	}
 	return b, nil
 }
@@ -405,7 +405,7 @@ func (s *GovService) GetMeeting(ctx context.Context, id uuid.UUID) (*Meeting, er
 		return nil, err
 	}
 	if m == nil {
-		return nil, api.NewNotFoundError("meeting not found")
+		return nil, api.NewNotFoundError("resource.not_found", api.P("resource", "meeting"))
 	}
 	return m, nil
 }
