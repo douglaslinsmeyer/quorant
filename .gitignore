@@ -4,3 +4,8 @@
 node_modules/
 .DS_Store
 *.swp
+
+# Compiled binaries
+backend/bin/
+backend/quorant-api
+backend/quorant-worker

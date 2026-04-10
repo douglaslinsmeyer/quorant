@@ -12,7 +12,6 @@ import (
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/fin"
 	"github.com/quorant/quorant/internal/platform/api"
-	"github.com/quorant/quorant/internal/platform/queue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -717,7 +716,7 @@ func newTestService() (*fin.FinService, *mockAssessmentRepo, *mockPaymentRepo, *
 	funds := &mockFundRepo{}
 	collections := &mockCollectionRepo{}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
 	return svc, assessments, payments, budgets, funds, collections
 }
 
@@ -1073,7 +1072,7 @@ func TestCreateAssessment_PostsJournalEntry(t *testing.T) {
 	glRepo.accounts[arAccount.ID] = arAccount
 	glRepo.accounts[revenueAccount.ID] = revenueAccount
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
 
 	unitID := uuid.New()
 	req := fin.CreateAssessmentRequest{
@@ -1129,7 +1128,7 @@ func TestRecordPayment_PostsJournalEntry(t *testing.T) {
 	glRepo.accounts[cashAccount.ID] = cashAccount
 	glRepo.accounts[arAccount.ID] = arAccount
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, audit.NewNoopAuditor(), queue.NewInMemoryPublisher(), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), logger)
 
 	unitID := uuid.New()
 	userID := uuid.New()
