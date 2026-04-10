@@ -9,16 +9,23 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	dbpkg "github.com/quorant/quorant/internal/platform/db"
 )
 
-// PostgresGLRepository implements GLRepository using a pgxpool.
+// PostgresGLRepository implements GLRepository using a DBTX.
 type PostgresGLRepository struct {
-	pool *pgxpool.Pool
+	db dbpkg.DBTX
 }
 
 // NewPostgresGLRepository creates a new PostgresGLRepository backed by pool.
 func NewPostgresGLRepository(pool *pgxpool.Pool) *PostgresGLRepository {
-	return &PostgresGLRepository{pool: pool}
+	return &PostgresGLRepository{db: pool}
+}
+
+// WithTx returns a new PostgresGLRepository scoped to the given transaction,
+// enabling participation in a caller-managed transaction.
+func (r *PostgresGLRepository) WithTx(tx pgx.Tx) *PostgresGLRepository {
+	return &PostgresGLRepository{db: tx}
 }
 
 // ─── Chart of Accounts ───────────────────────────────────────────────────────
@@ -37,7 +44,7 @@ func (r *PostgresGLRepository) CreateAccount(ctx context.Context, a *GLAccount) 
 		          account_type, is_header, is_system, description,
 		          created_at, updated_at, deleted_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		a.OrgID,
 		a.ParentID,
 		a.FundID,
@@ -66,7 +73,7 @@ func (r *PostgresGLRepository) FindAccountByID(ctx context.Context, id uuid.UUID
 		FROM gl_accounts
 		WHERE id = $1 AND deleted_at IS NULL`
 
-	row := r.pool.QueryRow(ctx, q, id)
+	row := r.db.QueryRow(ctx, q, id)
 	result, err := scanGLAccount(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -88,7 +95,7 @@ func (r *PostgresGLRepository) ListAccountsByOrg(ctx context.Context, orgID uuid
 		WHERE org_id = $1 AND deleted_at IS NULL
 		ORDER BY account_number`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.db.Query(ctx, q, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListAccountsByOrg: %w", err)
 	}
@@ -107,7 +114,7 @@ func (r *PostgresGLRepository) FindAccountByOrgAndNumber(ctx context.Context, or
 		FROM gl_accounts
 		WHERE org_id = $1 AND account_number = $2 AND deleted_at IS NULL`
 
-	row := r.pool.QueryRow(ctx, q, orgID, number)
+	row := r.db.QueryRow(ctx, q, orgID, number)
 	result, err := scanGLAccount(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -132,7 +139,7 @@ func (r *PostgresGLRepository) UpdateAccount(ctx context.Context, a *GLAccount) 
 		          account_type, is_header, is_system, description,
 		          created_at, updated_at, deleted_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		a.Name,
 		a.Description,
 		a.FundID,
@@ -157,7 +164,7 @@ func (r *PostgresGLRepository) SoftDeleteAccount(ctx context.Context, id uuid.UU
 		SET deleted_at = now(), updated_at = now()
 		WHERE id = $1 AND deleted_at IS NULL`
 
-	_, err := r.pool.Exec(ctx, q, id)
+	_, err := r.db.Exec(ctx, q, id)
 	if err != nil {
 		return fmt.Errorf("fin: SoftDeleteAccount: %w", err)
 	}
@@ -170,7 +177,7 @@ func (r *PostgresGLRepository) SoftDeleteAccount(ctx context.Context, id uuid.UU
 // single database transaction. It assigns the next sequential entry_number
 // for the org. Returns the fully-populated entry including lines.
 func (r *PostgresGLRepository) PostJournalEntry(ctx context.Context, entry *GLJournalEntry) (*GLJournalEntry, error) {
-	tx, err := r.pool.Begin(ctx)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fin: PostJournalEntry begin tx: %w", err)
 	}
@@ -242,7 +249,7 @@ func (r *PostgresGLRepository) FindJournalEntryByID(ctx context.Context, id uuid
 		FROM gl_journal_entries
 		WHERE id = $1`
 
-	row := r.pool.QueryRow(ctx, headerQ, id)
+	row := r.db.QueryRow(ctx, headerQ, id)
 	entry, err := scanGLJournalEntry(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -257,7 +264,7 @@ func (r *PostgresGLRepository) FindJournalEntryByID(ctx context.Context, id uuid
 		WHERE journal_entry_id = $1
 		ORDER BY id`
 
-	rows, err := r.pool.Query(ctx, linesQ, entry.ID)
+	rows, err := r.db.Query(ctx, linesQ, entry.ID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: FindJournalEntryByID lines: %w", err)
 	}
@@ -283,7 +290,7 @@ func (r *PostgresGLRepository) ListJournalEntriesByOrg(ctx context.Context, orgI
 		WHERE org_id = $1
 		ORDER BY entry_number DESC`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.db.Query(ctx, q, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListJournalEntriesByOrg: %w", err)
 	}
@@ -311,7 +318,7 @@ func (r *PostgresGLRepository) GetTrialBalance(ctx context.Context, orgID uuid.U
 		HAVING SUM(l.debit_cents) != 0 OR SUM(l.credit_cents) != 0
 		ORDER BY a.account_number`
 
-	rows, err := r.pool.Query(ctx, q, orgID, asOfDate)
+	rows, err := r.db.Query(ctx, q, orgID, asOfDate)
 	if err != nil {
 		return nil, fmt.Errorf("fin: GetTrialBalance: %w", err)
 	}
@@ -336,7 +343,7 @@ func (r *PostgresGLRepository) GetAccountBalances(ctx context.Context, orgID uui
 		HAVING SUM(l.debit_cents) != 0 OR SUM(l.credit_cents) != 0
 		ORDER BY a.account_number`
 
-	rows, err := r.pool.Query(ctx, q, orgID, from, to)
+	rows, err := r.db.Query(ctx, q, orgID, from, to)
 	if err != nil {
 		return nil, fmt.Errorf("fin: GetAccountBalances: %w", err)
 	}
@@ -351,7 +358,7 @@ func (r *PostgresGLRepository) HasPostedLines(ctx context.Context, accountID uui
 	const q = `SELECT EXISTS(SELECT 1 FROM gl_journal_lines WHERE account_id = $1)`
 
 	var exists bool
-	err := r.pool.QueryRow(ctx, q, accountID).Scan(&exists)
+	err := r.db.QueryRow(ctx, q, accountID).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("fin: HasPostedLines: %w", err)
 	}
