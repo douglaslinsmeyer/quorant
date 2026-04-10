@@ -209,79 +209,34 @@ func (s *GLService) GetAccountBalances(ctx context.Context, orgID uuid.UUID, fro
 }
 
 // SeedDefaultAccounts creates the default chart of accounts for a new org.
-func (s *GLService) SeedDefaultAccounts(ctx context.Context, orgID uuid.UUID, operatingFundID uuid.UUID, reserveFundID uuid.UUID) error {
-	type acctDef struct {
-		number    int
-		name      string
-		acctType  GLAccountType
-		isHeader  bool
-		isSystem  bool
-		fundID    *uuid.UUID
-		parentNum int // 0 means no parent
+func (s *GLService) SeedDefaultAccounts(ctx context.Context, orgID uuid.UUID, operatingFundID uuid.UUID, reserveFundID uuid.UUID, engine AccountingEngine) error {
+	fundMap := map[string]*uuid.UUID{
+		"operating": &operatingFundID,
+		"reserve":   &reserveFundID,
 	}
 
-	defs := []acctDef{
-		// Headers
-		{1000, "Assets", GLAccountTypeAsset, true, true, nil, 0},
-		{2000, "Liabilities", GLAccountTypeLiability, true, true, nil, 0},
-		{3000, "Fund Balances", GLAccountTypeEquity, true, true, nil, 0},
-		{4000, "Revenue", GLAccountTypeRevenue, true, true, nil, 0},
-		{5000, "Operating Expenses", GLAccountTypeExpense, true, true, nil, 0},
-
-		// Under 1000 Assets
-		{1010, "Cash-Operating", GLAccountTypeAsset, false, true, &operatingFundID, 1000},
-		{1020, "Cash-Reserve", GLAccountTypeAsset, false, true, &reserveFundID, 1000},
-		{1100, "AR-Assessments", GLAccountTypeAsset, false, true, &operatingFundID, 1000},
-		{1110, "AR-Other", GLAccountTypeAsset, false, false, &operatingFundID, 1000},
-		{1200, "Prepaid Expenses", GLAccountTypeAsset, false, false, &operatingFundID, 1000},
-
-		// Under 2000 Liabilities
-		{2100, "AP", GLAccountTypeLiability, false, true, &operatingFundID, 2000},
-		{2200, "Prepaid Assessments", GLAccountTypeLiability, false, false, &operatingFundID, 2000},
-
-		// Under 3000 Fund Balances
-		{3010, "Operating Fund Balance", GLAccountTypeEquity, false, true, &operatingFundID, 3000},
-		{3020, "Reserve Fund Balance", GLAccountTypeEquity, false, true, &reserveFundID, 3000},
-		{3100, "Interfund Transfer Out", GLAccountTypeEquity, false, true, nil, 3000},
-		{3110, "Interfund Transfer In", GLAccountTypeEquity, false, true, nil, 3000},
-
-		// Under 4000 Revenue
-		{4010, "Assessment Revenue-Operating", GLAccountTypeRevenue, false, true, &operatingFundID, 4000},
-		{4020, "Assessment Revenue-Reserve", GLAccountTypeRevenue, false, true, &reserveFundID, 4000},
-		{4100, "Late Fee Revenue", GLAccountTypeRevenue, false, true, &operatingFundID, 4000},
-		{4200, "Interest Income", GLAccountTypeRevenue, false, false, nil, 4000},
-
-		// Under 5000 Operating Expenses
-		{5010, "Management Fee", GLAccountTypeExpense, false, false, &operatingFundID, 5000},
-		{5020, "Insurance", GLAccountTypeExpense, false, false, &operatingFundID, 5000},
-		{5030, "Utilities", GLAccountTypeExpense, false, false, &operatingFundID, 5000},
-		{5040, "Landscaping", GLAccountTypeExpense, false, false, &operatingFundID, 5000},
-		{5050, "Maintenance and Repairs", GLAccountTypeExpense, false, false, &operatingFundID, 5000},
-		{5060, "Professional Services", GLAccountTypeExpense, false, false, &operatingFundID, 5000},
-	}
-
-	// Map account number to created account ID for parent references.
+	seeds := engine.ChartOfAccounts()
 	numToID := make(map[int]uuid.UUID)
 
-	for _, d := range defs {
+	for _, seed := range seeds {
 		a := &GLAccount{
 			OrgID:         orgID,
-			AccountNumber: d.number,
-			Name:          d.name,
-			AccountType:   d.acctType,
-			IsHeader:      d.isHeader,
-			IsSystem:      d.isSystem,
-			FundID:        d.fundID,
+			AccountNumber: seed.Number,
+			Name:          seed.Name,
+			AccountType:   seed.Type,
+			IsHeader:      seed.IsHeader,
+			IsSystem:      seed.IsSystem,
+			FundID:        fundMap[seed.FundKey],
 		}
-		if d.parentNum != 0 {
-			parentID := numToID[d.parentNum]
+		if seed.ParentNum != 0 {
+			parentID := numToID[seed.ParentNum]
 			a.ParentID = &parentID
 		}
 		created, err := s.gl.CreateAccount(ctx, a)
 		if err != nil {
-			return fmt.Errorf("seed account %d %s: %w", d.number, d.name, err)
+			return fmt.Errorf("seed account %d %s: %w", seed.Number, seed.Name, err)
 		}
-		numToID[d.number] = created.ID
+		numToID[seed.Number] = created.ID
 	}
 
 	return nil

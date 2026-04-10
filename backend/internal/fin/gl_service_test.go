@@ -436,7 +436,7 @@ func TestGLService_SeedDefaultAccounts(t *testing.T) {
 	operatingFundID := uuid.New()
 	reserveFundID := uuid.New()
 
-	err := svc.SeedDefaultAccounts(ctx, orgID, operatingFundID, reserveFundID)
+	err := svc.SeedDefaultAccounts(ctx, orgID, operatingFundID, reserveFundID, fin.NewGaapEngine())
 	require.NoError(t, err)
 
 	// Count accounts belonging to this org.
