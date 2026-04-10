@@ -396,13 +396,23 @@ func (r *PostgresAssessmentRepository) SoftDeleteAssessment(ctx context.Context,
 
 // CreateLedgerEntry inserts an immutable ledger entry. It computes
 // balance_cents as the previous balance for the unit plus this entry's
-// amount_cents (0 base when no prior entries exist).
+// amount_cents (0 base when no prior entries exist). An advisory lock
+// keyed on unit_id serializes concurrent writes to prevent running
+// balance corruption.
 func (r *PostgresAssessmentRepository) CreateLedgerEntry(ctx context.Context, entry *LedgerEntry) (*LedgerEntry, error) {
-	// Compute balance_cents = previous_balance + amount_cents using a CTE so
-	// the whole operation is a single round-trip and is safe under concurrent
-	// inserts (each INSERT reads the balance at INSERT time within the same
-	// statement — for a production system you would serialize with advisory
-	// locks or SERIALIZABLE isolation, but this is sufficient for HOA volumes).
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("fin: CreateLedgerEntry begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	// Acquire advisory lock scoped to this unit so concurrent ledger writes
+	// for the same unit are serialized (matches GL's entry_number pattern).
+	_, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1::text))`, entry.UnitID)
+	if err != nil {
+		return nil, fmt.Errorf("fin: CreateLedgerEntry advisory lock: %w", err)
+	}
+
 	const q = `
 		WITH prev AS (
 			SELECT COALESCE(
@@ -426,7 +436,7 @@ func (r *PostgresAssessmentRepository) CreateLedgerEntry(ctx context.Context, en
 		          balance_cents, description, reference_type, reference_id,
 		          effective_date, created_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := tx.QueryRow(ctx, q,
 		entry.UnitID,
 		entry.OrgID,
 		entry.AssessmentID,
@@ -442,6 +452,10 @@ func (r *PostgresAssessmentRepository) CreateLedgerEntry(ctx context.Context, en
 	result, err := scanLedgerEntry(row)
 	if err != nil {
 		return nil, fmt.Errorf("fin: CreateLedgerEntry: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("fin: CreateLedgerEntry commit: %w", err)
 	}
 	return result, nil
 }
