@@ -168,7 +168,7 @@ func (r *PostgresCollectionRepository) CreateAction(ctx context.Context, a *Coll
 	}
 
 	// triggered_by is NOT NULL in the DB; default to "system" when nil.
-	triggeredBy := "system"
+	triggeredBy := TriggeredBySystem
 	if a.TriggeredBy != nil {
 		triggeredBy = *a.TriggeredBy
 	}
@@ -443,7 +443,7 @@ func collectCollectionCases(rows pgx.Rows, op string) ([]CollectionCase, error) 
 func scanCollectionAction(row pgx.Row) (*CollectionAction, error) {
 	var a CollectionAction
 	var metaRaw []byte
-	var triggeredBy string
+	var triggeredBy TriggeredBy
 
 	err := row.Scan(
 		&a.ID,
@@ -483,7 +483,7 @@ func collectCollectionActions(rows pgx.Rows, op string) ([]CollectionAction, err
 	for rows.Next() {
 		var a CollectionAction
 		var metaRaw []byte
-		var triggeredBy string
+		var triggeredBy TriggeredBy
 
 		if err := rows.Scan(
 			&a.ID,

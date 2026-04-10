@@ -77,8 +77,8 @@ func (s *FinService) CreateSchedule(ctx context.Context, orgID uuid.UUID, req Cr
 		CurrencyCode:    "USD",
 		Name:            req.Name,
 		Description:     req.Description,
-		Frequency:       req.Frequency,
-		AmountStrategy:  req.AmountStrategy,
+		Frequency:       AssessmentFrequency(req.Frequency),
+		AmountStrategy:  AmountStrategy(req.AmountStrategy),
 		BaseAmountCents: req.BaseAmountCents,
 		AmountRules:     req.AmountRules,
 		DayOfMonth:      req.DayOfMonth,
@@ -121,10 +121,10 @@ func (s *FinService) UpdateSchedule(ctx context.Context, id uuid.UUID, req Updat
 		existing.Description = req.Description
 	}
 	if req.Frequency != nil {
-		existing.Frequency = *req.Frequency
+		existing.Frequency = AssessmentFrequency(*req.Frequency)
 	}
 	if req.AmountStrategy != nil {
-		existing.AmountStrategy = *req.AmountStrategy
+		existing.AmountStrategy = AmountStrategy(*req.AmountStrategy)
 	}
 	if req.BaseAmountCents != nil {
 		existing.BaseAmountCents = *req.BaseAmountCents
@@ -197,7 +197,7 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 		CurrencyCode:  "USD",
 		UnitID:        req.UnitID,
 		AssessmentID:  &created.ID,
-		EntryType:     "charge",
+		EntryType:     LedgerEntryTypeCharge,
 		AmountCents:   created.AmountCents,
 		Description:   &desc,
 		EffectiveDate: created.DueDate,
@@ -212,7 +212,7 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 		arAccount, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 1100)
 		revenueAccount, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 4010)
 		if arAccount != nil && revenueAccount != nil {
-			sourceType := "assessment"
+			sourceType := GLSourceTypeAssessment
 			lines := []GLJournalLine{
 				{AccountID: arAccount.ID, DebitCents: created.AmountCents, CreditCents: 0},
 				{AccountID: revenueAccount.ID, DebitCents: 0, CreditCents: created.AmountCents},
@@ -295,7 +295,7 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 		UserID:          userID,
 		PaymentMethodID: req.PaymentMethodID,
 		AmountCents:     req.AmountCents,
-		Status:          "completed",
+		Status:          PaymentStatusCompleted,
 		Description:     req.Description,
 		PaidAt:          &now,
 	}
@@ -305,12 +305,12 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 	}
 
 	// Create a credit ledger entry (negative amount reduces the balance).
-	refType := "payment"
+	refType := LedgerRefTypePayment
 	entry := &LedgerEntry{
 		OrgID:         orgID,
 		CurrencyCode:  "USD",
 		UnitID:        req.UnitID,
-		EntryType:     "payment",
+		EntryType:     LedgerEntryTypePayment,
 		AmountCents:   -created.AmountCents,
 		Description:   req.Description,
 		ReferenceType: &refType,
@@ -327,7 +327,7 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 		cashAccount, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 1010)
 		arAccount, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 1100)
 		if cashAccount != nil && arAccount != nil {
-			sourceType := "payment"
+			sourceType := GLSourceTypePayment
 			memo := "Payment received"
 			if req.Description != nil {
 				memo = *req.Description
@@ -390,7 +390,7 @@ func (s *FinService) CreateBudget(ctx context.Context, orgID uuid.UUID, createdB
 		OrgID:      orgID,
 		FiscalYear: req.FiscalYear,
 		Name:       req.Name,
-		Status:     "draft",
+		Status:     BudgetStatusDraft,
 		Notes:      req.Notes,
 		CreatedBy:  createdBy,
 	}
@@ -435,11 +435,11 @@ func (s *FinService) ProposeBudget(ctx context.Context, id uuid.UUID, proposedBy
 	if err != nil {
 		return nil, err
 	}
-	if b.Status != "draft" {
-		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", "draft"), api.P("action", "propose"), api.P("current", b.Status))
+	if b.Status != BudgetStatusDraft {
+		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", string(BudgetStatusDraft)), api.P("action", "propose"), api.P("current", string(b.Status)))
 	}
 	now := time.Now()
-	b.Status = "proposed"
+	b.Status = BudgetStatusProposed
 	b.ProposedAt = &now
 	b.ProposedBy = &proposedBy
 	return s.budgets.UpdateBudget(ctx, b)
@@ -451,11 +451,11 @@ func (s *FinService) ApproveBudget(ctx context.Context, id uuid.UUID, approvedBy
 	if err != nil {
 		return nil, err
 	}
-	if b.Status != "proposed" {
-		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", "proposed"), api.P("action", "approve"), api.P("current", b.Status))
+	if b.Status != BudgetStatusProposed {
+		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", string(BudgetStatusProposed)), api.P("action", "approve"), api.P("current", string(b.Status)))
 	}
 	now := time.Now()
-	b.Status = "approved"
+	b.Status = BudgetStatusApproved
 	b.ApprovedAt = &now
 	b.ApprovedBy = &approvedBy
 	return s.budgets.UpdateBudget(ctx, b)
@@ -526,6 +526,11 @@ func (s *FinService) CreateExpense(ctx context.Context, orgID uuid.UUID, submitt
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
+	var expenseFundType *FundType
+	if req.FundType != nil {
+		ft := FundType(*req.FundType)
+		expenseFundType = &ft
+	}
 	e := &Expense{
 		OrgID:        orgID,
 		CurrencyCode: "USD",
@@ -533,10 +538,10 @@ func (s *FinService) CreateExpense(ctx context.Context, orgID uuid.UUID, submitt
 		AmountCents:  req.AmountCents,
 		TaxCents:     0,
 		TotalCents:   req.AmountCents,
-		Status:       "submitted",
+		Status:       ExpenseStatusSubmitted,
 		ExpenseDate:  req.ExpenseDate,
 		DueDate:      req.DueDate,
-		FundType:     req.FundType,
+		FundType:     expenseFundType,
 		VendorID:     req.VendorID,
 		CategoryID:   req.CategoryID,
 		BudgetID:     req.BudgetID,
@@ -569,11 +574,11 @@ func (s *FinService) ApproveExpense(ctx context.Context, id uuid.UUID, approvedB
 	if err != nil {
 		return nil, err
 	}
-	if e.Status != "submitted" {
-		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", "submitted"), api.P("action", "approve"), api.P("current", e.Status))
+	if e.Status != ExpenseStatusSubmitted {
+		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", string(ExpenseStatusSubmitted)), api.P("action", "approve"), api.P("current", string(e.Status)))
 	}
 	now := time.Now()
-	e.Status = "approved"
+	e.Status = ExpenseStatusApproved
 	e.ApprovedBy = &approvedBy
 	e.ApprovedAt = &now
 	return s.budgets.UpdateExpense(ctx, e)
@@ -585,11 +590,11 @@ func (s *FinService) PayExpense(ctx context.Context, id uuid.UUID) (*Expense, er
 	if err != nil {
 		return nil, err
 	}
-	if e.Status != "approved" {
-		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", "approved"), api.P("action", "pay"), api.P("current", e.Status))
+	if e.Status != ExpenseStatusApproved {
+		return nil, api.NewValidationError("budget.invalid_status_transition", "status", api.P("expected", string(ExpenseStatusApproved)), api.P("action", "pay"), api.P("current", string(e.Status)))
 	}
 	now := time.Now()
-	e.Status = "paid"
+	e.Status = ExpenseStatusPaid
 	e.PaidDate = &now
 	return s.budgets.UpdateExpense(ctx, e)
 }
@@ -605,7 +610,7 @@ func (s *FinService) CreateFund(ctx context.Context, orgID uuid.UUID, req Create
 		OrgID:              orgID,
 		CurrencyCode:       "USD",
 		Name:               req.Name,
-		FundType:           req.FundType,
+		FundType:           FundType(req.FundType),
 		BalanceCents:       0,
 		TargetBalanceCents: req.TargetBalanceCents,
 	}
@@ -679,7 +684,7 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 			transferIn, _ := s.gl.FindAccountByOrgAndNumber(ctx, orgID, 3110)
 
 			if fromCash != nil && toCash != nil && transferOut != nil && transferIn != nil {
-				sourceType := "transfer"
+				sourceType := GLSourceTypeTransfer
 				memo := fmt.Sprintf("Transfer: %s to %s", fromFund.Name, toFund.Name)
 				lines := []GLJournalLine{
 					{AccountID: transferOut.ID, DebitCents: req.AmountCents, CreditCents: 0},
@@ -734,7 +739,7 @@ func (s *FinService) AddCollectionAction(ctx context.Context, caseID uuid.UUID, 
 	}
 	a := &CollectionAction{
 		CaseID:       caseID,
-		ActionType:   req.ActionType,
+		ActionType:   CollectionActionType(req.ActionType),
 		Notes:        req.Notes,
 		DocumentID:   req.DocumentID,
 		ScheduledFor: req.ScheduledFor,
@@ -758,8 +763,8 @@ func (s *FinService) CreatePaymentPlan(ctx context.Context, caseID uuid.UUID, or
 		InstallmentsTotal: req.InstallmentsTotal,
 		InstallmentsPaid:  0,
 		NextDueDate:       req.NextDueDate,
-		Frequency:         req.Frequency,
-		Status:            "active",
+		Frequency:         PaymentPlanFrequency(req.Frequency),
+		Status:            PaymentPlanStatusActive,
 	}
 	return s.collections.CreatePaymentPlan(ctx, p)
 }
@@ -832,9 +837,9 @@ func (s *FinService) CheckReconciliation(ctx context.Context, orgID uuid.UUID) (
 }
 
 // cashAccountForFundType returns the standard cash account number for a fund type.
-func cashAccountForFundType(fundType string) int {
+func cashAccountForFundType(fundType FundType) int {
 	switch fundType {
-	case "reserve":
+	case FundTypeReserve:
 		return 1020
 	default:
 		return 1010 // operating and all others default to operating cash

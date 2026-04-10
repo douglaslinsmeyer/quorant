@@ -83,7 +83,7 @@ func seedPayment(t *testing.T, repo *mockPaymentRepo, orgID, unitID uuid.UUID) *
 		UnitID:      unitID,
 		UserID:      uuid.New(),
 		AmountCents: 25000,
-		Status:      "completed",
+		Status:      fin.PaymentStatusCompleted,
 		PaidAt:      &now,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -99,7 +99,7 @@ func seedPaymentMethod(t *testing.T, repo *mockPaymentRepo, orgID, userID uuid.U
 		ID:         uuid.New(),
 		OrgID:      orgID,
 		UserID:     userID,
-		MethodType: "ach",
+		MethodType: fin.PaymentMethodTypeACH,
 		IsDefault:  true,
 		CreatedAt:  time.Now(),
 	}
@@ -130,12 +130,12 @@ func TestRecordPayment_Success(t *testing.T) {
 	assert.Equal(t, orgID, envelope.Data.OrgID)
 	assert.Equal(t, unitID, envelope.Data.UnitID)
 	assert.Equal(t, int64(25000), envelope.Data.AmountCents)
-	assert.Equal(t, "completed", envelope.Data.Status)
+	assert.Equal(t, fin.PaymentStatusCompleted, envelope.Data.Status)
 	assert.NotEqual(t, uuid.Nil, envelope.Data.ID)
 
 	// Verify ledger credit was created.
 	assert.Len(t, ts.mockAssessRepo.ledger, 1)
-	assert.Equal(t, "payment", ts.mockAssessRepo.ledger[0].EntryType)
+	assert.Equal(t, fin.LedgerEntryTypePayment, ts.mockAssessRepo.ledger[0].EntryType)
 	assert.Equal(t, int64(-25000), ts.mockAssessRepo.ledger[0].AmountCents)
 }
 
@@ -257,7 +257,7 @@ func TestAddPaymentMethod_Success(t *testing.T) {
 	decodeFinBody(t, resp, &envelope)
 	require.NotNil(t, envelope.Data)
 	assert.Equal(t, orgID, envelope.Data.OrgID)
-	assert.Equal(t, "ach", envelope.Data.MethodType)
+	assert.Equal(t, fin.PaymentMethodTypeACH, envelope.Data.MethodType)
 	assert.NotEqual(t, uuid.Nil, envelope.Data.ID)
 }
 

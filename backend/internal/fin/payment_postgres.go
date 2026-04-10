@@ -129,7 +129,7 @@ func (r *PostgresPaymentRepository) ListPaymentsByUnit(ctx context.Context, unit
 
 // UpdatePaymentStatus updates the status and optionally paid_at for the given
 // payment, and bumps updated_at to now().
-func (r *PostgresPaymentRepository) UpdatePaymentStatus(ctx context.Context, id uuid.UUID, status string, paidAt *time.Time) error {
+func (r *PostgresPaymentRepository) UpdatePaymentStatus(ctx context.Context, id uuid.UUID, status PaymentStatus, paidAt *time.Time) error {
 	const q = `
 		UPDATE payments
 		SET status     = $1,

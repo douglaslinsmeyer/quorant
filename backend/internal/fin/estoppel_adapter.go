@@ -35,7 +35,7 @@ func (a *EstoppelFinancialAdapter) GetUnitFinancialSnapshot(ctx context.Context,
 	for _, s := range schedules {
 		if s.IsActive {
 			snap.RegularAssessmentCents = s.BaseAmountCents
-			snap.AssessmentFrequency = s.Frequency
+			snap.AssessmentFrequency = string(s.Frequency)
 			break
 		}
 	}
@@ -58,7 +58,7 @@ func (a *EstoppelFinancialAdapter) GetUnitFinancialSnapshot(ctx context.Context,
 	collCase, err := a.service.GetUnitCollectionStatus(ctx, unitID)
 	if err == nil && collCase != nil {
 		snap.HasActiveCollection = true
-		snap.CollectionStatus = collCase.Status
+		snap.CollectionStatus = string(collCase.Status)
 		snap.TotalDelinquentCents = collCase.CurrentOwedCents
 	}
 	// If err != nil (e.g. NotFoundError) we leave collection fields at zero.
@@ -70,7 +70,7 @@ func (a *EstoppelFinancialAdapter) GetUnitFinancialSnapshot(ctx context.Context,
 	}
 	for _, f := range funds {
 		switch f.FundType {
-		case "reserve":
+		case FundTypeReserve:
 			snap.ReserveBalanceCents += f.BalanceCents
 			if f.TargetBalanceCents != nil {
 				snap.ReserveTargetCents += *f.TargetBalanceCents

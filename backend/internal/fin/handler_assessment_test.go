@@ -347,7 +347,7 @@ func TestCreateAssessment_Success(t *testing.T) {
 
 	// Verify ledger entry was also created.
 	assert.Len(t, ts.mockAssessRepo.ledger, 1)
-	assert.Equal(t, "charge", ts.mockAssessRepo.ledger[0].EntryType)
+	assert.Equal(t, fin.LedgerEntryTypeCharge, ts.mockAssessRepo.ledger[0].EntryType)
 }
 
 func TestCreateAssessment_InvalidBody(t *testing.T) {
@@ -422,7 +422,7 @@ func TestGetUnitLedger_Success(t *testing.T) {
 		ID:            uuid.New(),
 		OrgID:         orgID,
 		UnitID:        unitID,
-		EntryType:     "charge",
+		EntryType:     fin.LedgerEntryTypeCharge,
 		AmountCents:   25000,
 		BalanceCents:  25000,
 		EffectiveDate: time.Now(),
@@ -469,7 +469,7 @@ func TestGetOrgLedger_Success(t *testing.T) {
 			ID:            uuid.New(),
 			OrgID:         orgID,
 			UnitID:        unitID,
-			EntryType:     "charge",
+			EntryType:     fin.LedgerEntryTypeCharge,
 			AmountCents:   25000,
 			BalanceCents:  25000,
 			EffectiveDate: time.Now(),
@@ -479,7 +479,7 @@ func TestGetOrgLedger_Success(t *testing.T) {
 			ID:            uuid.New(),
 			OrgID:         orgID,
 			UnitID:        unitID,
-			EntryType:     "payment",
+			EntryType:     fin.LedgerEntryTypePayment,
 			AmountCents:   -25000,
 			BalanceCents:  0,
 			EffectiveDate: time.Now(),

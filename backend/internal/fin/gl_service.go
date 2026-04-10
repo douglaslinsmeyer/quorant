@@ -34,7 +34,7 @@ func (s *GLService) CreateAccount(ctx context.Context, orgID uuid.UUID, req Crea
 		FundID:        req.FundID,
 		AccountNumber: req.AccountNumber,
 		Name:          req.Name,
-		AccountType:   req.AccountType,
+		AccountType:   GLAccountType(req.AccountType),
 		IsHeader:      req.IsHeader,
 		Description:   req.Description,
 	}
@@ -114,7 +114,7 @@ func (s *GLService) PostJournalEntry(ctx context.Context, orgID uuid.UUID, poste
 		}
 	}
 
-	sourceType := "manual"
+	sourceType := GLSourceTypeManual
 	entry := &GLJournalEntry{
 		OrgID:      orgID,
 		EntryDate:  req.EntryDate,
@@ -134,7 +134,7 @@ func (s *GLService) PostSystemJournalEntry(
 	postedBy uuid.UUID,
 	entryDate time.Time,
 	memo string,
-	sourceType *string,
+	sourceType *GLSourceType,
 	sourceID *uuid.UUID,
 	unitID *uuid.UUID,
 	lines []GLJournalLine,
@@ -200,53 +200,53 @@ func (s *GLService) GetAccountBalances(ctx context.Context, orgID uuid.UUID, fro
 // SeedDefaultAccounts creates the default chart of accounts for a new org.
 func (s *GLService) SeedDefaultAccounts(ctx context.Context, orgID uuid.UUID, operatingFundID uuid.UUID, reserveFundID uuid.UUID) error {
 	type acctDef struct {
-		number      int
-		name        string
-		acctType    string
-		isHeader    bool
-		isSystem    bool
-		fundID      *uuid.UUID
-		parentNum   int // 0 means no parent
+		number    int
+		name      string
+		acctType  GLAccountType
+		isHeader  bool
+		isSystem  bool
+		fundID    *uuid.UUID
+		parentNum int // 0 means no parent
 	}
 
 	defs := []acctDef{
 		// Headers
-		{1000, "Assets", "asset", true, true, nil, 0},
-		{2000, "Liabilities", "liability", true, true, nil, 0},
-		{3000, "Fund Balances", "equity", true, true, nil, 0},
-		{4000, "Revenue", "revenue", true, true, nil, 0},
-		{5000, "Operating Expenses", "expense", true, true, nil, 0},
+		{1000, "Assets", GLAccountTypeAsset, true, true, nil, 0},
+		{2000, "Liabilities", GLAccountTypeLiability, true, true, nil, 0},
+		{3000, "Fund Balances", GLAccountTypeEquity, true, true, nil, 0},
+		{4000, "Revenue", GLAccountTypeRevenue, true, true, nil, 0},
+		{5000, "Operating Expenses", GLAccountTypeExpense, true, true, nil, 0},
 
 		// Under 1000 Assets
-		{1010, "Cash-Operating", "asset", false, true, &operatingFundID, 1000},
-		{1020, "Cash-Reserve", "asset", false, true, &reserveFundID, 1000},
-		{1100, "AR-Assessments", "asset", false, true, &operatingFundID, 1000},
-		{1110, "AR-Other", "asset", false, false, &operatingFundID, 1000},
-		{1200, "Prepaid Expenses", "asset", false, false, &operatingFundID, 1000},
+		{1010, "Cash-Operating", GLAccountTypeAsset, false, true, &operatingFundID, 1000},
+		{1020, "Cash-Reserve", GLAccountTypeAsset, false, true, &reserveFundID, 1000},
+		{1100, "AR-Assessments", GLAccountTypeAsset, false, true, &operatingFundID, 1000},
+		{1110, "AR-Other", GLAccountTypeAsset, false, false, &operatingFundID, 1000},
+		{1200, "Prepaid Expenses", GLAccountTypeAsset, false, false, &operatingFundID, 1000},
 
 		// Under 2000 Liabilities
-		{2100, "AP", "liability", false, true, &operatingFundID, 2000},
-		{2200, "Prepaid Assessments", "liability", false, false, &operatingFundID, 2000},
+		{2100, "AP", GLAccountTypeLiability, false, true, &operatingFundID, 2000},
+		{2200, "Prepaid Assessments", GLAccountTypeLiability, false, false, &operatingFundID, 2000},
 
 		// Under 3000 Fund Balances
-		{3010, "Operating Fund Balance", "equity", false, true, &operatingFundID, 3000},
-		{3020, "Reserve Fund Balance", "equity", false, true, &reserveFundID, 3000},
-		{3100, "Interfund Transfer Out", "equity", false, true, nil, 3000},
-		{3110, "Interfund Transfer In", "equity", false, true, nil, 3000},
+		{3010, "Operating Fund Balance", GLAccountTypeEquity, false, true, &operatingFundID, 3000},
+		{3020, "Reserve Fund Balance", GLAccountTypeEquity, false, true, &reserveFundID, 3000},
+		{3100, "Interfund Transfer Out", GLAccountTypeEquity, false, true, nil, 3000},
+		{3110, "Interfund Transfer In", GLAccountTypeEquity, false, true, nil, 3000},
 
 		// Under 4000 Revenue
-		{4010, "Assessment Revenue-Operating", "revenue", false, true, &operatingFundID, 4000},
-		{4020, "Assessment Revenue-Reserve", "revenue", false, true, &reserveFundID, 4000},
-		{4100, "Late Fee Revenue", "revenue", false, true, &operatingFundID, 4000},
-		{4200, "Interest Income", "revenue", false, false, nil, 4000},
+		{4010, "Assessment Revenue-Operating", GLAccountTypeRevenue, false, true, &operatingFundID, 4000},
+		{4020, "Assessment Revenue-Reserve", GLAccountTypeRevenue, false, true, &reserveFundID, 4000},
+		{4100, "Late Fee Revenue", GLAccountTypeRevenue, false, true, &operatingFundID, 4000},
+		{4200, "Interest Income", GLAccountTypeRevenue, false, false, nil, 4000},
 
 		// Under 5000 Operating Expenses
-		{5010, "Management Fee", "expense", false, false, &operatingFundID, 5000},
-		{5020, "Insurance", "expense", false, false, &operatingFundID, 5000},
-		{5030, "Utilities", "expense", false, false, &operatingFundID, 5000},
-		{5040, "Landscaping", "expense", false, false, &operatingFundID, 5000},
-		{5050, "Maintenance and Repairs", "expense", false, false, &operatingFundID, 5000},
-		{5060, "Professional Services", "expense", false, false, &operatingFundID, 5000},
+		{5010, "Management Fee", GLAccountTypeExpense, false, false, &operatingFundID, 5000},
+		{5020, "Insurance", GLAccountTypeExpense, false, false, &operatingFundID, 5000},
+		{5030, "Utilities", GLAccountTypeExpense, false, false, &operatingFundID, 5000},
+		{5040, "Landscaping", GLAccountTypeExpense, false, false, &operatingFundID, 5000},
+		{5050, "Maintenance and Repairs", GLAccountTypeExpense, false, false, &operatingFundID, 5000},
+		{5060, "Professional Services", GLAccountTypeExpense, false, false, &operatingFundID, 5000},
 	}
 
 	// Map account number to created account ID for parent references.

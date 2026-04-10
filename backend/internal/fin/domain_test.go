@@ -142,7 +142,7 @@ func TestPayment_JSONSerialization_RequiredFieldsPresent(t *testing.T) {
 		UnitID:      unitID,
 		UserID:      userID,
 		AmountCents: 15000,
-		Status:      "completed",
+		Status:      fin.PaymentStatusCompleted,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -174,7 +174,7 @@ func TestPayment_JSONSerialization_OmitsNilOptionalFields(t *testing.T) {
 		UnitID:      uuid.New(),
 		UserID:      uuid.New(),
 		AmountCents: 15000,
-		Status:      "submitted",
+		Status:      fin.PaymentStatusPending,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -210,7 +210,7 @@ func TestFund_JSONSerialization_RequiredFieldsPresent(t *testing.T) {
 		ID:           id,
 		OrgID:        orgID,
 		Name:         "Operating Fund",
-		FundType:     "operating",
+		FundType:     fin.FundTypeOperating,
 		BalanceCents: 500000,
 		IsDefault:    true,
 		CreatedAt:    now,
@@ -242,7 +242,7 @@ func TestFund_JSONSerialization_OmitsNilOptionalFields(t *testing.T) {
 		ID:           uuid.New(),
 		OrgID:        uuid.New(),
 		Name:         "Reserve Fund",
-		FundType:     "reserve",
+		FundType:     fin.FundTypeReserve,
 		BalanceCents: 100000,
 		CreatedAt:    now,
 		UpdatedAt:    now,
@@ -1016,7 +1016,7 @@ func TestGLJournalEntry_JSONSerialization_OmitsNilOptionalFields(t *testing.T) {
 
 func TestGLJournalEntry_JSONSerialization_OptionalFieldsIncludedWhenSet(t *testing.T) {
 	now := time.Now().UTC()
-	sourceType := "assessment"
+	sourceType := fin.GLSourceTypeAssessment
 	sourceID := uuid.New()
 	unitID := uuid.New()
 
@@ -1062,7 +1062,7 @@ func TestGLJournalEntry_JSONSerialization_OptionalFieldsIncludedWhenSet(t *testi
 
 func TestGLJournalEntry_JSONSerialization_RoundTrip(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
-	sourceType := "expense"
+	sourceType := fin.GLSourceTypeManual
 	sourceID := uuid.New()
 	lineMemo := "Debit office supplies"
 

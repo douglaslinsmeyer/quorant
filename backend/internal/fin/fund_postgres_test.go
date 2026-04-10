@@ -64,7 +64,7 @@ func minimalFund(orgID uuid.UUID) *fin.Fund {
 	return &fin.Fund{
 		OrgID:        orgID,
 		Name:         "Operating Fund",
-		FundType:     "operating",
+		FundType:     fin.FundTypeOperating,
 		BalanceCents: 0,
 		IsDefault:    false,
 	}
@@ -104,7 +104,7 @@ func TestCreateFund(t *testing.T) {
 	assert.NotEqual(t, uuid.Nil, got.ID, "should have a generated UUID")
 	assert.Equal(t, f.orgID, got.OrgID)
 	assert.Equal(t, "Operating Fund", got.Name)
-	assert.Equal(t, "operating", got.FundType)
+	assert.Equal(t, fin.FundTypeOperating, got.FundType)
 	assert.Equal(t, int64(0), got.BalanceCents)
 	assert.False(t, got.IsDefault)
 	assert.Nil(t, got.DeletedAt)
@@ -144,13 +144,13 @@ func TestListFundsByOrg(t *testing.T) {
 
 	fund1 := minimalFund(f.orgID)
 	fund1.Name = "Operating Fund"
-	fund1.FundType = "operating"
+	fund1.FundType = fin.FundTypeOperating
 	_, err := f.repo.CreateFund(ctx, fund1)
 	require.NoError(t, err)
 
 	fund2 := minimalFund(f.orgID)
 	fund2.Name = "Reserve Fund"
-	fund2.FundType = "reserve"
+	fund2.FundType = fin.FundTypeReserve
 	_, err = f.repo.CreateFund(ctx, fund2)
 	require.NoError(t, err)
 
@@ -298,7 +298,7 @@ func TestCreateTransfer(t *testing.T) {
 
 	toFund := minimalFund(f.orgID)
 	toFund.Name = "Reserve Fund"
-	toFund.FundType = "reserve"
+	toFund.FundType = fin.FundTypeReserve
 	createdTo, err := f.repo.CreateFund(ctx, toFund)
 	require.NoError(t, err)
 
@@ -328,13 +328,13 @@ func TestListTransfersByOrg(t *testing.T) {
 
 	reserveFund := minimalFund(f.orgID)
 	reserveFund.Name = "Reserve Fund"
-	reserveFund.FundType = "reserve"
+	reserveFund.FundType = fin.FundTypeReserve
 	reserve, err := f.repo.CreateFund(ctx, reserveFund)
 	require.NoError(t, err)
 
 	capitalFund := minimalFund(f.orgID)
 	capitalFund.Name = "Capital Fund"
-	capitalFund.FundType = "capital"
+	capitalFund.FundType = fin.FundTypeCapital
 	capital, err := f.repo.CreateFund(ctx, capitalFund)
 	require.NoError(t, err)
 

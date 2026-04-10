@@ -95,7 +95,7 @@ func minimalCollectionCase(orgID, unitID uuid.UUID) *fin.CollectionCase {
 	return &fin.CollectionCase{
 		OrgID:            orgID,
 		UnitID:           unitID,
-		Status:           "late",
+		Status:           fin.CollectionCaseStatusLate,
 		TotalOwedCents:   150000,
 		CurrentOwedCents: 150000,
 		OpenedAt:         time.Now().UTC(),
@@ -104,10 +104,10 @@ func minimalCollectionCase(orgID, unitID uuid.UUID) *fin.CollectionCase {
 }
 
 func minimalCollectionAction(caseID uuid.UUID) *fin.CollectionAction {
-	triggeredBy := "system"
+	triggeredBy := fin.TriggeredBySystem
 	return &fin.CollectionAction{
 		CaseID:      caseID,
-		ActionType:  "notice_sent",
+		ActionType:  fin.CollectionActionTypeNoticeSent,
 		TriggeredBy: &triggeredBy,
 		Metadata:    map[string]any{},
 	}
@@ -120,11 +120,11 @@ func minimalPaymentPlan(caseID, orgID, unitID uuid.UUID) *fin.PaymentPlan {
 		UnitID:            unitID,
 		TotalOwedCents:    150000,
 		InstallmentCents:  25000,
-		Frequency:         "monthly",
+		Frequency:         fin.PaymentPlanFreqMonthly,
 		InstallmentsTotal: 6,
 		InstallmentsPaid:  0,
 		NextDueDate:       time.Now().UTC().AddDate(0, 1, 0).Truncate(24 * time.Hour),
-		Status:            "active",
+		Status:            fin.PaymentPlanStatusActive,
 	}
 }
 
@@ -142,7 +142,7 @@ func TestCreateCase(t *testing.T) {
 	assert.NotEqual(t, uuid.Nil, got.ID, "should have a generated UUID")
 	assert.Equal(t, f.orgID, got.OrgID)
 	assert.Equal(t, f.unitID, got.UnitID)
-	assert.Equal(t, "late", got.Status)
+	assert.Equal(t, fin.CollectionCaseStatusLate, got.Status)
 	assert.Equal(t, int64(150000), got.TotalOwedCents)
 	assert.Equal(t, int64(150000), got.CurrentOwedCents)
 	assert.False(t, got.EscalationPaused)
@@ -231,9 +231,9 @@ func TestCreateAction(t *testing.T) {
 	require.NotNil(t, got)
 	assert.NotEqual(t, uuid.Nil, got.ID)
 	assert.Equal(t, coll.ID, got.CaseID)
-	assert.Equal(t, "notice_sent", got.ActionType)
+	assert.Equal(t, fin.CollectionActionTypeNoticeSent, got.ActionType)
 	assert.NotNil(t, got.TriggeredBy)
-	assert.Equal(t, "system", *got.TriggeredBy)
+	assert.Equal(t, fin.TriggeredBySystem, *got.TriggeredBy)
 	assert.NotNil(t, got.Metadata)
 	assert.False(t, got.CreatedAt.IsZero())
 }
@@ -246,12 +246,12 @@ func TestListActionsByCase(t *testing.T) {
 	require.NoError(t, err)
 
 	a1 := minimalCollectionAction(coll.ID)
-	a1.ActionType = "notice_sent"
+	a1.ActionType = fin.CollectionActionTypeNoticeSent
 	_, err = f.repo.CreateAction(ctx, a1)
 	require.NoError(t, err)
 
 	a2 := minimalCollectionAction(coll.ID)
-	a2.ActionType = "lien_filed"
+	a2.ActionType = fin.CollectionActionTypeLienFiled
 	_, err = f.repo.CreateAction(ctx, a2)
 	require.NoError(t, err)
 
@@ -260,9 +260,9 @@ func TestListActionsByCase(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, list, 2, "should return both actions")
 
-	types := []string{list[0].ActionType, list[1].ActionType}
-	assert.Contains(t, types, "notice_sent")
-	assert.Contains(t, types, "lien_filed")
+	types := []fin.CollectionActionType{list[0].ActionType, list[1].ActionType}
+	assert.Contains(t, types, fin.CollectionActionTypeNoticeSent)
+	assert.Contains(t, types, fin.CollectionActionTypeLienFiled)
 }
 
 func TestListActionsByCase_EmptySliceWhenNone(t *testing.T) {
@@ -299,10 +299,10 @@ func TestCreatePaymentPlan(t *testing.T) {
 	assert.Equal(t, f.unitID, got.UnitID)
 	assert.Equal(t, int64(150000), got.TotalOwedCents)
 	assert.Equal(t, int64(25000), got.InstallmentCents)
-	assert.Equal(t, "monthly", got.Frequency)
+	assert.Equal(t, fin.PaymentPlanFreqMonthly, got.Frequency)
 	assert.Equal(t, 6, got.InstallmentsTotal)
 	assert.Equal(t, 0, got.InstallmentsPaid)
-	assert.Equal(t, "active", got.Status)
+	assert.Equal(t, fin.PaymentPlanStatusActive, got.Status)
 	assert.Nil(t, got.ApprovedBy)
 	assert.False(t, got.CreatedAt.IsZero())
 	assert.False(t, got.UpdatedAt.IsZero())
@@ -322,7 +322,7 @@ func TestListPaymentPlansByCase(t *testing.T) {
 
 	p2 := minimalPaymentPlan(coll.ID, f.orgID, f.unitID)
 	p2.TotalOwedCents = 50000
-	p2.Status = "defaulted"
+	p2.Status = fin.PaymentPlanStatusDefaulted
 	_, err = f.repo.CreatePaymentPlan(ctx, p2)
 	require.NoError(t, err)
 
@@ -389,7 +389,7 @@ func TestGetCollectionStatusForUnit_ReturnsNilAfterCaseClosed(t *testing.T) {
 	closedReason := "paid in full"
 	coll.ClosedAt = &now
 	coll.ClosedReason = &closedReason
-	coll.Status = "settled"
+	coll.Status = fin.CollectionCaseStatusResolved
 	_, err = f.repo.UpdateCase(ctx, coll)
 	require.NoError(t, err)
 

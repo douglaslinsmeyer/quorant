@@ -93,7 +93,7 @@ func seedBudget(t *testing.T, repo *mockBudgetRepo, orgID uuid.UUID) *fin.Budget
 		OrgID:      orgID,
 		FiscalYear: 2026,
 		Name:       "Annual HOA Budget",
-		Status:     "draft",
+		Status:     fin.BudgetStatusDraft,
 		CreatedBy:  uuid.New(),
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
@@ -117,7 +117,7 @@ func seedBudgetLineItem(t *testing.T, repo *mockBudgetRepo, budgetID, categoryID
 	return &repo.lineItems[len(repo.lineItems)-1]
 }
 
-func seedExpense(t *testing.T, repo *mockBudgetRepo, orgID uuid.UUID, status string) *fin.Expense {
+func seedExpense(t *testing.T, repo *mockBudgetRepo, orgID uuid.UUID, status fin.ExpenseStatus) *fin.Expense {
 	t.Helper()
 	e := fin.Expense{
 		ID:          uuid.New(),
@@ -159,7 +159,7 @@ func TestCreateBudget_Success(t *testing.T) {
 	assert.Equal(t, orgID, envelope.Data.OrgID)
 	assert.Equal(t, 2026, envelope.Data.FiscalYear)
 	assert.Equal(t, "Annual HOA Budget 2026", envelope.Data.Name)
-	assert.Equal(t, "draft", envelope.Data.Status)
+	assert.Equal(t, fin.BudgetStatusDraft, envelope.Data.Status)
 	assert.NotEqual(t, uuid.Nil, envelope.Data.ID)
 }
 
@@ -246,7 +246,7 @@ func TestProposeBudget_Success(t *testing.T) {
 	}
 	decodeFinBody(t, resp, &envelope)
 	require.NotNil(t, envelope.Data)
-	assert.Equal(t, "proposed", envelope.Data.Status)
+	assert.Equal(t, fin.BudgetStatusProposed, envelope.Data.Status)
 	assert.NotNil(t, envelope.Data.ProposedAt)
 }
 
@@ -267,7 +267,7 @@ func TestApproveBudget_Success(t *testing.T) {
 	budget := seedBudget(t, ts.mockBudgetRepo, orgID)
 
 	// Must propose first.
-	budget.Status = "proposed"
+	budget.Status = fin.BudgetStatusProposed
 	ts.mockBudgetRepo.budgets[0] = *budget
 
 	resp := doFinRequest(t, ts.server.URL, http.MethodPost,
@@ -279,7 +279,7 @@ func TestApproveBudget_Success(t *testing.T) {
 	}
 	decodeFinBody(t, resp, &envelope)
 	require.NotNil(t, envelope.Data)
-	assert.Equal(t, "approved", envelope.Data.Status)
+	assert.Equal(t, fin.BudgetStatusApproved, envelope.Data.Status)
 	assert.NotNil(t, envelope.Data.ApprovedAt)
 }
 
@@ -371,7 +371,7 @@ func TestCreateExpense_Success(t *testing.T) {
 	assert.Equal(t, orgID, envelope.Data.OrgID)
 	assert.Equal(t, "Landscaping Q1", envelope.Data.Description)
 	assert.Equal(t, int64(75000), envelope.Data.AmountCents)
-	assert.Equal(t, "submitted", envelope.Data.Status)
+	assert.Equal(t, fin.ExpenseStatusSubmitted, envelope.Data.Status)
 	assert.NotEqual(t, uuid.Nil, envelope.Data.ID)
 }
 
@@ -391,7 +391,7 @@ func TestCreateExpense_InvalidBody(t *testing.T) {
 func TestApproveExpense_Success(t *testing.T) {
 	ts := setupBudgetTestServer(t)
 	orgID := uuid.New()
-	expense := seedExpense(t, ts.mockBudgetRepo, orgID, "submitted")
+	expense := seedExpense(t, ts.mockBudgetRepo, orgID, fin.ExpenseStatusSubmitted)
 
 	resp := doFinRequest(t, ts.server.URL, http.MethodPost,
 		fmt.Sprintf("/organizations/%s/expenses/%s/approve", orgID, expense.ID), nil)
@@ -402,7 +402,7 @@ func TestApproveExpense_Success(t *testing.T) {
 	}
 	decodeFinBody(t, resp, &envelope)
 	require.NotNil(t, envelope.Data)
-	assert.Equal(t, "approved", envelope.Data.Status)
+	assert.Equal(t, fin.ExpenseStatusApproved, envelope.Data.Status)
 	assert.NotNil(t, envelope.Data.ApprovedAt)
 }
 
@@ -420,7 +420,7 @@ func TestApproveExpense_NotFound(t *testing.T) {
 func TestPayExpense_Success(t *testing.T) {
 	ts := setupBudgetTestServer(t)
 	orgID := uuid.New()
-	expense := seedExpense(t, ts.mockBudgetRepo, orgID, "approved")
+	expense := seedExpense(t, ts.mockBudgetRepo, orgID, fin.ExpenseStatusApproved)
 
 	resp := doFinRequest(t, ts.server.URL, http.MethodPost,
 		fmt.Sprintf("/organizations/%s/expenses/%s/pay", orgID, expense.ID), nil)
@@ -431,14 +431,14 @@ func TestPayExpense_Success(t *testing.T) {
 	}
 	decodeFinBody(t, resp, &envelope)
 	require.NotNil(t, envelope.Data)
-	assert.Equal(t, "paid", envelope.Data.Status)
+	assert.Equal(t, fin.ExpenseStatusPaid, envelope.Data.Status)
 	assert.NotNil(t, envelope.Data.PaidDate)
 }
 
 func TestPayExpense_WrongStatus(t *testing.T) {
 	ts := setupBudgetTestServer(t)
 	orgID := uuid.New()
-	expense := seedExpense(t, ts.mockBudgetRepo, orgID, "submitted")
+	expense := seedExpense(t, ts.mockBudgetRepo, orgID, fin.ExpenseStatusSubmitted)
 
 	resp := doFinRequest(t, ts.server.URL, http.MethodPost,
 		fmt.Sprintf("/organizations/%s/expenses/%s/pay", orgID, expense.ID), nil)
@@ -495,7 +495,7 @@ func TestUpdateCategory_Success(t *testing.T) {
 		ID:           uuid.New(),
 		OrgID:        orgID,
 		Name:         "Landscaping",
-		CategoryType: "expense",
+		CategoryType: fin.BudgetCategoryTypeExpense,
 		CreatedAt:    time.Now(),
 	}
 	ts.mockBudgetRepo.categories = append(ts.mockBudgetRepo.categories, cat)
@@ -518,7 +518,7 @@ func TestUpdateCategory_Success(t *testing.T) {
 func TestUpdateExpense_Success(t *testing.T) {
 	ts := setupBudgetTestServer(t)
 	orgID := uuid.New()
-	expense := seedExpense(t, ts.mockBudgetRepo, orgID, "submitted")
+	expense := seedExpense(t, ts.mockBudgetRepo, orgID, fin.ExpenseStatusSubmitted)
 
 	body := map[string]any{
 		"description":  "Updated vendor invoice",

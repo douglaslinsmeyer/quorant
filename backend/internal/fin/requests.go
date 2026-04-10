@@ -27,20 +27,16 @@ func (r CreateAssessmentScheduleRequest) Validate() error {
 	if r.Name == "" {
 		return api.NewValidationError("validation.required", "name", api.P("field", "name"))
 	}
-	switch r.Frequency {
-	case "monthly", "quarterly", "annually", "semi_annually":
-		// valid
-	case "":
+	if r.Frequency == "" {
 		return api.NewValidationError("validation.required", "frequency", api.P("field", "frequency"))
-	default:
+	}
+	if !AssessmentFrequency(r.Frequency).IsValid() {
 		return api.NewValidationError("validation.one_of", "frequency", api.P("field", "frequency"), api.P("values", "monthly, quarterly, annually, semi_annually"))
 	}
-	switch r.AmountStrategy {
-	case "flat", "per_unit_type", "per_sqft", "custom":
-		// valid
-	case "":
+	if r.AmountStrategy == "" {
 		return api.NewValidationError("validation.required", "amount_strategy", api.P("field", "amount_strategy"))
-	default:
+	}
+	if !AmountStrategy(r.AmountStrategy).IsValid() {
 		return api.NewValidationError("validation.one_of", "amount_strategy", api.P("field", "amount_strategy"), api.P("values", "flat, per_unit_type, per_sqft, custom"))
 	}
 	if r.BaseAmountCents <= 0 {
@@ -154,12 +150,10 @@ func (r CreateFundRequest) Validate() error {
 	if r.Name == "" {
 		return api.NewValidationError("validation.required", "name", api.P("field", "name"))
 	}
-	switch r.FundType {
-	case "operating", "reserve", "capital", "special":
-		// valid
-	case "":
+	if r.FundType == "" {
 		return api.NewValidationError("validation.required", "fund_type", api.P("field", "fund_type"))
-	default:
+	}
+	if !FundType(r.FundType).IsValid() {
 		return api.NewValidationError("validation.one_of", "fund_type", api.P("field", "fund_type"), api.P("values", "operating, reserve, capital, special"))
 	}
 	return nil
@@ -197,7 +191,7 @@ type UpdateBudgetRequest struct {
 // UpdateCollectionRequest holds the fields that can be patched on an existing
 // collection case.
 type UpdateCollectionRequest struct {
-	Status           *string    `json:"status,omitempty"`
+	Status           *CollectionCaseStatus `json:"status,omitempty"`
 	EscalationPaused *bool      `json:"escalation_paused,omitempty"`
 	PauseReason      *string    `json:"pause_reason,omitempty"`
 	AssignedTo       *uuid.UUID `json:"assigned_to,omitempty"`
@@ -273,31 +267,33 @@ func (r CreateGLAccountRequest) Validate() error {
 	if r.AccountNumber <= 0 {
 		return api.NewValidationError("validation.constraint", "account_number", api.P("field", "account_number"), api.P("constraint", "greater than zero"))
 	}
-	switch r.AccountType {
-	case "asset":
+	if r.AccountType == "" {
+		return api.NewValidationError("validation.required", "account_type", api.P("field", "account_type"))
+	}
+	if !GLAccountType(r.AccountType).IsValid() {
+		return api.NewValidationError("validation.one_of", "account_type", api.P("field", "account_type"), api.P("values", "asset, liability, equity, revenue, expense"))
+	}
+	switch GLAccountType(r.AccountType) {
+	case GLAccountTypeAsset:
 		if r.AccountNumber < 1000 || r.AccountNumber > 1999 {
 			return api.NewValidationError("validation.constraint", "account_number", api.P("field", "account_number"), api.P("constraint", "between 1000 and 1999 for asset accounts"))
 		}
-	case "liability":
+	case GLAccountTypeLiability:
 		if r.AccountNumber < 2000 || r.AccountNumber > 2999 {
 			return api.NewValidationError("validation.constraint", "account_number", api.P("field", "account_number"), api.P("constraint", "between 2000 and 2999 for liability accounts"))
 		}
-	case "equity":
+	case GLAccountTypeEquity:
 		if r.AccountNumber < 3000 || r.AccountNumber > 3999 {
 			return api.NewValidationError("validation.constraint", "account_number", api.P("field", "account_number"), api.P("constraint", "between 3000 and 3999 for equity accounts"))
 		}
-	case "revenue":
+	case GLAccountTypeRevenue:
 		if r.AccountNumber < 4000 || r.AccountNumber > 4999 {
 			return api.NewValidationError("validation.constraint", "account_number", api.P("field", "account_number"), api.P("constraint", "between 4000 and 4999 for revenue accounts"))
 		}
-	case "expense":
+	case GLAccountTypeExpense:
 		if r.AccountNumber < 5000 || r.AccountNumber > 9999 {
 			return api.NewValidationError("validation.constraint", "account_number", api.P("field", "account_number"), api.P("constraint", "between 5000 and 9999 for expense accounts"))
 		}
-	case "":
-		return api.NewValidationError("validation.required", "account_type", api.P("field", "account_type"))
-	default:
-		return api.NewValidationError("validation.one_of", "account_type", api.P("field", "account_type"), api.P("values", "asset, liability, equity, revenue, expense"))
 	}
 	return nil
 }

@@ -64,7 +64,7 @@ func minimalCategory(orgID uuid.UUID) *fin.BudgetCategory {
 	return &fin.BudgetCategory{
 		OrgID:        orgID,
 		Name:         "Maintenance",
-		CategoryType: "expense",
+		CategoryType: fin.BudgetCategoryTypeExpense,
 		SortOrder:    0,
 		IsReserve:    false,
 	}
@@ -75,7 +75,7 @@ func minimalBudget(orgID, userID uuid.UUID) *fin.Budget {
 		OrgID:      orgID,
 		FiscalYear: 2026,
 		Name:       "FY2026 Operating Budget",
-		Status:     "draft",
+		Status:     fin.BudgetStatusDraft,
 		CreatedBy:  userID,
 	}
 }
@@ -97,7 +97,7 @@ func minimalExpense(orgID, userID uuid.UUID) *fin.Expense {
 		AmountCents: 75000,
 		TaxCents:    0,
 		TotalCents:  75000,
-		Status:      "draft",
+		Status:      fin.ExpenseStatusPending,
 		ExpenseDate: expDate,
 		SubmittedBy: userID,
 		Metadata:    map[string]any{},
@@ -118,7 +118,7 @@ func TestCreateCategory(t *testing.T) {
 	assert.NotEqual(t, uuid.Nil, got.ID, "should have a generated UUID")
 	assert.Equal(t, f.orgID, got.OrgID)
 	assert.Equal(t, "Maintenance", got.Name)
-	assert.Equal(t, "expense", got.CategoryType)
+	assert.Equal(t, fin.BudgetCategoryTypeExpense, got.CategoryType)
 	assert.False(t, got.IsReserve)
 	assert.False(t, got.CreatedAt.IsZero())
 }
@@ -134,7 +134,7 @@ func TestListCategoriesByOrg(t *testing.T) {
 
 	c2 := minimalCategory(f.orgID)
 	c2.Name = "Insurance"
-	c2.CategoryType = "expense"
+	c2.CategoryType = fin.BudgetCategoryTypeExpense
 	_, err = f.repo.CreateCategory(ctx, c2)
 	require.NoError(t, err)
 
@@ -174,7 +174,7 @@ func TestCreateBudget(t *testing.T) {
 	assert.Equal(t, f.orgID, got.OrgID)
 	assert.Equal(t, 2026, got.FiscalYear)
 	assert.Equal(t, "FY2026 Operating Budget", got.Name)
-	assert.Equal(t, "draft", got.Status)
+	assert.Equal(t, fin.BudgetStatusDraft, got.Status)
 	assert.Equal(t, f.userID, got.CreatedBy)
 	assert.Nil(t, got.DeletedAt)
 	assert.False(t, got.CreatedAt.IsZero())
@@ -362,7 +362,7 @@ func TestCreateExpense(t *testing.T) {
 	assert.Equal(t, "Pool maintenance", got.Description)
 	assert.Equal(t, int64(75000), got.AmountCents)
 	assert.Equal(t, int64(75000), got.TotalCents)
-	assert.Equal(t, "draft", got.Status)
+	assert.Equal(t, fin.ExpenseStatusPending, got.Status)
 	assert.Equal(t, f.userID, got.SubmittedBy)
 	assert.NotNil(t, got.Metadata, "metadata should not be nil")
 	assert.Nil(t, got.DeletedAt)
