@@ -359,7 +359,7 @@ func (r *PostgresBudgetRepository) CreateExpense(ctx context.Context, e *Expense
 	}
 
 	// fund_type is NOT NULL in the schema; default to "operating" when nil.
-	fundType := "operating"
+	fundType := FundTypeOperating
 	if e.FundType != nil {
 		fundType = *e.FundType
 	}
@@ -465,7 +465,7 @@ func (r *PostgresBudgetRepository) UpdateExpense(ctx context.Context, e *Expense
 		return nil, fmt.Errorf("fin: UpdateExpense marshal metadata: %w", err)
 	}
 
-	fundType := "operating"
+	fundType := FundTypeOperating
 	if e.FundType != nil {
 		fundType = *e.FundType
 	}
@@ -704,7 +704,7 @@ func collectLineItems(rows pgx.Rows, op string) ([]BudgetLineItem, error) {
 func scanExpense(row pgx.Row) (*Expense, error) {
 	var e Expense
 	var metaRaw []byte
-	var fundType string
+	var fundType FundType
 
 	err := row.Scan(
 		&e.ID,
@@ -756,7 +756,7 @@ func collectExpenses(rows pgx.Rows, op string) ([]Expense, error) {
 	for rows.Next() {
 		var e Expense
 		var metaRaw []byte
-		var fundType string
+		var fundType FundType
 
 		if err := rows.Scan(
 			&e.ID,
