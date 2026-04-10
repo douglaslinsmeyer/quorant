@@ -25,6 +25,8 @@ func (e *GaapEngine) JournalLines(ctx context.Context, gl *GLService, tx Financi
 		return e.assessmentLines(ctx, gl, tx)
 	case TxTypePayment:
 		return e.paymentLines(ctx, gl, tx)
+	case TxTypeFundTransfer:
+		return e.fundTransferLines(ctx, gl, tx)
 	default:
 		return nil, fmt.Errorf("gaap: unsupported transaction type %q", tx.Type)
 	}
@@ -77,6 +79,59 @@ func (e *GaapEngine) paymentLines(ctx context.Context, gl *GLService, tx Financi
 	return []GLJournalLine{
 		{AccountID: cash.ID, DebitCents: tx.AmountCents, CreditCents: 0},
 		{AccountID: ar.ID, DebitCents: 0, CreditCents: tx.AmountCents},
+	}, nil
+}
+
+func (e *GaapEngine) fundTransferLines(ctx context.Context, gl *GLService, tx FinancialTransaction) ([]GLJournalLine, error) {
+	fromFundType, ok := tx.Metadata["from_fund_type"].(string)
+	if !ok || fromFundType == "" {
+		return nil, fmt.Errorf("gaap: fund transfer requires metadata key \"from_fund_type\"")
+	}
+	toFundType, ok := tx.Metadata["to_fund_type"].(string)
+	if !ok || toFundType == "" {
+		return nil, fmt.Errorf("gaap: fund transfer requires metadata key \"to_fund_type\"")
+	}
+
+	fromCashNum := cashAccountForFundType(FundType(fromFundType))
+	toCashNum := cashAccountForFundType(FundType(toFundType))
+
+	fromCash, err := gl.FindAccountByOrgAndNumber(ctx, tx.OrgID, fromCashNum)
+	if err != nil {
+		return nil, fmt.Errorf("gaap: lookup source cash account %d: %w", fromCashNum, err)
+	}
+	if fromCash == nil {
+		return nil, fmt.Errorf("gaap: source cash account %d not found for org %s", fromCashNum, tx.OrgID)
+	}
+
+	toCash, err := gl.FindAccountByOrgAndNumber(ctx, tx.OrgID, toCashNum)
+	if err != nil {
+		return nil, fmt.Errorf("gaap: lookup dest cash account %d: %w", toCashNum, err)
+	}
+	if toCash == nil {
+		return nil, fmt.Errorf("gaap: dest cash account %d not found for org %s", toCashNum, tx.OrgID)
+	}
+
+	transferOut, err := gl.FindAccountByOrgAndNumber(ctx, tx.OrgID, 3100)
+	if err != nil {
+		return nil, fmt.Errorf("gaap: lookup account 3100: %w", err)
+	}
+	if transferOut == nil {
+		return nil, fmt.Errorf("gaap: account 3100 (Interfund Transfer Out) not found for org %s", tx.OrgID)
+	}
+
+	transferIn, err := gl.FindAccountByOrgAndNumber(ctx, tx.OrgID, 3110)
+	if err != nil {
+		return nil, fmt.Errorf("gaap: lookup account 3110: %w", err)
+	}
+	if transferIn == nil {
+		return nil, fmt.Errorf("gaap: account 3110 (Interfund Transfer In) not found for org %s", tx.OrgID)
+	}
+
+	return []GLJournalLine{
+		{AccountID: transferOut.ID, DebitCents: tx.AmountCents, CreditCents: 0},
+		{AccountID: fromCash.ID, DebitCents: 0, CreditCents: tx.AmountCents},
+		{AccountID: toCash.ID, DebitCents: tx.AmountCents, CreditCents: 0},
+		{AccountID: transferIn.ID, DebitCents: 0, CreditCents: tx.AmountCents},
 	}, nil
 }
 
