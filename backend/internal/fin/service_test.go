@@ -1316,3 +1316,84 @@ func TestCreateFundTransfer_SetsCurrencyCode(t *testing.T) {
 	assert.Equal(t, "USD", transfer.CurrencyCode)
 	assert.Len(t, fundRepo.transfers, 1)
 }
+
+// TestCreateFundTransfer_UpdatesFundBalances verifies that a transfer debits the
+// source fund and credits the destination fund.
+func TestCreateFundTransfer_UpdatesFundBalances(t *testing.T) {
+	svc, _, _, _, fundRepo, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	from, err := svc.CreateFund(ctx, orgID, fin.CreateFundRequest{Name: "Operating", FundType: "operating"})
+	require.NoError(t, err)
+	to, err := svc.CreateFund(ctx, orgID, fin.CreateFundRequest{Name: "Reserve", FundType: "reserve"})
+	require.NoError(t, err)
+
+	// Seed the source fund with a starting balance.
+	for i := range fundRepo.funds {
+		if fundRepo.funds[i].ID == from.ID {
+			fundRepo.funds[i].BalanceCents = 100_000
+		}
+	}
+
+	_, err = svc.CreateFundTransfer(ctx, orgID, fin.CreateFundTransferRequest{
+		FromFundID:  from.ID,
+		ToFundID:    to.ID,
+		AmountCents: 25_000,
+	})
+	require.NoError(t, err)
+
+	// Verify source fund was debited.
+	updatedFrom, err := svc.GetFund(ctx, from.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(75_000), updatedFrom.BalanceCents, "source fund should be debited")
+
+	// Verify destination fund was credited.
+	updatedTo, err := svc.GetFund(ctx, to.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(25_000), updatedTo.BalanceCents, "destination fund should be credited")
+}
+
+// TestCreateFundTransfer_CreatesFundTransactions verifies that a transfer creates
+// a debit transaction on the source fund and a credit transaction on the destination.
+func TestCreateFundTransfer_CreatesFundTransactions(t *testing.T) {
+	svc, _, _, _, fundRepo, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	from, err := svc.CreateFund(ctx, orgID, fin.CreateFundRequest{Name: "Operating", FundType: "operating"})
+	require.NoError(t, err)
+	to, err := svc.CreateFund(ctx, orgID, fin.CreateFundRequest{Name: "Reserve", FundType: "reserve"})
+	require.NoError(t, err)
+
+	// Seed starting balance so debit succeeds.
+	for i := range fundRepo.funds {
+		if fundRepo.funds[i].ID == from.ID {
+			fundRepo.funds[i].BalanceCents = 50_000
+		}
+	}
+
+	transfer, err := svc.CreateFundTransfer(ctx, orgID, fin.CreateFundTransferRequest{
+		FromFundID:  from.ID,
+		ToFundID:    to.ID,
+		AmountCents: 20_000,
+	})
+	require.NoError(t, err)
+
+	require.Len(t, fundRepo.transactions, 2, "should create exactly 2 fund transactions")
+
+	debit := fundRepo.transactions[0]
+	assert.Equal(t, from.ID, debit.FundID)
+	assert.Equal(t, int64(-20_000), debit.AmountCents, "debit should be negative")
+	assert.Equal(t, "transfer_out", debit.TransactionType)
+	refType := "fund_transfer"
+	assert.Equal(t, &refType, debit.ReferenceType)
+	assert.Equal(t, &transfer.ID, debit.ReferenceID)
+
+	credit := fundRepo.transactions[1]
+	assert.Equal(t, to.ID, credit.FundID)
+	assert.Equal(t, int64(20_000), credit.AmountCents, "credit should be positive")
+	assert.Equal(t, "transfer_in", credit.TransactionType)
+	assert.Equal(t, &refType, credit.ReferenceType)
+	assert.Equal(t, &transfer.ID, credit.ReferenceID)
+}
