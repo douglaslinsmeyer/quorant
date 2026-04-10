@@ -234,7 +234,7 @@ func run() error {
 	// Real implementations of AI interfaces injected into domain modules.
 	contextRetriever := ai.NewPostgresContextRetriever(contextLakeService)
 	_ = contextRetriever // reserved for future com module wiring
-	policyResolver := ai.NewPostgresPolicyResolver(policyService)
+	policyResolver := ai.NewPostgresPolicyResolverWithLLM(policyService, contextLakeService, llmClient)
 
 	// Compliance engine
 	jurisdictionRuleRepo := ai.NewPostgresJurisdictionRuleRepository(pool)
