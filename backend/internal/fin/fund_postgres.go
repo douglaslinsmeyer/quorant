@@ -8,17 +8,24 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	dbpkg "github.com/quorant/quorant/internal/platform/db"
 )
 
-// PostgresFundRepository implements FundRepository using a pgxpool.
+// PostgresFundRepository implements FundRepository using a DBTX.
 type PostgresFundRepository struct {
-	pool *pgxpool.Pool
+	db dbpkg.DBTX
 }
 
 // NewPostgresFundRepository creates a new PostgresFundRepository backed by
 // pool.
 func NewPostgresFundRepository(pool *pgxpool.Pool) *PostgresFundRepository {
-	return &PostgresFundRepository{pool: pool}
+	return &PostgresFundRepository{db: pool}
+}
+
+// WithTx returns a new PostgresFundRepository scoped to the given transaction,
+// enabling participation in a caller-managed transaction.
+func (r *PostgresFundRepository) WithTx(tx pgx.Tx) FundRepository {
+	return &PostgresFundRepository{db: tx}
 }
 
 // ─── Funds ────────────────────────────────────────────────────────────────────
@@ -34,7 +41,7 @@ func (r *PostgresFundRepository) CreateFund(ctx context.Context, f *Fund) (*Fund
 		RETURNING id, org_id, currency_code, name, fund_type, balance_cents, target_balance_cents,
 		          is_default, created_at, updated_at, deleted_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		f.OrgID,
 		f.CurrencyCode,
 		f.Name,
@@ -60,7 +67,7 @@ func (r *PostgresFundRepository) FindFundByID(ctx context.Context, id uuid.UUID)
 		FROM funds
 		WHERE id = $1 AND deleted_at IS NULL`
 
-	row := r.pool.QueryRow(ctx, q, id)
+	row := r.db.QueryRow(ctx, q, id)
 	result, err := scanFund(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -81,7 +88,7 @@ func (r *PostgresFundRepository) ListFundsByOrg(ctx context.Context, orgID uuid.
 		WHERE org_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.db.Query(ctx, q, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListFundsByOrg: %w", err)
 	}
@@ -105,7 +112,7 @@ func (r *PostgresFundRepository) UpdateFund(ctx context.Context, f *Fund) (*Fund
 		RETURNING id, org_id, currency_code, name, fund_type, balance_cents, target_balance_cents,
 		          is_default, created_at, updated_at, deleted_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		f.CurrencyCode,
 		f.Name,
 		f.FundType,
@@ -130,7 +137,7 @@ func (r *PostgresFundRepository) UpdateFund(ctx context.Context, f *Fund) (*Fund
 // CreateTransaction inserts a new fund transaction and atomically updates the
 // parent fund's balance_cents denormalized field within a single transaction.
 func (r *PostgresFundRepository) CreateTransaction(ctx context.Context, t *FundTransaction) (*FundTransaction, error) {
-	tx, err := r.pool.Begin(ctx)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fin: CreateTransaction begin tx: %w", err)
 	}
@@ -200,7 +207,7 @@ func (r *PostgresFundRepository) ListTransactionsByFund(ctx context.Context, fun
 		WHERE fund_id = $1
 		ORDER BY effective_date DESC, created_at DESC`
 
-	rows, err := r.pool.Query(ctx, q, fundID)
+	rows, err := r.db.Query(ctx, q, fundID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListTransactionsByFund: %w", err)
 	}
@@ -225,7 +232,7 @@ func (r *PostgresFundRepository) CreateTransfer(ctx context.Context, t *FundTran
 		RETURNING id, org_id, currency_code, from_fund_id, to_fund_id, amount_cents,
 		          description, approved_by, approved_at, effective_date, created_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		t.OrgID,
 		t.CurrencyCode,
 		t.FromFundID,
@@ -254,7 +261,7 @@ func (r *PostgresFundRepository) ListTransfersByOrg(ctx context.Context, orgID u
 		WHERE org_id = $1
 		ORDER BY effective_date DESC, created_at DESC`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.db.Query(ctx, q, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListTransfersByOrg: %w", err)
 	}

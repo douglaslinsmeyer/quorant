@@ -45,10 +45,17 @@ const (
 	PaymentStatusFailed    PaymentStatus = "failed"
 )
 
+const (
+	PaymentStatusPendingReview PaymentStatus = "pending_review"
+	PaymentStatusReversed      PaymentStatus = "reversed"
+	PaymentStatusNSF           PaymentStatus = "nsf"
+)
+
 // IsValid returns true if the PaymentStatus value is one of the defined constants.
 func (s PaymentStatus) IsValid() bool {
 	switch s {
-	case PaymentStatusPending, PaymentStatusCompleted, PaymentStatusFailed:
+	case PaymentStatusPending, PaymentStatusCompleted, PaymentStatusFailed,
+		PaymentStatusPendingReview, PaymentStatusReversed, PaymentStatusNSF:
 		return true
 	}
 	return false
@@ -295,6 +302,29 @@ const (
 func (s BudgetCategoryType) IsValid() bool {
 	switch s {
 	case BudgetCategoryTypeExpense:
+		return true
+	}
+	return false
+}
+
+// ChargeType classifies a charge for payment allocation purposes.
+type ChargeType string
+
+const (
+	ChargeTypeRegularAssessment ChargeType = "regular_assessment"
+	ChargeTypeSpecialAssessment ChargeType = "special_assessment"
+	ChargeTypeLateFee           ChargeType = "late_fee"
+	ChargeTypeInterest          ChargeType = "interest"
+	ChargeTypeCollectionCost    ChargeType = "collection_cost"
+	ChargeTypeAttorneyFee       ChargeType = "attorney_fee"
+	ChargeTypeFine              ChargeType = "fine"
+)
+
+func (s ChargeType) IsValid() bool {
+	switch s {
+	case ChargeTypeRegularAssessment, ChargeTypeSpecialAssessment,
+		ChargeTypeLateFee, ChargeTypeInterest,
+		ChargeTypeCollectionCost, ChargeTypeAttorneyFee, ChargeTypeFine:
 		return true
 	}
 	return false

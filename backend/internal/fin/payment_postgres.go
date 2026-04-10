@@ -9,17 +9,24 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	dbpkg "github.com/quorant/quorant/internal/platform/db"
 )
 
-// PostgresPaymentRepository implements PaymentRepository using a pgxpool.
+// PostgresPaymentRepository implements PaymentRepository using a DBTX.
 type PostgresPaymentRepository struct {
-	pool *pgxpool.Pool
+	db dbpkg.DBTX
 }
 
 // NewPostgresPaymentRepository creates a new PostgresPaymentRepository backed
 // by pool.
 func NewPostgresPaymentRepository(pool *pgxpool.Pool) *PostgresPaymentRepository {
-	return &PostgresPaymentRepository{pool: pool}
+	return &PostgresPaymentRepository{db: pool}
+}
+
+// WithTx returns a new PostgresPaymentRepository scoped to the given
+// transaction, enabling participation in a caller-managed transaction.
+func (r *PostgresPaymentRepository) WithTx(tx pgx.Tx) PaymentRepository {
+	return &PostgresPaymentRepository{db: tx}
 }
 
 // ─── Payments ─────────────────────────────────────────────────────────────────
@@ -38,7 +45,7 @@ func (r *PostgresPaymentRepository) CreatePayment(ctx context.Context, p *Paymen
 		RETURNING id, org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
 		          status, provider_ref, description, paid_at, created_at, updated_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		p.OrgID,
 		p.CurrencyCode,
 		p.UnitID,
@@ -67,7 +74,7 @@ func (r *PostgresPaymentRepository) FindPaymentByID(ctx context.Context, id uuid
 		FROM payments
 		WHERE id = $1`
 
-	row := r.pool.QueryRow(ctx, q, id)
+	row := r.db.QueryRow(ctx, q, id)
 	result, err := scanPayment(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -90,7 +97,7 @@ func (r *PostgresPaymentRepository) ListPaymentsByOrg(ctx context.Context, orgID
 		ORDER BY id DESC
 		LIMIT $2`
 
-	rows, err := r.pool.Query(ctx, q, orgID, limit+1, afterID)
+	rows, err := r.db.Query(ctx, q, orgID, limit+1, afterID)
 	if err != nil {
 		return nil, false, fmt.Errorf("fin: ListPaymentsByOrg: %w", err)
 	}
@@ -118,7 +125,7 @@ func (r *PostgresPaymentRepository) ListPaymentsByUnit(ctx context.Context, unit
 		WHERE unit_id = $1
 		ORDER BY created_at DESC`
 
-	rows, err := r.pool.Query(ctx, q, unitID)
+	rows, err := r.db.Query(ctx, q, unitID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListPaymentsByUnit: %w", err)
 	}
@@ -137,7 +144,7 @@ func (r *PostgresPaymentRepository) UpdatePaymentStatus(ctx context.Context, id 
 		    updated_at = now()
 		WHERE id = $3`
 
-	_, err := r.pool.Exec(ctx, q, status, paidAt, id)
+	_, err := r.db.Exec(ctx, q, status, paidAt, id)
 	if err != nil {
 		return fmt.Errorf("fin: UpdatePaymentStatus: %w", err)
 	}
@@ -158,7 +165,7 @@ func (r *PostgresPaymentRepository) CreatePaymentMethod(ctx context.Context, m *
 		RETURNING id, org_id, user_id, method_type, provider_ref, last_four,
 		          is_default, created_at, deleted_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		m.OrgID,
 		m.UserID,
 		m.MethodType,
@@ -185,7 +192,7 @@ func (r *PostgresPaymentRepository) ListPaymentMethodsByUser(ctx context.Context
 		WHERE user_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at`
 
-	rows, err := r.pool.Query(ctx, q, userID)
+	rows, err := r.db.Query(ctx, q, userID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListPaymentMethodsByUser: %w", err)
 	}
@@ -202,11 +209,69 @@ func (r *PostgresPaymentRepository) SoftDeletePaymentMethod(ctx context.Context,
 		SET deleted_at = now()
 		WHERE id = $1 AND deleted_at IS NULL`
 
-	_, err := r.pool.Exec(ctx, q, id)
+	_, err := r.db.Exec(ctx, q, id)
 	if err != nil {
 		return fmt.Errorf("fin: SoftDeletePaymentMethod: %w", err)
 	}
 	return nil
+}
+
+// ─── Payment Allocations ──────────────────────────────────────────────────────
+
+func (r *PostgresPaymentRepository) CreatePaymentAllocation(ctx context.Context, a *PaymentAllocation) (*PaymentAllocation, error) {
+	const q = `
+		INSERT INTO payment_allocations (
+			payment_id, charge_type, charge_id, allocated_cents, resolution_id,
+			estoppel_id, reversed_at, reversed_by_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id, payment_id, charge_type, charge_id, allocated_cents, resolution_id,
+		          estoppel_id, reversed_at, reversed_by_id, created_at`
+
+	var out PaymentAllocation
+	err := r.db.QueryRow(ctx, q,
+		a.PaymentID, a.ChargeType, a.ChargeID, a.AllocatedCents,
+		a.ResolutionID, a.EstoppelID, a.ReversedAt, a.ReversedByID,
+	).Scan(
+		&out.ID, &out.PaymentID, &out.ChargeType, &out.ChargeID,
+		&out.AllocatedCents, &out.ResolutionID, &out.EstoppelID,
+		&out.ReversedAt, &out.ReversedByID, &out.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("fin: CreatePaymentAllocation: %w", err)
+	}
+	return &out, nil
+}
+
+func (r *PostgresPaymentRepository) ListAllocationsByPayment(ctx context.Context, paymentID uuid.UUID) ([]PaymentAllocation, error) {
+	const q = `
+		SELECT id, payment_id, charge_type, charge_id, allocated_cents, resolution_id,
+		       estoppel_id, reversed_at, reversed_by_id, created_at
+		FROM payment_allocations
+		WHERE payment_id = $1
+		ORDER BY created_at`
+
+	rows, err := r.db.Query(ctx, q, paymentID)
+	if err != nil {
+		return nil, fmt.Errorf("fin: ListAllocationsByPayment: %w", err)
+	}
+	defer rows.Close()
+
+	var results []PaymentAllocation
+	for rows.Next() {
+		var a PaymentAllocation
+		if err := rows.Scan(
+			&a.ID, &a.PaymentID, &a.ChargeType, &a.ChargeID,
+			&a.AllocatedCents, &a.ResolutionID, &a.EstoppelID,
+			&a.ReversedAt, &a.ReversedByID, &a.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, a)
+	}
+	if results == nil {
+		return []PaymentAllocation{}, nil
+	}
+	return results, nil
 }
 
 // ─── Scan helpers ─────────────────────────────────────────────────────────────

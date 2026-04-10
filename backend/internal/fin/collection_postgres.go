@@ -9,18 +9,24 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	dbpkg "github.com/quorant/quorant/internal/platform/db"
 )
 
-// PostgresCollectionRepository implements CollectionRepository using a
-// pgxpool.
+// PostgresCollectionRepository implements CollectionRepository using a DBTX.
 type PostgresCollectionRepository struct {
-	pool *pgxpool.Pool
+	db dbpkg.DBTX
 }
 
 // NewPostgresCollectionRepository creates a new PostgresCollectionRepository
 // backed by pool.
 func NewPostgresCollectionRepository(pool *pgxpool.Pool) *PostgresCollectionRepository {
-	return &PostgresCollectionRepository{pool: pool}
+	return &PostgresCollectionRepository{db: pool}
+}
+
+// WithTx returns a new PostgresCollectionRepository scoped to the given
+// transaction, enabling participation in a caller-managed transaction.
+func (r *PostgresCollectionRepository) WithTx(tx pgx.Tx) CollectionRepository {
+	return &PostgresCollectionRepository{db: tx}
 }
 
 // ─── Collection Cases ─────────────────────────────────────────────────────────
@@ -46,7 +52,7 @@ func (r *PostgresCollectionRepository) CreateCase(ctx context.Context, c *Collec
 		          escalation_paused, pause_reason, opened_at, closed_at, closed_reason,
 		          assigned_to, metadata, created_at, updated_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		c.OrgID,
 		c.UnitID,
 		c.Status,
@@ -78,7 +84,7 @@ func (r *PostgresCollectionRepository) FindCaseByID(ctx context.Context, id uuid
 		FROM collection_cases
 		WHERE id = $1`
 
-	row := r.pool.QueryRow(ctx, q, id)
+	row := r.db.QueryRow(ctx, q, id)
 	result, err := scanCollectionCase(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -100,7 +106,7 @@ func (r *PostgresCollectionRepository) ListCasesByOrg(ctx context.Context, orgID
 		WHERE org_id = $1
 		ORDER BY created_at DESC`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.db.Query(ctx, q, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListCasesByOrg: %w", err)
 	}
@@ -134,7 +140,7 @@ func (r *PostgresCollectionRepository) UpdateCase(ctx context.Context, c *Collec
 		          escalation_paused, pause_reason, opened_at, closed_at, closed_reason,
 		          assigned_to, metadata, created_at, updated_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		c.Status,
 		c.TotalOwedCents,
 		c.CurrentOwedCents,
@@ -185,7 +191,7 @@ func (r *PostgresCollectionRepository) CreateAction(ctx context.Context, a *Coll
 		          triggered_by, performed_by, scheduled_for, completed_at,
 		          metadata, created_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		a.CaseID,
 		a.ActionType,
 		a.Notes,
@@ -215,7 +221,7 @@ func (r *PostgresCollectionRepository) ListActionsByCase(ctx context.Context, ca
 		WHERE case_id = $1
 		ORDER BY created_at`
 
-	rows, err := r.pool.Query(ctx, q, caseID)
+	rows, err := r.db.Query(ctx, q, caseID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListActionsByCase: %w", err)
 	}
@@ -243,7 +249,7 @@ func (r *PostgresCollectionRepository) CreatePaymentPlan(ctx context.Context, p 
 		          frequency, installments_total, installments_paid, next_due_date,
 		          status, approved_by, approved_at, defaulted_at, created_at, updated_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		p.CaseID,
 		p.OrgID,
 		p.UnitID,
@@ -277,7 +283,7 @@ func (r *PostgresCollectionRepository) ListPaymentPlansByCase(ctx context.Contex
 		WHERE case_id = $1
 		ORDER BY created_at`
 
-	rows, err := r.pool.Query(ctx, q, caseID)
+	rows, err := r.db.Query(ctx, q, caseID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListPaymentPlansByCase: %w", err)
 	}
@@ -307,7 +313,7 @@ func (r *PostgresCollectionRepository) UpdatePaymentPlan(ctx context.Context, p 
 		          frequency, installments_total, installments_paid, next_due_date,
 		          status, approved_by, approved_at, defaulted_at, created_at, updated_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		p.TotalOwedCents,
 		p.InstallmentCents,
 		p.Frequency,
@@ -344,7 +350,7 @@ func (r *PostgresCollectionRepository) GetCollectionStatusForUnit(ctx context.Co
 		WHERE unit_id = $1 AND closed_at IS NULL
 		LIMIT 1`
 
-	row := r.pool.QueryRow(ctx, q, unitID)
+	row := r.db.QueryRow(ctx, q, unitID)
 	result, err := scanCollectionCase(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

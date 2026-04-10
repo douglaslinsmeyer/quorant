@@ -1,6 +1,10 @@
 package fin
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestBudgetStatus_IsValid(t *testing.T) {
 	valid := []BudgetStatus{BudgetStatusDraft, BudgetStatusProposed, BudgetStatusApproved}
@@ -267,4 +271,25 @@ func TestTriggeredBy_IsValid(t *testing.T) {
 			t.Errorf("expected %q to be invalid", v)
 		}
 	}
+}
+
+func TestChargeType_IsValid(t *testing.T) {
+	valid := []ChargeType{
+		ChargeTypeRegularAssessment, ChargeTypeSpecialAssessment,
+		ChargeTypeLateFee, ChargeTypeInterest,
+		ChargeTypeCollectionCost, ChargeTypeAttorneyFee, ChargeTypeFine,
+	}
+	for _, v := range valid {
+		assert.True(t, v.IsValid(), "expected %q to be valid", v)
+	}
+	invalid := []ChargeType{"", "unknown", "Assessment"}
+	for _, v := range invalid {
+		assert.False(t, v.IsValid(), "expected %q to be invalid", v)
+	}
+}
+
+func TestPaymentStatus_NewValues(t *testing.T) {
+	assert.True(t, PaymentStatusPendingReview.IsValid())
+	assert.True(t, PaymentStatusReversed.IsValid())
+	assert.True(t, PaymentStatusNSF.IsValid())
 }

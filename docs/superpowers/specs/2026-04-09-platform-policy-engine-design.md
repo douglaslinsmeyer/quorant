@@ -21,15 +21,18 @@ Payment allocation in the `fin` module is the first consumer.
 
 ## Prerequisites
 
-### Transaction Composition Refactoring
+### Transaction Composition: Already Solved
 
-The current `CreateLedgerEntry` (assessment_postgres.go) and `PostSystemJournalEntry` / `PostJournalEntry` (gl_postgres.go) each start their own internal transactions. The allocation flow requires all operations (payment + allocations + ledger entries + GL entries) in a single transaction. Before implementing this spec:
+The `feature/atomic-financial-ops` merge (issue #60) introduced the infrastructure this spec requires:
 
-1. **Add `CreateLedgerEntryTx(ctx, tx, entry)`** — accepts a `pgx.Tx` parameter instead of beginning its own transaction. The existing `CreateLedgerEntry` becomes a convenience wrapper that begins a transaction, calls `CreateLedgerEntryTx`, and commits.
-2. **Add `PostJournalEntryTx(ctx, tx, entry)`** — same pattern for GL. The existing `PostJournalEntry` wraps it.
-3. The advisory lock (`pg_advisory_xact_lock`) moves into the `*Tx` variants, acquired on the caller's transaction.
+- **`DBTX` interface** (`platform/db/dbtx.go`): Satisfied by both `*pgxpool.Pool` and `pgx.Tx`. Repositories use this as their backing connection. When `DBTX` is already a `pgx.Tx`, `Begin()` creates a savepoint — advisory locks work either way.
+- **`UnitOfWork` + `UnitOfWorkFactory`** (`platform/db/unitofwork.go`): Wraps a database transaction, providing a single commit/rollback boundary for multi-repository operations.
+- **`WithTx(tx pgx.Tx)` on all repositories**: `AssessmentRepository`, `PaymentRepository`, `GLRepository`, `FundRepository`, `BudgetRepository`, `CollectionRepository` all support scoping to a transaction.
+- **`GLService.WithTx`** (`gl_service.go`): Returns a transaction-scoped GL service instance.
 
-This refactoring is backwards-compatible — existing callers are unaffected.
+`RecordPayment` already uses this pattern (service.go:314-398): UnitOfWork → `payments.WithTx(uow.Tx())` → `assessments.WithTx(uow.Tx())` → `gl.WithTx(uow.Tx())` → atomic commit. The allocation flow will extend this exact pattern by adding allocation writes within the same UnitOfWork.
+
+**No prerequisite refactoring is needed.** The `allocatePayment` function uses the same `UnitOfWork` already acquired by `RecordPayment`.
 
 ### Relationship to Existing `ai.PolicyResolver`
 
@@ -654,7 +657,15 @@ When a completed payment is returned (ACH failure, bounced check, chargeback):
 4. **Post reversal GL entries** — Debit AR / Credit Cash (reverse of the original).
 5. **Re-evaluate late fees** — assessments that were partially or fully paid and are now unpaid may need late fee reinstatement. This triggers the `late_fee_calculation` policy category (future consumer of the same policy engine).
 
-The `payment_status` enum gains two new values: `reversed` and `nsf`.
+The `PaymentStatus` typed enum (`fin/enums.go`) gains three new values:
+
+```go
+PaymentStatusPendingReview PaymentStatus = "pending_review"  // held for policy review
+PaymentStatusReversed      PaymentStatus = "reversed"         // NSF / ACH return / chargeback
+PaymentStatusNSF           PaymentStatus = "nsf"              // specifically bounced check
+```
+
+The DB `payment_status` enum in `migrations/enums.sql` must be updated to match.
 
 ### Board Credits and Adjustments
 
@@ -668,48 +679,79 @@ This ensures credits are tracked with the same audit trail as payments and corre
 
 ### Updated `RecordPayment` Flow
 
+Uses the existing `UnitOfWork` + `WithTx` pattern from `feature/atomic-financial-ops`:
+
 ```go
 func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID uuid.UUID, req CreatePaymentRequest) (*Payment, error) {
     if err := req.Validate(); err != nil {
         return nil, err
     }
 
-    // 1. Create payment record
-    payment, err := s.createPaymentRecord(ctx, orgID, userID, req)
-    if err != nil {
-        return nil, err
-    }
-
-    // 2. Resolve allocation policy
+    // 1. Resolve allocation policy (before starting the transaction)
     res, err := s.registry.Resolve(ctx, orgID, &req.UnitID, "payment_allocation")
     if err != nil {
         return nil, err
     }
 
-    // 3. If held for review, payment is saved but unallocated
-    if res.Held() {
-        return payment, nil // OnHold already set status to pending_review
+    // 2. Begin UnitOfWork — same pattern as existing RecordPayment
+    var uow *db.UnitOfWork
+    payments := s.payments
+    assessments := s.assessments
+    gl := s.gl
+
+    if s.uowFactory != nil {
+        uow, err = s.uowFactory.Begin(ctx)
+        if err != nil {
+            return nil, fmt.Errorf("fin: RecordPayment begin tx: %w", err)
+        }
+        defer uow.Rollback(ctx)
+        payments = s.payments.WithTx(uow.Tx())
+        assessments = s.assessments.WithTx(uow.Tx())
+        if s.gl != nil {
+            gl = s.gl.WithTx(uow.Tx())
+        }
     }
 
-    // 4. Decode ruling and allocate
+    // 3. Create payment record
+    payment, err := payments.CreatePayment(ctx, buildPayment(orgID, userID, req))
+    if err != nil {
+        return nil, err
+    }
+
+    // 4. If held for review, commit payment with pending_review status
+    if res.Held() {
+        payment.Status = PaymentStatusPendingReview
+        // ... commit and return
+    }
+
+    // 5. Decode ruling, run allocation engine, persist allocations + ledger + GL
     var ruling PaymentAllocationRuling
     if err := res.Decode(&ruling); err != nil {
         return nil, err
     }
-    return s.allocatePayment(ctx, payment, res.ID, ruling)
+    if err := s.executeAllocations(ctx, payment, res.ID, ruling, assessments, gl); err != nil {
+        return nil, err
+    }
+
+    if uow != nil {
+        if err := uow.Commit(ctx); err != nil {
+            return nil, fmt.Errorf("fin: RecordPayment commit: %w", err)
+        }
+    }
+    return payment, nil
 }
 
-func (s *FinService) allocatePayment(ctx context.Context, payment *Payment, resolutionID uuid.UUID, ruling PaymentAllocationRuling) (*Payment, error) {
-    // In a single transaction (using *Tx variants):
-    // - Acquire advisory lock on unit_id
-    // - Load outstanding charges for the unit
-    // - Run allocation engine (mechanical)
-    // - Insert payment_allocations rows
-    // - Create per-allocation ledger entries via CreateLedgerEntryTx (each with assessment_id)
-    // - Post GL journal entries via PostJournalEntryTx (Debit Cash / Credit AR)
-    // - Handle credit balance if overpayment
-    // - Update payment status to completed
+func (s *FinService) executeAllocations(ctx context.Context, payment *Payment, resolutionID uuid.UUID, ruling PaymentAllocationRuling, assessments AssessmentRepository, gl *GLService) error {
+    // All operations run within the caller's UnitOfWork transaction:
+    // 1. Load outstanding charges for the unit
+    // 2. Run allocation engine (pure function: charges + ruling → []Allocation)
+    // 3. Insert payment_allocations rows
+    // 4. Create per-allocation ledger entries (each with assessment_id)
+    //    - advisory lock acquired automatically via savepoint (DBTX.Begin)
+    // 5. Post GL journal entries (Debit Cash / Credit AR per allocation)
+    // 6. Handle credit balance if overpayment
 }
+```
 ```
 
 ## Ingestion Integration

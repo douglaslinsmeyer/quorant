@@ -9,17 +9,24 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	dbpkg "github.com/quorant/quorant/internal/platform/db"
 )
 
-// PostgresBudgetRepository implements BudgetRepository using a pgxpool.
+// PostgresBudgetRepository implements BudgetRepository using a DBTX.
 type PostgresBudgetRepository struct {
-	pool *pgxpool.Pool
+	db dbpkg.DBTX
 }
 
 // NewPostgresBudgetRepository creates a new PostgresBudgetRepository backed by
 // pool.
 func NewPostgresBudgetRepository(pool *pgxpool.Pool) *PostgresBudgetRepository {
-	return &PostgresBudgetRepository{pool: pool}
+	return &PostgresBudgetRepository{db: pool}
+}
+
+// WithTx returns a new PostgresBudgetRepository scoped to the given
+// transaction, enabling participation in a caller-managed transaction.
+func (r *PostgresBudgetRepository) WithTx(tx pgx.Tx) BudgetRepository {
+	return &PostgresBudgetRepository{db: tx}
 }
 
 // ─── Categories ───────────────────────────────────────────────────────────────
@@ -35,7 +42,7 @@ func (r *PostgresBudgetRepository) CreateCategory(ctx context.Context, c *Budget
 		)
 		RETURNING id, org_id, name, category_type, parent_id, sort_order, is_reserve, created_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		c.OrgID,
 		c.Name,
 		c.CategoryType,
@@ -60,7 +67,7 @@ func (r *PostgresBudgetRepository) ListCategoriesByOrg(ctx context.Context, orgI
 		WHERE org_id = $1
 		ORDER BY sort_order, name`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.db.Query(ctx, q, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListCategoriesByOrg: %w", err)
 	}
@@ -82,7 +89,7 @@ func (r *PostgresBudgetRepository) UpdateCategory(ctx context.Context, c *Budget
 		WHERE id = $6
 		RETURNING id, org_id, name, category_type, parent_id, sort_order, is_reserve, created_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		c.Name,
 		c.CategoryType,
 		c.ParentID,
@@ -122,7 +129,7 @@ func (r *PostgresBudgetRepository) CreateBudget(ctx context.Context, b *Budget) 
 		          notes, proposed_at, proposed_by, approved_at, approved_by,
 		          document_id, created_by, created_at, updated_at, deleted_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		b.OrgID,
 		b.FiscalYear,
 		b.Name,
@@ -157,7 +164,7 @@ func (r *PostgresBudgetRepository) FindBudgetByID(ctx context.Context, id uuid.U
 		FROM budgets
 		WHERE id = $1 AND deleted_at IS NULL`
 
-	row := r.pool.QueryRow(ctx, q, id)
+	row := r.db.QueryRow(ctx, q, id)
 	result, err := scanBudget(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -180,7 +187,7 @@ func (r *PostgresBudgetRepository) ListBudgetsByOrg(ctx context.Context, orgID u
 		WHERE org_id = $1 AND deleted_at IS NULL
 		ORDER BY fiscal_year DESC`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.db.Query(ctx, q, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListBudgetsByOrg: %w", err)
 	}
@@ -213,7 +220,7 @@ func (r *PostgresBudgetRepository) UpdateBudget(ctx context.Context, b *Budget) 
 		          notes, proposed_at, proposed_by, approved_at, approved_by,
 		          document_id, created_by, created_at, updated_at, deleted_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		b.FiscalYear,
 		b.Name,
 		b.Status,
@@ -246,7 +253,7 @@ func (r *PostgresBudgetRepository) SoftDeleteBudget(ctx context.Context, id uuid
 		SET deleted_at = now()
 		WHERE id = $1 AND deleted_at IS NULL`
 
-	_, err := r.pool.Exec(ctx, q, id)
+	_, err := r.db.Exec(ctx, q, id)
 	if err != nil {
 		return fmt.Errorf("fin: SoftDeleteBudget: %w", err)
 	}
@@ -267,7 +274,7 @@ func (r *PostgresBudgetRepository) CreateLineItem(ctx context.Context, item *Bud
 		RETURNING id, budget_id, category_id, description, planned_cents, actual_cents,
 		          notes, created_at, updated_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		item.BudgetID,
 		item.CategoryID,
 		item.Description,
@@ -293,7 +300,7 @@ func (r *PostgresBudgetRepository) ListLineItemsByBudget(ctx context.Context, bu
 		WHERE budget_id = $1
 		ORDER BY created_at`
 
-	rows, err := r.pool.Query(ctx, q, budgetID)
+	rows, err := r.db.Query(ctx, q, budgetID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListLineItemsByBudget: %w", err)
 	}
@@ -317,7 +324,7 @@ func (r *PostgresBudgetRepository) UpdateLineItem(ctx context.Context, item *Bud
 		RETURNING id, budget_id, category_id, description, planned_cents, actual_cents,
 		          notes, created_at, updated_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		item.CategoryID,
 		item.Description,
 		item.PlannedCents,
@@ -341,7 +348,7 @@ func (r *PostgresBudgetRepository) UpdateLineItem(ctx context.Context, item *Bud
 func (r *PostgresBudgetRepository) DeleteLineItem(ctx context.Context, id uuid.UUID) error {
 	const q = `DELETE FROM budget_line_items WHERE id = $1`
 
-	_, err := r.pool.Exec(ctx, q, id)
+	_, err := r.db.Exec(ctx, q, id)
 	if err != nil {
 		return fmt.Errorf("fin: DeleteLineItem: %w", err)
 	}
@@ -382,7 +389,7 @@ func (r *PostgresBudgetRepository) CreateExpense(ctx context.Context, e *Expense
 		          receipt_doc_id, submitted_by, approved_by, approved_at, metadata,
 		          created_at, updated_at, deleted_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		e.OrgID,
 		e.CurrencyCode,
 		e.VendorID,
@@ -424,7 +431,7 @@ func (r *PostgresBudgetRepository) FindExpenseByID(ctx context.Context, id uuid.
 		FROM expenses
 		WHERE id = $1 AND deleted_at IS NULL`
 
-	row := r.pool.QueryRow(ctx, q, id)
+	row := r.db.QueryRow(ctx, q, id)
 	result, err := scanExpense(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -448,7 +455,7 @@ func (r *PostgresBudgetRepository) ListExpensesByOrg(ctx context.Context, orgID 
 		WHERE org_id = $1 AND deleted_at IS NULL
 		ORDER BY expense_date DESC`
 
-	rows, err := r.pool.Query(ctx, q, orgID)
+	rows, err := r.db.Query(ctx, q, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: ListExpensesByOrg: %w", err)
 	}
@@ -498,7 +505,7 @@ func (r *PostgresBudgetRepository) UpdateExpense(ctx context.Context, e *Expense
 		          receipt_doc_id, submitted_by, approved_by, approved_at, metadata,
 		          created_at, updated_at, deleted_at`
 
-	row := r.pool.QueryRow(ctx, q,
+	row := r.db.QueryRow(ctx, q,
 		e.CurrencyCode,
 		e.VendorID,
 		e.CategoryID,
@@ -537,7 +544,7 @@ func (r *PostgresBudgetRepository) SoftDeleteExpense(ctx context.Context, id uui
 		SET deleted_at = now()
 		WHERE id = $1 AND deleted_at IS NULL`
 
-	_, err := r.pool.Exec(ctx, q, id)
+	_, err := r.db.Exec(ctx, q, id)
 	if err != nil {
 		return fmt.Errorf("fin: SoftDeleteExpense: %w", err)
 	}

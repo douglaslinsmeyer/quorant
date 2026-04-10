@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/platform/api"
 )
@@ -21,6 +22,16 @@ type GLService struct {
 // NewGLService creates a new GLService.
 func NewGLService(gl GLRepository, auditor audit.Auditor, logger *slog.Logger) *GLService {
 	return &GLService{gl: gl, auditor: auditor, logger: logger}
+}
+
+// WithTx returns a copy of the GLService whose underlying repository runs
+// against the given transaction.
+func (s *GLService) WithTx(tx pgx.Tx) *GLService {
+	return &GLService{
+		gl:      s.gl.WithTx(tx),
+		auditor: s.auditor,
+		logger:  s.logger,
+	}
 }
 
 // CreateAccount validates the request and persists a new GL account.
