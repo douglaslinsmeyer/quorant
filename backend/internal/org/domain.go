@@ -23,6 +23,10 @@ type Organization struct {
 	Email        *string        `json:"email,omitempty"`
 	Website      *string        `json:"website,omitempty"`
 	LogoURL      *string        `json:"logo_url,omitempty"`
+	Locale       string         `json:"locale"`
+	Timezone     string         `json:"timezone"`
+	CurrencyCode string         `json:"currency_code"`
+	Country      string         `json:"country"`
 	Settings     map[string]any `json:"settings"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
@@ -50,6 +54,7 @@ type Unit struct {
 	City         *string        `json:"city,omitempty"`
 	State        *string        `json:"state,omitempty"`
 	Zip          *string        `json:"zip,omitempty"`
+	Country      string         `json:"country"`
 	Status       string         `json:"status"`
 	LotSizeSqft  *int           `json:"lot_size_sqft,omitempty"`
 	VotingWeight float64        `json:"voting_weight"`

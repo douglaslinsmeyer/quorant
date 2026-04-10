@@ -41,15 +41,15 @@ func (r *PostgresUnitRepository) CreateUnit(ctx context.Context, unit *Unit) (*U
 	const q = `
 		INSERT INTO units (
 			org_id, label, unit_type,
-			address_line1, address_line2, city, state, zip,
+			address_line1, address_line2, city, state, zip, country,
 			status, lot_size_sqft, voting_weight, metadata
 		) VALUES (
 			$1, $2, $3,
-			$4, $5, $6, $7, $8,
-			$9, $10, $11, $12
+			$4, $5, $6, $7, $8, $9,
+			$10, $11, $12, $13
 		)
 		RETURNING id, org_id, label, unit_type,
-		          address_line1, address_line2, city, state, zip,
+		          address_line1, address_line2, city, state, zip, country,
 		          status, lot_size_sqft, voting_weight, metadata,
 		          created_at, updated_at, deleted_at`
 
@@ -67,6 +67,7 @@ func (r *PostgresUnitRepository) CreateUnit(ctx context.Context, unit *Unit) (*U
 		unit.City,
 		unit.State,
 		unit.Zip,
+		unit.Country,
 		status,
 		unit.LotSizeSqft,
 		unit.VotingWeight,
@@ -86,7 +87,7 @@ func (r *PostgresUnitRepository) CreateUnit(ctx context.Context, unit *Unit) (*U
 func (r *PostgresUnitRepository) FindUnitByID(ctx context.Context, id uuid.UUID) (*Unit, error) {
 	const q = `
 		SELECT id, org_id, label, unit_type,
-		       address_line1, address_line2, city, state, zip,
+		       address_line1, address_line2, city, state, zip, country,
 		       status, lot_size_sqft, voting_weight, metadata,
 		       created_at, updated_at, deleted_at
 		FROM units
@@ -110,7 +111,7 @@ func (r *PostgresUnitRepository) FindUnitByID(ctx context.Context, id uuid.UUID)
 func (r *PostgresUnitRepository) ListUnitsByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Unit, bool, error) {
 	const q = `
 		SELECT id, org_id, label, unit_type,
-		       address_line1, address_line2, city, state, zip,
+		       address_line1, address_line2, city, state, zip, country,
 		       status, lot_size_sqft, voting_weight, metadata,
 		       created_at, updated_at, deleted_at
 		FROM units
@@ -159,14 +160,15 @@ func (r *PostgresUnitRepository) UpdateUnit(ctx context.Context, unit *Unit) (*U
 			city          = $5,
 			state         = $6,
 			zip           = $7,
-			status        = $8,
-			lot_size_sqft = $9,
-			voting_weight = $10,
-			metadata      = $11,
+			country       = $8,
+			status        = $9,
+			lot_size_sqft = $10,
+			voting_weight = $11,
+			metadata      = $12,
 			updated_at    = now()
-		WHERE id = $12 AND deleted_at IS NULL
+		WHERE id = $13 AND deleted_at IS NULL
 		RETURNING id, org_id, label, unit_type,
-		          address_line1, address_line2, city, state, zip,
+		          address_line1, address_line2, city, state, zip, country,
 		          status, lot_size_sqft, voting_weight, metadata,
 		          created_at, updated_at, deleted_at`
 
@@ -178,6 +180,7 @@ func (r *PostgresUnitRepository) UpdateUnit(ctx context.Context, unit *Unit) (*U
 		unit.City,
 		unit.State,
 		unit.Zip,
+		unit.Country,
 		unit.Status,
 		unit.LotSizeSqft,
 		unit.VotingWeight,
@@ -501,6 +504,7 @@ func scanUnit(row pgx.Row) (*Unit, error) {
 		&u.City,
 		&u.State,
 		&u.Zip,
+		&u.Country,
 		&u.Status,
 		&u.LotSizeSqft,
 		&u.VotingWeight,
@@ -539,6 +543,7 @@ func collectUnits(rows pgx.Rows, op string) ([]Unit, error) {
 			&u.City,
 			&u.State,
 			&u.Zip,
+			&u.Country,
 			&u.Status,
 			&u.LotSizeSqft,
 			&u.VotingWeight,
