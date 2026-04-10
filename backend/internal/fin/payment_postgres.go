@@ -29,17 +29,18 @@ func NewPostgresPaymentRepository(pool *pgxpool.Pool) *PostgresPaymentRepository
 func (r *PostgresPaymentRepository) CreatePayment(ctx context.Context, p *Payment) (*Payment, error) {
 	const q = `
 		INSERT INTO payments (
-			org_id, unit_id, user_id, payment_method_id, amount_cents,
+			org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
 			status, provider_ref, description, paid_at
 		) VALUES (
-			$1, $2, $3, $4, $5,
-			$6, $7, $8, $9
+			$1, $2, $3, $4, $5, $6,
+			$7, $8, $9, $10
 		)
-		RETURNING id, org_id, unit_id, user_id, payment_method_id, amount_cents,
+		RETURNING id, org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
 		          status, provider_ref, description, paid_at, created_at, updated_at`
 
 	row := r.pool.QueryRow(ctx, q,
 		p.OrgID,
+		p.CurrencyCode,
 		p.UnitID,
 		p.UserID,
 		p.PaymentMethodID,
@@ -61,7 +62,7 @@ func (r *PostgresPaymentRepository) CreatePayment(ctx context.Context, p *Paymen
 // found.
 func (r *PostgresPaymentRepository) FindPaymentByID(ctx context.Context, id uuid.UUID) (*Payment, error) {
 	const q = `
-		SELECT id, org_id, unit_id, user_id, payment_method_id, amount_cents,
+		SELECT id, org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
 		       status, provider_ref, description, paid_at, created_at, updated_at
 		FROM payments
 		WHERE id = $1`
@@ -81,7 +82,7 @@ func (r *PostgresPaymentRepository) FindPaymentByID(ctx context.Context, id uuid
 // pagination ordered by id DESC. afterID is the cursor from the previous page.
 func (r *PostgresPaymentRepository) ListPaymentsByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Payment, bool, error) {
 	const q = `
-		SELECT id, org_id, unit_id, user_id, payment_method_id, amount_cents,
+		SELECT id, org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
 		       status, provider_ref, description, paid_at, created_at, updated_at
 		FROM payments
 		WHERE org_id = $1
@@ -111,7 +112,7 @@ func (r *PostgresPaymentRepository) ListPaymentsByOrg(ctx context.Context, orgID
 // created_at DESC. Returns an empty (non-nil) slice when none exist.
 func (r *PostgresPaymentRepository) ListPaymentsByUnit(ctx context.Context, unitID uuid.UUID) ([]Payment, error) {
 	const q = `
-		SELECT id, org_id, unit_id, user_id, payment_method_id, amount_cents,
+		SELECT id, org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
 		       status, provider_ref, description, paid_at, created_at, updated_at
 		FROM payments
 		WHERE unit_id = $1
@@ -216,6 +217,7 @@ func scanPayment(row pgx.Row) (*Payment, error) {
 	err := row.Scan(
 		&p.ID,
 		&p.OrgID,
+		&p.CurrencyCode,
 		&p.UnitID,
 		&p.UserID,
 		&p.PaymentMethodID,
@@ -241,6 +243,7 @@ func collectPayments(rows pgx.Rows, op string) ([]Payment, error) {
 		if err := rows.Scan(
 			&p.ID,
 			&p.OrgID,
+			&p.CurrencyCode,
 			&p.UnitID,
 			&p.UserID,
 			&p.PaymentMethodID,

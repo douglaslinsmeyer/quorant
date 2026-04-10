@@ -366,17 +366,17 @@ func (r *PostgresBudgetRepository) CreateExpense(ctx context.Context, e *Expense
 
 	const q = `
 		INSERT INTO expenses (
-			org_id, vendor_id, category_id, budget_id, fund_type,
+			org_id, currency_code, vendor_id, category_id, budget_id, fund_type,
 			description, amount_cents, tax_cents, total_cents,
 			status, expense_date, due_date, paid_date, payment_ref,
 			receipt_doc_id, submitted_by, approved_by, approved_at, metadata
 		) VALUES (
-			$1, $2, $3, $4, $5,
-			$6, $7, $8, $9,
-			$10, $11, $12, $13, $14,
-			$15, $16, $17, $18, $19
+			$1, $2, $3, $4, $5, $6,
+			$7, $8, $9, $10,
+			$11, $12, $13, $14, $15,
+			$16, $17, $18, $19, $20
 		)
-		RETURNING id, org_id, vendor_id, category_id, budget_id, fund_type,
+		RETURNING id, org_id, currency_code, vendor_id, category_id, budget_id, fund_type,
 		          description, amount_cents, tax_cents, total_cents,
 		          status, expense_date, due_date, paid_date, payment_ref,
 		          receipt_doc_id, submitted_by, approved_by, approved_at, metadata,
@@ -384,6 +384,7 @@ func (r *PostgresBudgetRepository) CreateExpense(ctx context.Context, e *Expense
 
 	row := r.pool.QueryRow(ctx, q,
 		e.OrgID,
+		e.CurrencyCode,
 		e.VendorID,
 		e.CategoryID,
 		e.BudgetID,
@@ -415,7 +416,7 @@ func (r *PostgresBudgetRepository) CreateExpense(ctx context.Context, e *Expense
 // found or soft-deleted.
 func (r *PostgresBudgetRepository) FindExpenseByID(ctx context.Context, id uuid.UUID) (*Expense, error) {
 	const q = `
-		SELECT id, org_id, vendor_id, category_id, budget_id, fund_type,
+		SELECT id, org_id, currency_code, vendor_id, category_id, budget_id, fund_type,
 		       description, amount_cents, tax_cents, total_cents,
 		       status, expense_date, due_date, paid_date, payment_ref,
 		       receipt_doc_id, submitted_by, approved_by, approved_at, metadata,
@@ -438,7 +439,7 @@ func (r *PostgresBudgetRepository) FindExpenseByID(ctx context.Context, id uuid.
 // by expense_date DESC. Returns an empty (non-nil) slice when none exist.
 func (r *PostgresBudgetRepository) ListExpensesByOrg(ctx context.Context, orgID uuid.UUID) ([]Expense, error) {
 	const q = `
-		SELECT id, org_id, vendor_id, category_id, budget_id, fund_type,
+		SELECT id, org_id, currency_code, vendor_id, category_id, budget_id, fund_type,
 		       description, amount_cents, tax_cents, total_cents,
 		       status, expense_date, due_date, paid_date, payment_ref,
 		       receipt_doc_id, submitted_by, approved_by, approved_at, metadata,
@@ -471,32 +472,34 @@ func (r *PostgresBudgetRepository) UpdateExpense(ctx context.Context, e *Expense
 
 	const q = `
 		UPDATE expenses SET
-			vendor_id     = $1,
-			category_id   = $2,
-			budget_id     = $3,
-			fund_type     = $4,
-			description   = $5,
-			amount_cents  = $6,
-			tax_cents     = $7,
-			total_cents   = $8,
-			status        = $9,
-			expense_date  = $10,
-			due_date      = $11,
-			paid_date     = $12,
-			payment_ref   = $13,
-			receipt_doc_id = $14,
-			approved_by   = $15,
-			approved_at   = $16,
-			metadata      = $17,
+			currency_code  = $1,
+			vendor_id     = $2,
+			category_id   = $3,
+			budget_id     = $4,
+			fund_type     = $5,
+			description   = $6,
+			amount_cents  = $7,
+			tax_cents     = $8,
+			total_cents   = $9,
+			status        = $10,
+			expense_date  = $11,
+			due_date      = $12,
+			paid_date     = $13,
+			payment_ref   = $14,
+			receipt_doc_id = $15,
+			approved_by   = $16,
+			approved_at   = $17,
+			metadata      = $18,
 			updated_at    = now()
-		WHERE id = $18 AND deleted_at IS NULL
-		RETURNING id, org_id, vendor_id, category_id, budget_id, fund_type,
+		WHERE id = $19 AND deleted_at IS NULL
+		RETURNING id, org_id, currency_code, vendor_id, category_id, budget_id, fund_type,
 		          description, amount_cents, tax_cents, total_cents,
 		          status, expense_date, due_date, paid_date, payment_ref,
 		          receipt_doc_id, submitted_by, approved_by, approved_at, metadata,
 		          created_at, updated_at, deleted_at`
 
 	row := r.pool.QueryRow(ctx, q,
+		e.CurrencyCode,
 		e.VendorID,
 		e.CategoryID,
 		e.BudgetID,
@@ -706,6 +709,7 @@ func scanExpense(row pgx.Row) (*Expense, error) {
 	err := row.Scan(
 		&e.ID,
 		&e.OrgID,
+		&e.CurrencyCode,
 		&e.VendorID,
 		&e.CategoryID,
 		&e.BudgetID,
@@ -757,6 +761,7 @@ func collectExpenses(rows pgx.Rows, op string) ([]Expense, error) {
 		if err := rows.Scan(
 			&e.ID,
 			&e.OrgID,
+			&e.CurrencyCode,
 			&e.VendorID,
 			&e.CategoryID,
 			&e.BudgetID,

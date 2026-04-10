@@ -13,6 +13,7 @@ import (
 type AssessmentSchedule struct {
 	ID               uuid.UUID      `json:"id"`
 	OrgID            uuid.UUID      `json:"org_id"`
+	CurrencyCode     string         `json:"currency_code"`
 	Name             string         `json:"name"`
 	Description      *string        `json:"description,omitempty"`
 	Frequency        string         `json:"frequency"`       // monthly|quarterly|annually|semi_annually
@@ -36,6 +37,7 @@ type AssessmentSchedule struct {
 type Assessment struct {
 	ID           uuid.UUID  `json:"id"`
 	OrgID        uuid.UUID  `json:"org_id"`
+	CurrencyCode string    `json:"currency_code"`
 	UnitID       uuid.UUID  `json:"unit_id"`
 	ScheduleID   *uuid.UUID `json:"schedule_id,omitempty"`
 	Description  string     `json:"description"`
@@ -54,6 +56,7 @@ type Assessment struct {
 type LedgerEntry struct {
 	ID            uuid.UUID  `json:"id"`
 	OrgID         uuid.UUID  `json:"org_id"`
+	CurrencyCode  string     `json:"currency_code"`
 	UnitID        uuid.UUID  `json:"unit_id"`
 	AssessmentID  *uuid.UUID `json:"assessment_id,omitempty"`
 	EntryType     string     `json:"entry_type"` // charge|payment|credit|adjustment|late_fee
@@ -83,6 +86,7 @@ type PaymentMethod struct {
 type Payment struct {
 	ID              uuid.UUID  `json:"id"`
 	OrgID           uuid.UUID  `json:"org_id"`
+	CurrencyCode    string     `json:"currency_code"`
 	UnitID          uuid.UUID  `json:"unit_id"`
 	UserID          uuid.UUID  `json:"user_id"`
 	PaymentMethodID *uuid.UUID `json:"payment_method_id,omitempty"`
@@ -146,6 +150,7 @@ type BudgetLineItem struct {
 type Expense struct {
 	ID            uuid.UUID      `json:"id"`
 	OrgID         uuid.UUID      `json:"org_id"`
+	CurrencyCode  string         `json:"currency_code"`
 	VendorID      *uuid.UUID     `json:"vendor_id,omitempty"`
 	CategoryID    *uuid.UUID     `json:"category_id,omitempty"`
 	BudgetID      *uuid.UUID     `json:"budget_id,omitempty"`
@@ -176,6 +181,7 @@ type Expense struct {
 type Fund struct {
 	ID                  uuid.UUID  `json:"id"`
 	OrgID               uuid.UUID  `json:"org_id"`
+	CurrencyCode        string     `json:"currency_code"`
 	Name                string     `json:"name"`
 	FundType            string     `json:"fund_type"` // operating|reserve|capital|special
 	BalanceCents        int64      `json:"balance_cents"`
@@ -191,6 +197,7 @@ type FundTransaction struct {
 	ID               uuid.UUID  `json:"id"`
 	FundID           uuid.UUID  `json:"fund_id"`
 	OrgID            uuid.UUID  `json:"org_id"`
+	CurrencyCode     string     `json:"currency_code"`
 	TransactionType  string     `json:"transaction_type"`
 	AmountCents      int64      `json:"amount_cents"`
 	BalanceAfterCents int64     `json:"balance_after_cents"`
@@ -205,6 +212,7 @@ type FundTransaction struct {
 type FundTransfer struct {
 	ID           uuid.UUID  `json:"id"`
 	OrgID        uuid.UUID  `json:"org_id"`
+	CurrencyCode string     `json:"currency_code"`
 	FromFundID   uuid.UUID  `json:"from_fund_id"`
 	ToFundID     uuid.UUID  `json:"to_fund_id"`
 	AmountCents  int64      `json:"amount_cents"`
