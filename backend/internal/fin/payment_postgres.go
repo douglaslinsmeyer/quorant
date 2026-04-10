@@ -43,7 +43,8 @@ func (r *PostgresPaymentRepository) CreatePayment(ctx context.Context, p *Paymen
 			$7, $8, $9, $10
 		)
 		RETURNING id, org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
-		          status, provider_ref, description, paid_at, created_at, updated_at`
+		          status, provider_ref, description, paid_at,
+		          voided_by, voided_at, created_at, updated_at`
 
 	row := r.db.QueryRow(ctx, q,
 		p.OrgID,
@@ -70,7 +71,8 @@ func (r *PostgresPaymentRepository) CreatePayment(ctx context.Context, p *Paymen
 func (r *PostgresPaymentRepository) FindPaymentByID(ctx context.Context, id uuid.UUID) (*Payment, error) {
 	const q = `
 		SELECT id, org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
-		       status, provider_ref, description, paid_at, created_at, updated_at
+		       status, provider_ref, description, paid_at,
+		       voided_by, voided_at, created_at, updated_at
 		FROM payments
 		WHERE id = $1`
 
@@ -90,7 +92,8 @@ func (r *PostgresPaymentRepository) FindPaymentByID(ctx context.Context, id uuid
 func (r *PostgresPaymentRepository) ListPaymentsByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Payment, bool, error) {
 	const q = `
 		SELECT id, org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
-		       status, provider_ref, description, paid_at, created_at, updated_at
+		       status, provider_ref, description, paid_at,
+		       voided_by, voided_at, created_at, updated_at
 		FROM payments
 		WHERE org_id = $1
 		  AND ($3::uuid IS NULL OR id < $3)
@@ -120,7 +123,8 @@ func (r *PostgresPaymentRepository) ListPaymentsByOrg(ctx context.Context, orgID
 func (r *PostgresPaymentRepository) ListPaymentsByUnit(ctx context.Context, unitID uuid.UUID) ([]Payment, error) {
 	const q = `
 		SELECT id, org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
-		       status, provider_ref, description, paid_at, created_at, updated_at
+		       status, provider_ref, description, paid_at,
+		       voided_by, voided_at, created_at, updated_at
 		FROM payments
 		WHERE unit_id = $1
 		ORDER BY created_at DESC`
@@ -250,6 +254,8 @@ func scanPayment(row pgx.Row) (*Payment, error) {
 		&p.ProviderRef,
 		&p.Description,
 		&p.PaidAt,
+		&p.VoidedBy,
+		&p.VoidedAt,
 		&p.CreatedAt,
 		&p.UpdatedAt,
 	)
@@ -276,6 +282,8 @@ func collectPayments(rows pgx.Rows, op string) ([]Payment, error) {
 			&p.ProviderRef,
 			&p.Description,
 			&p.PaidAt,
+			&p.VoidedBy,
+			&p.VoidedAt,
 			&p.CreatedAt,
 			&p.UpdatedAt,
 		); err != nil {

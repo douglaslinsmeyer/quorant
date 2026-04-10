@@ -224,13 +224,14 @@ func (r *PostgresAssessmentRepository) CreateAssessment(ctx context.Context, a *
 	const q = `
 		INSERT INTO assessments (
 			org_id, currency_code, unit_id, schedule_id, description, amount_cents,
-			due_date, grace_days, late_fee_cents, is_recurring, created_by
+			due_date, grace_days, late_fee_cents, is_recurring, status, created_by
 		) VALUES (
 			$1, $2, $3, $4, $5, $6,
-			$7, $8, $9, $10, $11
+			$7, $8, $9, $10, $11, $12
 		)
 		RETURNING id, org_id, currency_code, unit_id, schedule_id, description, amount_cents,
 		          due_date, grace_days, late_fee_cents, is_recurring,
+		          status, voided_by, voided_at,
 		          created_by, created_at, updated_at, deleted_at`
 
 	// Resolve nullable int fields — the schema has NOT NULL DEFAULT 0 but the
@@ -255,6 +256,7 @@ func (r *PostgresAssessmentRepository) CreateAssessment(ctx context.Context, a *
 		graceDays,
 		lateFeeCents,
 		a.IsRecurring,
+		a.Status,
 		a.CreatedBy,
 	)
 
@@ -271,6 +273,7 @@ func (r *PostgresAssessmentRepository) FindAssessmentByID(ctx context.Context, i
 	const q = `
 		SELECT id, org_id, currency_code, unit_id, schedule_id, description, amount_cents,
 		       due_date, grace_days, late_fee_cents, is_recurring,
+		       status, voided_by, voided_at,
 		       created_by, created_at, updated_at, deleted_at
 		FROM assessments
 		WHERE id = $1 AND deleted_at IS NULL`
@@ -293,6 +296,7 @@ func (r *PostgresAssessmentRepository) ListAssessmentsByOrg(ctx context.Context,
 	const q = `
 		SELECT id, org_id, currency_code, unit_id, schedule_id, description, amount_cents,
 		       due_date, grace_days, late_fee_cents, is_recurring,
+		       status, voided_by, voided_at,
 		       created_by, created_at, updated_at, deleted_at
 		FROM assessments
 		WHERE org_id = $1 AND deleted_at IS NULL
@@ -324,6 +328,7 @@ func (r *PostgresAssessmentRepository) ListAssessmentsByUnit(ctx context.Context
 	const q = `
 		SELECT id, org_id, currency_code, unit_id, schedule_id, description, amount_cents,
 		       due_date, grace_days, late_fee_cents, is_recurring,
+		       status, voided_by, voided_at,
 		       created_by, created_at, updated_at, deleted_at
 		FROM assessments
 		WHERE unit_id = $1 AND deleted_at IS NULL
@@ -363,6 +368,7 @@ func (r *PostgresAssessmentRepository) UpdateAssessment(ctx context.Context, a *
 		WHERE id = $8 AND deleted_at IS NULL
 		RETURNING id, org_id, currency_code, unit_id, schedule_id, description, amount_cents,
 		          due_date, grace_days, late_fee_cents, is_recurring,
+		          status, voided_by, voided_at,
 		          created_by, created_at, updated_at, deleted_at`
 
 	row := r.db.QueryRow(ctx, q,
@@ -442,7 +448,7 @@ func (r *PostgresAssessmentRepository) CreateLedgerEntry(ctx context.Context, en
 		FROM prev
 		RETURNING id, org_id, currency_code, unit_id, assessment_id, entry_type, amount_cents,
 		          balance_cents, description, reference_type, reference_id,
-		          effective_date, created_at`
+		          reversed_by_entry_id, effective_date, created_at`
 
 	row := tx.QueryRow(ctx, q,
 		entry.UnitID,
@@ -474,7 +480,7 @@ func (r *PostgresAssessmentRepository) ListLedgerByUnit(ctx context.Context, uni
 	const q = `
 		SELECT id, org_id, currency_code, unit_id, assessment_id, entry_type, amount_cents,
 		       balance_cents, description, reference_type, reference_id,
-		       effective_date, created_at
+		       reversed_by_entry_id, effective_date, created_at
 		FROM ledger_entries
 		WHERE unit_id = $1
 		  AND ($3::uuid IS NULL OR id > $3)
@@ -506,7 +512,7 @@ func (r *PostgresAssessmentRepository) ListLedgerByOrg(ctx context.Context, orgI
 	const q = `
 		SELECT id, org_id, currency_code, unit_id, assessment_id, entry_type, amount_cents,
 		       balance_cents, description, reference_type, reference_id,
-		       effective_date, created_at
+		       reversed_by_entry_id, effective_date, created_at
 		FROM ledger_entries
 		WHERE org_id = $1
 		ORDER BY effective_date ASC, created_at ASC`
@@ -546,7 +552,7 @@ func (r *PostgresAssessmentRepository) FindLedgerEntryByID(ctx context.Context, 
 	const q = `
 		SELECT id, org_id, currency_code, unit_id, assessment_id, entry_type, amount_cents,
 		       balance_cents, description, reference_type, reference_id,
-		       effective_date, created_at
+		       reversed_by_entry_id, effective_date, created_at
 		FROM ledger_entries
 		WHERE id = $1`
 
@@ -566,7 +572,7 @@ func (r *PostgresAssessmentRepository) FindLedgerEntriesByAssessment(ctx context
 	const q = `
 		SELECT id, org_id, currency_code, unit_id, assessment_id, entry_type, amount_cents,
 		       balance_cents, description, reference_type, reference_id,
-		       effective_date, created_at
+		       reversed_by_entry_id, effective_date, created_at
 		FROM ledger_entries
 		WHERE assessment_id = $1
 		ORDER BY effective_date ASC, created_at ASC`
@@ -586,7 +592,7 @@ func (r *PostgresAssessmentRepository) FindLedgerEntryByPaymentRef(ctx context.C
 	const q = `
 		SELECT id, org_id, currency_code, unit_id, assessment_id, entry_type, amount_cents,
 		       balance_cents, description, reference_type, reference_id,
-		       effective_date, created_at
+		       reversed_by_entry_id, effective_date, created_at
 		FROM ledger_entries
 		WHERE reference_type = 'payment' AND reference_id = $1
 		LIMIT 1`
@@ -752,6 +758,9 @@ func scanAssessment(row pgx.Row) (*Assessment, error) {
 		&graceDays,
 		&lateFeeCents,
 		&a.IsRecurring,
+		&a.Status,
+		&a.VoidedBy,
+		&a.VoidedAt,
 		&a.CreatedBy,
 		&a.CreatedAt,
 		&a.UpdatedAt,
@@ -787,6 +796,9 @@ func collectAssessments(rows pgx.Rows, op string) ([]Assessment, error) {
 			&graceDays,
 			&lateFeeCents,
 			&a.IsRecurring,
+			&a.Status,
+			&a.VoidedBy,
+			&a.VoidedAt,
 			&a.CreatedBy,
 			&a.CreatedAt,
 			&a.UpdatedAt,
@@ -820,6 +832,7 @@ func scanLedgerEntry(row pgx.Row) (*LedgerEntry, error) {
 		&e.Description,
 		&e.ReferenceType,
 		&e.ReferenceID,
+		&e.ReversedByEntryID,
 		&e.EffectiveDate,
 		&e.CreatedAt,
 	)
@@ -846,6 +859,7 @@ func collectLedgerEntries(rows pgx.Rows, op string) ([]LedgerEntry, error) {
 			&e.Description,
 			&e.ReferenceType,
 			&e.ReferenceID,
+			&e.ReversedByEntryID,
 			&e.EffectiveDate,
 			&e.CreatedAt,
 		); err != nil {

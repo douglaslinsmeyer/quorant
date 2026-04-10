@@ -300,22 +300,46 @@ func (r *PostgresGLRepository) ListJournalEntriesByOrg(ctx context.Context, orgI
 }
 
 // FindJournalEntriesBySource returns all journal entries whose source_type
-// and source_id match the given values. Lines are NOT loaded.
+// and source_id match the given values, including their lines.
 func (r *PostgresGLRepository) FindJournalEntriesBySource(ctx context.Context, sourceType GLSourceType, sourceID uuid.UUID) ([]GLJournalEntry, error) {
-	const q = `
+	const headerQ = `
 		SELECT id, org_id, entry_number, entry_date, memo, source_type,
 		       source_id, unit_id, posted_by, reversed_by, is_reversal, created_at
 		FROM gl_journal_entries
 		WHERE source_type = $1 AND source_id = $2
 		ORDER BY entry_number ASC`
 
-	rows, err := r.pool.Query(ctx, q, sourceType, sourceID)
+	rows, err := r.pool.Query(ctx, headerQ, sourceType, sourceID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: FindJournalEntriesBySource: %w", err)
 	}
 	defer rows.Close()
 
-	return collectGLJournalEntries(rows, "FindJournalEntriesBySource")
+	entries, err := collectGLJournalEntries(rows, "FindJournalEntriesBySource")
+	if err != nil {
+		return nil, err
+	}
+
+	const linesQ = `
+		SELECT id, journal_entry_id, account_id, debit_cents, credit_cents, memo
+		FROM gl_journal_lines
+		WHERE journal_entry_id = $1
+		ORDER BY id`
+
+	for i := range entries {
+		lineRows, err := r.pool.Query(ctx, linesQ, entries[i].ID)
+		if err != nil {
+			return nil, fmt.Errorf("fin: FindJournalEntriesBySource lines: %w", err)
+		}
+		lines, err := collectGLJournalLines(lineRows, "FindJournalEntriesBySource")
+		lineRows.Close()
+		if err != nil {
+			return nil, err
+		}
+		entries[i].Lines = lines
+	}
+
+	return entries, nil
 }
 
 // UpdateJournalEntryReversedBy sets the reversed_by field on the given journal entry.

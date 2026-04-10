@@ -183,6 +183,7 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 		AmountCents:  req.AmountCents,
 		DueDate:      req.DueDate,
 		GraceDays:    req.GraceDays,
+		Status:       AssessmentStatusPosted,
 	}
 
 	// Optional: look up late fee policy to set late_fee_cents if not provided.
