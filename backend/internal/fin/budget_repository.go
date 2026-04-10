@@ -51,6 +51,10 @@ type BudgetRepository interface {
 	// fully-populated row.
 	CreateLineItem(ctx context.Context, item *BudgetLineItem) (*BudgetLineItem, error)
 
+	// FindLineItemByID returns the line item with the given id, or nil, nil
+	// if no matching row exists.
+	FindLineItemByID(ctx context.Context, id uuid.UUID) (*BudgetLineItem, error)
+
 	// ListLineItemsByBudget returns all line items for the given budget, ordered
 	// by created_at. Returns an empty (non-nil) slice when none exist.
 	ListLineItemsByBudget(ctx context.Context, budgetID uuid.UUID) ([]BudgetLineItem, error)

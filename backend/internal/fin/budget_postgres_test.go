@@ -346,6 +346,40 @@ func TestDeleteLineItem(t *testing.T) {
 	assert.Empty(t, list, "line item should be removed after deletion")
 }
 
+// ─── TestFindLineItemByID ───────────────────────────────────────────────────
+
+func TestFindLineItemByID(t *testing.T) {
+	f := setupBudgetFixture(t)
+	ctx := context.Background()
+
+	cat, err := f.repo.CreateCategory(ctx, minimalCategory(f.orgID))
+	require.NoError(t, err)
+
+	budget, err := f.repo.CreateBudget(ctx, minimalBudget(f.orgID, f.userID))
+	require.NoError(t, err)
+
+	created, err := f.repo.CreateLineItem(ctx, minimalLineItem(budget.ID, cat.ID))
+	require.NoError(t, err)
+
+	found, err := f.repo.FindLineItemByID(ctx, created.ID)
+
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, created.ID, found.ID)
+	assert.Equal(t, created.BudgetID, found.BudgetID)
+	assert.Equal(t, created.PlannedCents, found.PlannedCents)
+}
+
+func TestFindLineItemByID_ReturnsNilWhenNotFound(t *testing.T) {
+	f := setupBudgetFixture(t)
+	ctx := context.Background()
+
+	found, err := f.repo.FindLineItemByID(ctx, uuid.New())
+
+	require.NoError(t, err)
+	assert.Nil(t, found, "should return nil for non-existent line item")
+}
+
 // ─── TestCreateExpense + FindExpenseByID ─────────────────────────────────────
 
 func TestCreateExpense(t *testing.T) {

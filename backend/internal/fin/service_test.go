@@ -459,6 +459,16 @@ func (m *mockBudgetRepo) DeleteLineItem(_ context.Context, id uuid.UUID) error {
 	return nil
 }
 
+func (m *mockBudgetRepo) FindLineItemByID(_ context.Context, id uuid.UUID) (*fin.BudgetLineItem, error) {
+	for i := range m.lineItems {
+		if m.lineItems[i].ID == id {
+			out := m.lineItems[i]
+			return &out, nil
+		}
+	}
+	return nil, nil
+}
+
 func (m *mockBudgetRepo) CreateExpense(_ context.Context, e *fin.Expense) (*fin.Expense, error) {
 	e.ID = uuid.New()
 	e.CreatedAt = time.Now()

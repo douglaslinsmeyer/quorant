@@ -290,6 +290,27 @@ func (r *PostgresBudgetRepository) CreateLineItem(ctx context.Context, item *Bud
 	return result, nil
 }
 
+// FindLineItemByID returns the line item with the given id, or nil, nil if
+// no matching row exists.
+func (r *PostgresBudgetRepository) FindLineItemByID(ctx context.Context, id uuid.UUID) (*BudgetLineItem, error) {
+	const q = `
+		SELECT id, budget_id, category_id, description, planned_cents, actual_cents,
+		       notes, created_at, updated_at
+		FROM budget_line_items
+		WHERE id = $1`
+
+	row := r.db.QueryRow(ctx, q, id)
+
+	result, err := scanLineItem(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("fin: FindLineItemByID: %w", err)
+	}
+	return result, nil
+}
+
 // ListLineItemsByBudget returns all line items for the given budget ordered by
 // created_at. Returns an empty (non-nil) slice when none exist.
 func (r *PostgresBudgetRepository) ListLineItemsByBudget(ctx context.Context, budgetID uuid.UUID) ([]BudgetLineItem, error) {
