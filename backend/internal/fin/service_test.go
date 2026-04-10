@@ -2,6 +2,7 @@ package fin_test
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"testing"
@@ -552,9 +553,17 @@ func (m *mockFundRepo) UpdateFund(_ context.Context, f *fin.Fund) (*fin.Fund, er
 func (m *mockFundRepo) CreateTransaction(_ context.Context, t *fin.FundTransaction) (*fin.FundTransaction, error) {
 	t.ID = uuid.New()
 	t.CreatedAt = time.Now()
-	m.transactions = append(m.transactions, *t)
-	out := m.transactions[len(m.transactions)-1]
-	return &out, nil
+	// Mirror the real repo: update the parent fund's balance.
+	for i := range m.funds {
+		if m.funds[i].ID == t.FundID && m.funds[i].DeletedAt == nil {
+			m.funds[i].BalanceCents += t.AmountCents
+			t.BalanceAfterCents = m.funds[i].BalanceCents
+			m.transactions = append(m.transactions, *t)
+			out := m.transactions[len(m.transactions)-1]
+			return &out, nil
+		}
+	}
+	return nil, fmt.Errorf("fin: CreateTransaction: fund %s not found or deleted", t.FundID)
 }
 
 func (m *mockFundRepo) ListTransactionsByFund(_ context.Context, fundID uuid.UUID) ([]fin.FundTransaction, error) {
