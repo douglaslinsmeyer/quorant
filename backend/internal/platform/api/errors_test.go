@@ -405,11 +405,11 @@ func TestInternalError(t *testing.T) {
 		}
 	})
 
-	t.Run("MsgParams returns empty map", func(t *testing.T) {
+	t.Run("returns nil params", func(t *testing.T) {
 		err := api.NewInternalError(errors.New("db connection failed"))
 		params := err.MsgParams()
-		if len(params) != 0 {
-			t.Errorf("expected empty params, got %v", params)
+		if params != nil {
+			t.Errorf("expected nil params, got %v", params)
 		}
 	})
 

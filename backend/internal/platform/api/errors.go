@@ -234,5 +234,5 @@ func (e *InternalError) Error() string              { return "internal server er
 func (e *InternalError) StatusCode() int            { return http.StatusInternalServerError }
 func (e *InternalError) ErrorCode() string          { return "INTERNAL_ERROR" }
 func (e *InternalError) MsgKey() string             { return "server.internal_error" }
-func (e *InternalError) MsgParams() map[string]any  { return map[string]any{} }
+func (e *InternalError) MsgParams() map[string]any  { return nil }
 func (e *InternalError) Unwrap() error              { return e.underlying }
