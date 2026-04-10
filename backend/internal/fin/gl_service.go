@@ -65,7 +65,7 @@ func (s *GLService) UpdateAccount(ctx context.Context, id uuid.UUID, req UpdateG
 		return nil, err
 	}
 	if existing.IsSystem && req.Name != nil {
-		return nil, api.NewUnprocessableError("cannot modify system account")
+		return nil, api.NewUnprocessableError("gl.cannot_modify_system_account")
 	}
 	if req.Name != nil {
 		existing.Name = *req.Name
@@ -86,14 +86,14 @@ func (s *GLService) DeleteAccount(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 	if existing.IsSystem {
-		return api.NewUnprocessableError("cannot delete system account")
+		return api.NewUnprocessableError("gl.cannot_delete_system_account")
 	}
 	hasLines, err := s.gl.HasPostedLines(ctx, id)
 	if err != nil {
 		return err
 	}
 	if hasLines {
-		return api.NewUnprocessableError("cannot delete account with posted journal lines")
+		return api.NewUnprocessableError("gl.cannot_delete_account_with_entries")
 	}
 	return s.gl.SoftDeleteAccount(ctx, id)
 }

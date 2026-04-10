@@ -65,7 +65,7 @@ func TestCreateFeatureFlagRequest_Validate_MissingKey(t *testing.T) {
 	req := admin.CreateFeatureFlagRequest{}
 	err := req.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "key is required")
+	assert.Contains(t, err.Error(), "validation.required")
 }
 
 // ─── UpdateFeatureFlagRequest validation ────────────────────────────────────
@@ -86,7 +86,7 @@ func TestUpdateFeatureFlagRequest_Validate_NoFields(t *testing.T) {
 	req := admin.UpdateFeatureFlagRequest{}
 	err := req.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "at least one")
+	assert.Contains(t, err.Error(), "validation.at_least_one")
 }
 
 // ─── SetFlagOverrideRequest validation ──────────────────────────────────────
@@ -100,5 +100,5 @@ func TestSetFlagOverrideRequest_Validate_MissingOrgID(t *testing.T) {
 	req := admin.SetFlagOverrideRequest{Enabled: true}
 	err := req.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "org_id is required")
+	assert.Contains(t, err.Error(), "validation.required")
 }

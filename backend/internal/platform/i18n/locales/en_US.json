@@ -27,6 +27,9 @@
     "server.internal_error": "an internal error occurred",
     "budget.invalid_status_transition": "budget must be in '{expected}' status to {action}, current status: {current}",
     "collection.case_not_open": "collection case is not in open status",
-    "payment_plan.already_exists": "an active payment plan already exists for this case"
+    "payment_plan.already_exists": "an active payment plan already exists for this case",
+    "gl.cannot_modify_system_account": "cannot modify system account",
+    "gl.cannot_delete_system_account": "cannot delete system account",
+    "gl.cannot_delete_account_with_entries": "cannot delete account with posted journal entries"
   }
 }

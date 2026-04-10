@@ -1,10 +1,10 @@
 package iam
 
 import (
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/quorant/quorant/internal/platform/api"
 )
 
 // User represents an application user profile linked to Zitadel.
@@ -74,7 +74,7 @@ type UpdateProfileRequest struct {
 // Validate checks that the UpdateProfileRequest has at least one field set.
 func (r UpdateProfileRequest) Validate() error {
 	if r.DisplayName == nil && r.Phone == nil && r.AvatarURL == nil {
-		return errors.New("at least one field must be provided: display_name, phone, or avatar_url")
+		return api.NewValidationError("validation.at_least_one", "")
 	}
 	return nil
 }
