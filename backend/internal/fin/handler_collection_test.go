@@ -40,6 +40,7 @@ func setupCollectionTestServer(t *testing.T) *collectionTestServer {
 		mockFundRepo,
 		mockCollectionRepo,
 		nil,
+		nil,
 		ai.NewNoopPolicyResolver(),
 		ai.NewNoopComplianceResolver(),
 		nil,

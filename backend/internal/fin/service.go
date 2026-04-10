@@ -37,6 +37,7 @@ type FinService struct {
 	funds       FundRepository
 	collections CollectionRepository
 	gl          *GLService
+	engine      AccountingEngine
 	policy      ai.PolicyResolver
 	compliance  ai.ComplianceResolver
 	registry    *policy.Registry
@@ -52,6 +53,7 @@ func NewFinService(
 	funds FundRepository,
 	collections CollectionRepository,
 	gl *GLService,
+	engine AccountingEngine,
 	policy ai.PolicyResolver,
 	compliance ai.ComplianceResolver,
 	registry *policy.Registry,
@@ -65,6 +67,7 @@ func NewFinService(
 		funds:       funds,
 		collections: collections,
 		gl:          gl,
+		engine:      engine,
 		policy:      policy,
 		compliance:  compliance,
 		registry:    registry,

@@ -42,6 +42,7 @@ func setupBudgetTestServer(t *testing.T) *budgetTestServer {
 		mockFundRepo,
 		mockCollectionRepo,
 		nil,
+		nil,
 		ai.NewNoopPolicyResolver(),
 		ai.NewNoopComplianceResolver(),
 		nil,

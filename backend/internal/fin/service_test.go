@@ -788,7 +788,7 @@ func newTestService() (*fin.FinService, *mockAssessmentRepo, *mockPaymentRepo, *
 	funds := &mockFundRepo{}
 	collections := &mockCollectionRepo{}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 	return svc, assessments, payments, budgets, funds, collections
 }
 
@@ -1144,7 +1144,7 @@ func TestCreateAssessment_PostsJournalEntry(t *testing.T) {
 	glRepo.accounts[arAccount.ID] = arAccount
 	glRepo.accounts[revenueAccount.ID] = revenueAccount
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 
 	unitID := uuid.New()
 	req := fin.CreateAssessmentRequest{
@@ -1199,7 +1199,7 @@ func TestCreateAssessment_GLFailureReturnsError(t *testing.T) {
 	glRepo.SetAccounts(arAccount, revenueAccount)
 	glRepo.SetPostError(fmt.Errorf("simulated GL failure"))
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 
 	_, err := svc.CreateAssessment(context.Background(), orgID, fin.CreateAssessmentRequest{
 		UnitID:      uuid.New(),
@@ -1239,7 +1239,7 @@ func TestRecordPayment_PostsJournalEntry(t *testing.T) {
 	glRepo.accounts[cashAccount.ID] = cashAccount
 	glRepo.accounts[arAccount.ID] = arAccount
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 
 	unitID := uuid.New()
 	userID := uuid.New()
@@ -1318,7 +1318,7 @@ func TestRecordPayment_GLFailureReturnsError(t *testing.T) {
 	glRepo.SetAccounts(cashAccount, arAccount)
 	glRepo.SetPostError(fmt.Errorf("simulated GL failure"))
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 
 	desc := "Test payment"
 	_, err := svc.RecordPayment(context.Background(), orgID, userID, fin.CreatePaymentRequest{
@@ -1358,7 +1358,7 @@ func TestCreateFundTransfer_GLFailureReturnsError(t *testing.T) {
 	glRepo.SetAccounts(fromCash, toCash, transferOut, transferIn)
 	glRepo.SetPostError(fmt.Errorf("simulated GL failure"))
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 
 	desc := "Test transfer"
 	_, err := svc.CreateFundTransfer(context.Background(), orgID, fin.CreateFundTransferRequest{
@@ -1585,7 +1585,7 @@ func TestCreateFundTransfer_CreatesFundTransactions(t *testing.T) {
 
 func TestCreateLineItem_RecalculatesTotals(t *testing.T) {
 	budgetRepo := &mockBudgetRepo{}
-	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
+	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
 
 	ctx := context.Background()
 	orgID := testutil.TestOrgID()
@@ -1624,7 +1624,7 @@ func TestCreateLineItem_RecalculatesTotals(t *testing.T) {
 
 func TestUpdateLineItem_RecalculatesTotals(t *testing.T) {
 	budgetRepo := &mockBudgetRepo{}
-	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
+	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
 
 	ctx := context.Background()
 	orgID := testutil.TestOrgID()
@@ -1664,7 +1664,7 @@ func TestUpdateLineItem_RecalculatesTotals(t *testing.T) {
 
 func TestDeleteLineItem_RecalculatesTotals(t *testing.T) {
 	budgetRepo := &mockBudgetRepo{}
-	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
+	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
 
 	ctx := context.Background()
 	orgID := testutil.TestOrgID()
@@ -1707,7 +1707,7 @@ func TestDeleteLineItem_RecalculatesTotals(t *testing.T) {
 
 func TestDeleteLineItem_NotFound(t *testing.T) {
 	budgetRepo := &mockBudgetRepo{}
-	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
+	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
 
 	err := svc.DeleteLineItem(context.Background(), uuid.New())
 	require.Error(t, err)
@@ -1718,7 +1718,7 @@ func TestDeleteLineItem_NotFound(t *testing.T) {
 
 func TestUpdateLineItem_NotFound(t *testing.T) {
 	budgetRepo := &mockBudgetRepo{}
-	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
+	svc := fin.NewFinService(nil, nil, budgetRepo, nil, nil, nil, nil, nil, nil, testutil.DiscardLogger(), nil)
 
 	_, err := svc.UpdateLineItem(context.Background(), uuid.New(), &fin.BudgetLineItem{
 		PlannedCents: 10000,
