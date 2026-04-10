@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/fin"
 	"github.com/quorant/quorant/internal/platform/api"
@@ -155,6 +156,8 @@ func (m *mockGLRepo) HasPostedLines(_ context.Context, accountID uuid.UUID) (boo
 	}
 	return false, nil
 }
+
+func (m *mockGLRepo) WithTx(_ pgx.Tx) fin.GLRepository { return m }
 
 // ── Helper ───────────────────────────────────────────────────────────────────
 

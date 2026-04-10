@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // FundRepository persists and retrieves funds, fund transactions, and fund
@@ -48,4 +49,8 @@ type FundRepository interface {
 	// ListTransfersByOrg returns all transfers for the given org, ordered by
 	// effective_date DESC. Returns an empty (non-nil) slice when none exist.
 	ListTransfersByOrg(ctx context.Context, orgID uuid.UUID) ([]FundTransfer, error)
+
+	// WithTx returns a copy of the repository that runs queries against the
+	// given transaction. Used by UnitOfWork to enlist the repo in a shared tx.
+	WithTx(tx pgx.Tx) FundRepository
 }

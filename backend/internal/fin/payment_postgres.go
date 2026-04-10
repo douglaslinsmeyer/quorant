@@ -25,7 +25,7 @@ func NewPostgresPaymentRepository(pool *pgxpool.Pool) *PostgresPaymentRepository
 
 // WithTx returns a new PostgresPaymentRepository scoped to the given
 // transaction, enabling participation in a caller-managed transaction.
-func (r *PostgresPaymentRepository) WithTx(tx pgx.Tx) *PostgresPaymentRepository {
+func (r *PostgresPaymentRepository) WithTx(tx pgx.Tx) PaymentRepository {
 	return &PostgresPaymentRepository{db: tx}
 }
 

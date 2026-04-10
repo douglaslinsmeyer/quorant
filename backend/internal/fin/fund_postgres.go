@@ -24,7 +24,7 @@ func NewPostgresFundRepository(pool *pgxpool.Pool) *PostgresFundRepository {
 
 // WithTx returns a new PostgresFundRepository scoped to the given transaction,
 // enabling participation in a caller-managed transaction.
-func (r *PostgresFundRepository) WithTx(tx pgx.Tx) *PostgresFundRepository {
+func (r *PostgresFundRepository) WithTx(tx pgx.Tx) FundRepository {
 	return &PostgresFundRepository{db: tx}
 }
 

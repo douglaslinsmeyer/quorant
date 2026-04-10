@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // AssessmentRepository persists and retrieves assessment schedules, assessments,
@@ -78,4 +79,8 @@ type AssessmentRepository interface {
 	// GetUnitBalance returns the balance_cents from the most recent ledger
 	// entry for the given unit, or 0 if no entries exist.
 	GetUnitBalance(ctx context.Context, unitID uuid.UUID) (int64, error)
+
+	// WithTx returns a copy of the repository that runs queries against the
+	// given transaction. Used by UnitOfWork to enlist the repo in a shared tx.
+	WithTx(tx pgx.Tx) AssessmentRepository
 }

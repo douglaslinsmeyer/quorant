@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // GLRepository persists and retrieves GL accounts, journal entries, and
@@ -70,4 +71,8 @@ type GLRepository interface {
 	// HasPostedLines returns true if any journal lines reference the
 	// given account. Used to prevent deletion of accounts with activity.
 	HasPostedLines(ctx context.Context, accountID uuid.UUID) (bool, error)
+
+	// WithTx returns a copy of the repository that runs queries against the
+	// given transaction. Used by UnitOfWork to enlist the repo in a shared tx.
+	WithTx(tx pgx.Tx) GLRepository
 }

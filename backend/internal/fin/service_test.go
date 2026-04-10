@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/quorant/quorant/internal/ai"
 	"github.com/quorant/quorant/internal/audit"
 	"github.com/quorant/quorant/internal/fin"
@@ -206,6 +207,8 @@ func (m *mockAssessmentRepo) GetUnitBalance(_ context.Context, unitID uuid.UUID)
 	return balance, nil
 }
 
+func (m *mockAssessmentRepo) WithTx(_ pgx.Tx) fin.AssessmentRepository { return m }
+
 // mockPaymentRepo is an in-memory implementation of PaymentRepository.
 type mockPaymentRepo struct {
 	payments []fin.Payment
@@ -303,6 +306,8 @@ func (m *mockPaymentRepo) SoftDeletePaymentMethod(_ context.Context, id uuid.UUI
 	}
 	return nil
 }
+
+func (m *mockPaymentRepo) WithTx(_ pgx.Tx) fin.PaymentRepository { return m }
 
 // mockBudgetRepo is an in-memory implementation of BudgetRepository.
 type mockBudgetRepo struct {
@@ -590,6 +595,8 @@ func (m *mockFundRepo) ListTransfersByOrg(_ context.Context, orgID uuid.UUID) ([
 	}
 	return result, nil
 }
+
+func (m *mockFundRepo) WithTx(_ pgx.Tx) fin.FundRepository { return m }
 
 // mockCollectionRepo is an in-memory implementation of CollectionRepository.
 type mockCollectionRepo struct {
