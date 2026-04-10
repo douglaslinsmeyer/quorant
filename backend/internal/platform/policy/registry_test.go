@@ -1,12 +1,109 @@
 package policy_test
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/quorant/quorant/internal/ai"
 	"github.com/quorant/quorant/internal/platform/policy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// testLogger returns a logger that discards all output.
+func testLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+// --- stubPolicyResolver ---
+
+type stubPolicyResolver struct {
+	result *ai.ResolutionResult
+	err    error
+}
+
+func (s *stubPolicyResolver) GetPolicy(_ context.Context, _ uuid.UUID, _ string) (*ai.PolicyResult, error) {
+	return nil, nil
+}
+
+func (s *stubPolicyResolver) QueryPolicy(_ context.Context, _ uuid.UUID, _ string, _ ai.QueryContext) (*ai.ResolutionResult, error) {
+	return s.result, s.err
+}
+
+// --- stubRecordRepo ---
+
+type stubRecordRepo struct {
+	records []policy.PolicyRecord
+}
+
+func (s *stubRecordRepo) CreateRecord(_ context.Context, r *policy.PolicyRecord) (*policy.PolicyRecord, error) {
+	return r, nil
+}
+
+func (s *stubRecordRepo) FindRecordByID(_ context.Context, id uuid.UUID) (*policy.PolicyRecord, error) {
+	for _, rec := range s.records {
+		if rec.ID == id {
+			return &rec, nil
+		}
+	}
+	return nil, fmt.Errorf("not found")
+}
+
+func (s *stubRecordRepo) GatherForResolution(_ context.Context, category string, _ string, _ uuid.UUID, _ *uuid.UUID) ([]policy.PolicyRecord, error) {
+	var matched []policy.PolicyRecord
+	for _, rec := range s.records {
+		if rec.Category == category {
+			matched = append(matched, rec)
+		}
+	}
+	return matched, nil
+}
+
+func (s *stubRecordRepo) DeactivateRecord(_ context.Context, _ uuid.UUID) error {
+	return nil
+}
+
+func (s *stubRecordRepo) WithTx(_ pgx.Tx) policy.PolicyRecordRepository {
+	return s
+}
+
+// --- stubResolutionRepo ---
+
+type stubResolutionRepo struct {
+	resolutions []policy.ResolutionRecord
+}
+
+func (s *stubResolutionRepo) CreateResolution(_ context.Context, r *policy.ResolutionRecord) (*policy.ResolutionRecord, error) {
+	s.resolutions = append(s.resolutions, *r)
+	return r, nil
+}
+
+func (s *stubResolutionRepo) FindResolutionByID(_ context.Context, id uuid.UUID) (*policy.ResolutionRecord, error) {
+	for _, rec := range s.resolutions {
+		if rec.ID == id {
+			return &rec, nil
+		}
+	}
+	return nil, fmt.Errorf("not found")
+}
+
+func (s *stubResolutionRepo) UpdateReviewStatus(_ context.Context, _ uuid.UUID, _ string, _ *uuid.UUID, _ *string) error {
+	return nil
+}
+
+func (s *stubResolutionRepo) ListPendingReviews(_ context.Context) ([]policy.ResolutionRecord, error) {
+	return nil, nil
+}
+
+func (s *stubResolutionRepo) WithTx(_ pgx.Tx) policy.ResolutionRepository {
+	return s
+}
 
 func TestRegistry_Register(t *testing.T) {
 	t.Run("registers a descriptor successfully", func(t *testing.T) {
@@ -153,4 +250,158 @@ func TestRegistry_FindTriggers(t *testing.T) {
 		assert.True(t, keys["reserve_contribution"])
 		assert.True(t, keys["late_fee"])
 	})
+}
+
+// --- Resolve tests ---
+
+func newTestRecords() []policy.PolicyRecord {
+	return []policy.PolicyRecord{
+		{
+			ID:           uuid.New(),
+			Scope:        "org",
+			Category:     "fee_schedule",
+			Key:          "late_fee",
+			Value:        json.RawMessage(`{"amount": 50}`),
+			PriorityHint: "medium",
+			IsActive:     true,
+		},
+	}
+}
+
+func newTestDescriptor(onHold func(ctx context.Context, res *policy.Resolution) error) policy.OperationDescriptor {
+	return policy.OperationDescriptor{
+		Category:         "fee_schedule",
+		Description:      "HOA fee schedule policies",
+		DefaultThreshold: 0.80,
+		PromptTemplate:   "Resolve fees given: {{.Policies}}",
+		Policies: map[string]policy.PolicySpec{
+			"late_fee": {
+				Description:   "Late payment fee",
+				DocumentTypes: []string{"fee_schedule"},
+				Concepts:      []string{"late fee"},
+			},
+		},
+		OnHold: onHold,
+	}
+}
+
+func TestRegistry_Resolve_AutoApproved(t *testing.T) {
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	records := newTestRecords()
+	recordRepo := &stubRecordRepo{records: records}
+	resolutionRepo := &stubResolutionRepo{}
+	aiResolver := &stubPolicyResolver{
+		result: &ai.ResolutionResult{
+			Resolution: json.RawMessage(`{"late_fee": 50}`),
+			Reasoning:  "Based on org policy document section 4.2",
+			Confidence: 0.95,
+		},
+	}
+
+	reg := policy.NewRegistry(recordRepo, resolutionRepo, aiResolver, nil, testLogger())
+	err := reg.Register("fee_schedule", newTestDescriptor(nil))
+	require.NoError(t, err)
+
+	res, err := reg.Resolve(ctx, orgID, nil, "fee_schedule")
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	assert.Equal(t, "approved", res.Status)
+	assert.False(t, res.Held())
+	assert.InDelta(t, 0.95, res.Confidence, 0.001)
+	assert.Equal(t, "Based on org policy document section 4.2", res.Reasoning)
+	assert.NotEmpty(t, res.SourcePolicies)
+	assert.NotEqual(t, uuid.Nil, res.ID)
+
+	// Verify resolution was persisted
+	require.Len(t, resolutionRepo.resolutions, 1)
+	assert.Equal(t, "auto_approved", resolutionRepo.resolutions[0].ReviewStatus)
+}
+
+func TestRegistry_Resolve_Held(t *testing.T) {
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	records := newTestRecords()
+	recordRepo := &stubRecordRepo{records: records}
+	resolutionRepo := &stubResolutionRepo{}
+	aiResolver := &stubPolicyResolver{
+		result: &ai.ResolutionResult{
+			Resolution: json.RawMessage(`{"late_fee": 50}`),
+			Reasoning:  "Conflicting policies found",
+			Confidence: 0.60,
+		},
+	}
+
+	var holdCalled bool
+	onHold := func(_ context.Context, res *policy.Resolution) error {
+		holdCalled = true
+		return nil
+	}
+
+	reg := policy.NewRegistry(recordRepo, resolutionRepo, aiResolver, nil, testLogger())
+	err := reg.Register("fee_schedule", newTestDescriptor(onHold))
+	require.NoError(t, err)
+
+	res, err := reg.Resolve(ctx, orgID, nil, "fee_schedule")
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	assert.Equal(t, "held", res.Status)
+	assert.True(t, res.Held())
+	assert.InDelta(t, 0.60, res.Confidence, 0.001)
+	assert.True(t, holdCalled, "OnHold callback should have been invoked")
+
+	// Verify resolution was persisted with pending_review status
+	require.Len(t, resolutionRepo.resolutions, 1)
+	assert.Equal(t, "pending_review", resolutionRepo.resolutions[0].ReviewStatus)
+}
+
+func TestRegistry_Resolve_AIUnavailable(t *testing.T) {
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	records := newTestRecords()
+	recordRepo := &stubRecordRepo{records: records}
+	resolutionRepo := &stubResolutionRepo{}
+	aiResolver := &stubPolicyResolver{
+		err: fmt.Errorf("connection refused"),
+	}
+
+	var holdCalled bool
+	onHold := func(_ context.Context, res *policy.Resolution) error {
+		holdCalled = true
+		return nil
+	}
+
+	reg := policy.NewRegistry(recordRepo, resolutionRepo, aiResolver, nil, testLogger())
+	err := reg.Register("fee_schedule", newTestDescriptor(onHold))
+	require.NoError(t, err)
+
+	res, err := reg.Resolve(ctx, orgID, nil, "fee_schedule")
+	require.NoError(t, err, "AI errors should not propagate as Resolve errors")
+	require.NotNil(t, res)
+
+	assert.Equal(t, "held", res.Status)
+	assert.True(t, res.Held())
+	assert.Equal(t, float64(0), res.Confidence)
+	assert.True(t, holdCalled, "OnHold callback should have been invoked")
+
+	// Verify resolution was persisted with ai_unavailable status
+	require.Len(t, resolutionRepo.resolutions, 1)
+	assert.Equal(t, "ai_unavailable", resolutionRepo.resolutions[0].ReviewStatus)
+}
+
+func TestRegistry_Resolve_UnregisteredCategory(t *testing.T) {
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	reg := policy.NewRegistry(nil, nil, nil, nil, testLogger())
+
+	res, err := reg.Resolve(ctx, orgID, nil, "nonexistent_category")
+	require.Error(t, err)
+	assert.Nil(t, res)
+	assert.Contains(t, err.Error(), "nonexistent_category")
 }

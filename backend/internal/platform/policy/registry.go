@@ -2,6 +2,7 @@ package policy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -122,4 +123,161 @@ func (r *Registry) matchesTrigger(spec PolicySpec, documentType string, concepts
 	}
 
 	return false
+}
+
+// Resolve executes the two-tier policy resolution pipeline for the given
+// category. Tier 1 gathers applicable policy records from the database.
+// Tier 2 sends them to the AI resolver for precedence reasoning. The result
+// is persisted (when a resolutions repo is available) and returned.
+func (r *Registry) Resolve(ctx context.Context, orgID uuid.UUID, unitID *uuid.UUID, category string) (*Resolution, error) {
+	r.mu.RLock()
+	desc, exists := r.descriptors[category]
+	r.mu.RUnlock()
+
+	if !exists {
+		return nil, fmt.Errorf("policy: category %q is not registered", category)
+	}
+
+	// Tier 1: gather applicable policy records.
+	jurisdiction := r.lookupJurisdiction(ctx, orgID)
+
+	records, err := r.records.GatherForResolution(ctx, category, jurisdiction, orgID, unitID)
+	if err != nil {
+		return nil, fmt.Errorf("policy: gather records for %q: %w", category, err)
+	}
+
+	// Build policy ID slice for audit trail.
+	policyIDs := make([]uuid.UUID, len(records))
+	for i, rec := range records {
+		policyIDs[i] = rec.ID
+	}
+
+	// Tier 2: AI resolution.
+	var (
+		ruling       json.RawMessage
+		reasoning    string
+		confidence   float64
+		modelID      string
+		status       string
+		reviewStatus string
+	)
+
+	ruling, reasoning, confidence, modelID, err = r.callTier2(ctx, orgID, desc, records)
+	if err != nil {
+		// AI unavailable -- hold for human review.
+		if r.logger != nil {
+			r.logger.WarnContext(ctx, "tier 2 AI call failed, holding resolution",
+				"category", category,
+				"org_id", orgID,
+				"error", err,
+			)
+		}
+		status = "held"
+		reviewStatus = "ai_unavailable"
+		confidence = 0
+		ruling = nil
+		reasoning = ""
+	} else {
+		threshold := desc.DefaultThreshold
+		if threshold == 0 {
+			threshold = 0.80
+		}
+
+		if confidence < threshold {
+			status = "held"
+			reviewStatus = "pending_review"
+		} else {
+			status = "approved"
+			reviewStatus = "auto_approved"
+		}
+	}
+
+	resID := uuid.New()
+	res := &Resolution{
+		ID:         resID,
+		Status:     status,
+		Ruling:     ruling,
+		Reasoning:  reasoning,
+		Confidence: confidence,
+	}
+
+	// Build source policy references from the gathered records.
+	refs := make([]PolicyReference, len(records))
+	for i, rec := range records {
+		refs[i] = PolicyReference{
+			ID:           rec.ID,
+			Scope:        rec.Scope,
+			Category:     rec.Category,
+			Key:          rec.Key,
+			PriorityHint: rec.PriorityHint,
+			StatuteRef:   rec.StatuteRef,
+		}
+	}
+	res.SourcePolicies = refs
+
+	// Persist if resolutions repo is available.
+	if r.resolutions != nil {
+		record := &ResolutionRecord{
+			ID:             resID,
+			OrgID:          orgID,
+			UnitID:         unitID,
+			Category:       category,
+			InputPolicyIDs: policyIDs,
+			Ruling:         ruling,
+			Reasoning:      reasoning,
+			Confidence:     confidence,
+			ModelID:        modelID,
+			ReviewStatus:   reviewStatus,
+		}
+		if _, persistErr := r.resolutions.CreateResolution(ctx, record); persistErr != nil {
+			if r.logger != nil {
+				r.logger.ErrorContext(ctx, "failed to persist resolution",
+					"resolution_id", resID,
+					"error", persistErr,
+				)
+			}
+		}
+	}
+
+	// Invoke OnHold callback if held.
+	if res.Held() && desc.OnHold != nil {
+		if holdErr := desc.OnHold(ctx, res); holdErr != nil {
+			if r.logger != nil {
+				r.logger.ErrorContext(ctx, "OnHold callback failed",
+					"category", category,
+					"resolution_id", resID,
+					"error", holdErr,
+				)
+			}
+		}
+	}
+
+	return res, nil
+}
+
+// callTier2 marshals the gathered records and sends them to the AI resolver.
+// It returns the ruling, reasoning, confidence, model ID, and any error.
+func (r *Registry) callTier2(ctx context.Context, orgID uuid.UUID, desc OperationDescriptor, records []PolicyRecord) (json.RawMessage, string, float64, string, error) {
+	if r.ai == nil {
+		return nil, "", 0, "", fmt.Errorf("policy: AI resolver is not configured")
+	}
+
+	recordsJSON, err := json.Marshal(records)
+	if err != nil {
+		return nil, "", 0, "", fmt.Errorf("policy: marshal records: %w", err)
+	}
+
+	query := strings.ReplaceAll(desc.PromptTemplate, "{{.Policies}}", string(recordsJSON))
+
+	qctx := ai.QueryContext{
+		Module:       "policy",
+		ResourceType: desc.Category,
+	}
+
+	result, err := r.ai.QueryPolicy(ctx, orgID, query, qctx)
+	if err != nil {
+		return nil, "", 0, "", err
+	}
+
+	return result.Resolution, result.Reasoning, result.Confidence, "ai-model", nil
 }
