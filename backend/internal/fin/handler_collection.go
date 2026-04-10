@@ -95,7 +95,7 @@ func (h *CollectionHandler) UpdateCollection(w http.ResponseWriter, r *http.Requ
 	if req.Status != nil {
 		existing.Status = *req.Status
 		if *req.Status != "" && existing.ClosedAt == nil &&
-			(*req.Status == "closed" || *req.Status == "resolved") {
+			(*req.Status == CollectionCaseStatusClosed || *req.Status == CollectionCaseStatusResolved) {
 			now := time.Now()
 			existing.ClosedAt = &now
 		}
