@@ -504,6 +504,8 @@ func (m *mockBudgetRepo) SoftDeleteExpense(_ context.Context, id uuid.UUID) erro
 	return nil
 }
 
+func (m *mockBudgetRepo) WithTx(_ pgx.Tx) fin.BudgetRepository { return m }
+
 // mockFundRepo is an in-memory implementation of FundRepository.
 type mockFundRepo struct {
 	funds        []fin.Fund
@@ -714,6 +716,8 @@ func (m *mockCollectionRepo) GetCollectionStatusForUnit(_ context.Context, unitI
 	}
 	return nil, nil
 }
+
+func (m *mockCollectionRepo) WithTx(_ pgx.Tx) fin.CollectionRepository { return m }
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 

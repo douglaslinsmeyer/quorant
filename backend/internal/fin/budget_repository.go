@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // BudgetRepository persists and retrieves budget categories, budgets, budget
@@ -83,4 +84,8 @@ type BudgetRepository interface {
 
 	// SoftDeleteExpense marks the expense as deleted without removing the row.
 	SoftDeleteExpense(ctx context.Context, id uuid.UUID) error
+
+	// WithTx returns a copy of the repository that runs queries against the
+	// given transaction instead of the pool.
+	WithTx(tx pgx.Tx) BudgetRepository
 }
