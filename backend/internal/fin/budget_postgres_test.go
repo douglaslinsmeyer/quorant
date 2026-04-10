@@ -362,11 +362,11 @@ func TestFindLineItemByID(t *testing.T) {
 	require.NoError(t, err)
 
 	found, err := f.repo.FindLineItemByID(ctx, created.ID)
-
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	assert.Equal(t, created.ID, found.ID)
 	assert.Equal(t, created.BudgetID, found.BudgetID)
+	assert.Equal(t, created.CategoryID, found.CategoryID)
 	assert.Equal(t, created.PlannedCents, found.PlannedCents)
 }
 
