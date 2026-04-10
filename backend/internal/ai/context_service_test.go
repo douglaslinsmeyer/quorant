@@ -72,8 +72,8 @@ func (m *mockOrgRepo) FindByID(ctx context.Context, id uuid.UUID) (*org.Organiza
 	if m.findByIDFunc != nil {
 		return m.findByIDFunc(ctx, id)
 	}
-	state := "CA"
-	return &org.Organization{ID: id, State: &state}, nil
+	jurisdiction := "CA"
+	return &org.Organization{ID: id, Jurisdiction: &jurisdiction}, nil
 }
 func (m *mockOrgRepo) FindBySlug(ctx context.Context, slug string) (*org.Organization, error) {
 	return nil, nil
@@ -102,6 +102,9 @@ func (m *mockOrgRepo) FindActiveManagement(ctx context.Context, hoaOrgID uuid.UU
 		return m.findActiveManagementFn(ctx, hoaOrgID)
 	}
 	return nil, nil // self-managed by default
+}
+func (m *mockOrgRepo) ListByJurisdiction(_ context.Context, jurisdiction string) ([]org.Organization, error) {
+	return nil, nil
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

@@ -15,4 +15,5 @@ type OrgLookup interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*org.Organization, error)
 	FindActiveManagement(ctx context.Context, hoaOrgID uuid.UUID) (*org.OrgManagement, error)
 	Update(ctx context.Context, o *org.Organization) (*org.Organization, error)
+	ListByJurisdiction(ctx context.Context, jurisdiction string) ([]org.Organization, error)
 }

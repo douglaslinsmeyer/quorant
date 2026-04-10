@@ -85,6 +85,10 @@ func (r *handlerMockOrgRepo) FindActiveManagement(_ context.Context, _ uuid.UUID
 	return nil, nil
 }
 
+func (r *handlerMockOrgRepo) ListByJurisdiction(_ context.Context, _ string) ([]org.Organization, error) {
+	return nil, nil
+}
+
 // ─── Test server setup ────────────────────────────────────────────────────────
 
 type aiTestServer struct {

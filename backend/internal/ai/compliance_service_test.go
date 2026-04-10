@@ -98,6 +98,10 @@ func (m *mockJurisdictionRuleRepo) ListUpcomingRules(_ context.Context, withinDa
 	return nil, nil
 }
 
+func (m *mockJurisdictionRuleRepo) ListRulesEffectiveToday(_ context.Context) ([]ai.JurisdictionRule, error) {
+	return nil, nil
+}
+
 // ─── mockComplianceCheckRepo ──────────────────────────────────────────────────
 
 type mockComplianceCheckRepo struct {
@@ -127,11 +131,15 @@ func (m *mockComplianceCheckRepo) Resolve(_ context.Context, id uuid.UUID, notes
 // ─── mockOrgLookup ────────────────────────────────────────────────────────────
 
 type mockOrgLookup struct {
-	orgs map[uuid.UUID]*org.Organization
+	orgs         map[uuid.UUID]*org.Organization
+	byJurisdiction map[string][]org.Organization
 }
 
 func newMockOrgLookup() *mockOrgLookup {
-	return &mockOrgLookup{orgs: make(map[uuid.UUID]*org.Organization)}
+	return &mockOrgLookup{
+		orgs:         make(map[uuid.UUID]*org.Organization),
+		byJurisdiction: make(map[string][]org.Organization),
+	}
 }
 
 func (m *mockOrgLookup) FindByID(_ context.Context, id uuid.UUID) (*org.Organization, error) {
@@ -151,6 +159,10 @@ func (m *mockOrgLookup) Update(_ context.Context, o *org.Organization) (*org.Org
 	m.orgs[o.ID] = o
 	cp := *o
 	return &cp, nil
+}
+
+func (m *mockOrgLookup) ListByJurisdiction(_ context.Context, jurisdiction string) ([]org.Organization, error) {
+	return m.byJurisdiction[jurisdiction], nil
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -218,7 +230,7 @@ func TestComplianceService_GetJurisdictionRule_NotFound(t *testing.T) {
 // ─── TestComplianceService_EvaluateCompliance ─────────────────────────────────
 
 func TestComplianceService_EvaluateCompliance(t *testing.T) {
-	// Given an org with State="FL" and a website rule seeded for FL/website_requirements,
+	// Given an org with Jurisdiction="FL" and a website rule seeded for FL/website_requirements,
 	// and all 7 evaluators registered,
 	// when EvaluateCompliance is called,
 	// then the report has 7 results and correct summary counts.
@@ -230,14 +242,14 @@ func TestComplianceService_EvaluateCompliance(t *testing.T) {
 
 	orgLookup := newMockOrgLookup()
 	orgID := uuid.New()
-	state := "FL"
+	jurisdiction := "FL"
 	website := "https://myhoaflorida.com"
 	orgLookup.orgs[orgID] = &org.Organization{
-		ID:      orgID,
-		Name:    "Sunset Palms HOA",
-		Type:    "hoa",
-		State:   &state,
-		Website: &website,
+		ID:           orgID,
+		Name:         "Sunset Palms HOA",
+		Type:         "hoa",
+		Jurisdiction: &jurisdiction,
+		Website:      &website,
 	}
 
 	svc := newTestComplianceService(ruleRepo, &mockComplianceCheckRepo{}, orgLookup)
@@ -292,15 +304,15 @@ func TestComplianceService_EvaluateCompliance_OrgNotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), "not found")
 }
 
-func TestComplianceService_EvaluateCompliance_NoState(t *testing.T) {
-	// Given an org with no State field,
+func TestComplianceService_EvaluateCompliance_NoJurisdiction(t *testing.T) {
+	// Given an org with no Jurisdiction field,
 	// when EvaluateCompliance is called,
 	// then it returns an error about missing jurisdiction.
 	orgLookup := newMockOrgLookup()
 	orgID := uuid.New()
 	orgLookup.orgs[orgID] = &org.Organization{
 		ID:   orgID,
-		Name: "No State HOA",
+		Name: "No Jurisdiction HOA",
 		Type: "hoa",
 	}
 
@@ -316,7 +328,7 @@ func TestComplianceService_EvaluateCompliance_NoState(t *testing.T) {
 // ─── TestComplianceService_CheckCompliance ────────────────────────────────────
 
 func TestComplianceService_CheckCompliance_SingleCategory(t *testing.T) {
-	// Given an org with State="FL" and a meeting_notice rule seeded,
+	// Given an org with Jurisdiction="FL" and a meeting_notice rule seeded,
 	// when CheckCompliance is called for "meeting_notice",
 	// then a single result is returned.
 	ruleRepo := &mockJurisdictionRuleRepo{}
@@ -326,12 +338,12 @@ func TestComplianceService_CheckCompliance_SingleCategory(t *testing.T) {
 
 	orgLookup := newMockOrgLookup()
 	orgID := uuid.New()
-	state := "FL"
+	jurisdiction := "FL"
 	orgLookup.orgs[orgID] = &org.Organization{
-		ID:    orgID,
-		Name:  "Test HOA",
-		Type:  "hoa",
-		State: &state,
+		ID:           orgID,
+		Name:         "Test HOA",
+		Type:         "hoa",
+		Jurisdiction: &jurisdiction,
 	}
 
 	svc := newTestComplianceService(ruleRepo, &mockComplianceCheckRepo{}, orgLookup)
@@ -364,12 +376,12 @@ func TestComplianceService_EvaluateCompliance_NoEvaluatorRegistered(t *testing.T
 	// then all results have status "unknown" and the report still succeeds.
 	orgLookup := newMockOrgLookup()
 	orgID := uuid.New()
-	state := "FL"
+	jurisdiction := "FL"
 	orgLookup.orgs[orgID] = &org.Organization{
-		ID:    orgID,
-		Name:  "Bare HOA",
-		Type:  "hoa",
-		State: &state,
+		ID:           orgID,
+		Name:         "Bare HOA",
+		Type:         "hoa",
+		Jurisdiction: &jurisdiction,
 	}
 
 	svc := newTestComplianceService(&mockJurisdictionRuleRepo{}, &mockComplianceCheckRepo{}, orgLookup)

@@ -75,12 +75,12 @@ func (s *ComplianceService) EvaluateCompliance(ctx context.Context, orgID uuid.U
 	if o == nil {
 		return nil, fmt.Errorf("ai: EvaluateCompliance: org %s not found", orgID)
 	}
-	if o.State == nil {
-		return nil, fmt.Errorf("ai: EvaluateCompliance: org %s has no state/jurisdiction", orgID)
+	if o.Jurisdiction == nil || *o.Jurisdiction == "" {
+		return nil, fmt.Errorf("ai: EvaluateCompliance: org %s has no jurisdiction configured", orgID)
 	}
+	jurisdiction := *o.Jurisdiction
 
 	orgCtx := buildOrgComplianceContext(o)
-	jurisdiction := orgCtx.Jurisdiction
 
 	now := time.Now()
 	report := &ComplianceReport{
@@ -145,8 +145,8 @@ func (s *ComplianceService) CheckCompliance(ctx context.Context, orgID uuid.UUID
 	if o == nil {
 		return nil, fmt.Errorf("ai: CheckCompliance: org %s not found", orgID)
 	}
-	if o.State == nil {
-		return nil, fmt.Errorf("ai: CheckCompliance: org %s has no state/jurisdiction", orgID)
+	if o.Jurisdiction == nil || *o.Jurisdiction == "" {
+		return nil, fmt.Errorf("ai: CheckCompliance: org %s has no jurisdiction configured", orgID)
 	}
 
 	orgCtx := buildOrgComplianceContext(o)
@@ -195,8 +195,8 @@ func buildOrgComplianceContext(o *org.Organization) OrgComplianceContext {
 		OrgID:      o.ID,
 		HasWebsite: o.Website != nil && *o.Website != "",
 	}
-	if o.State != nil {
-		ctx.Jurisdiction = *o.State
+	if o.Jurisdiction != nil {
+		ctx.Jurisdiction = *o.Jurisdiction
 	}
 	// UnitCount, BuildingStories, LastReserveStudyDate, voting flags
 	// default to zero values for now. Future: populated from org settings or additional queries.

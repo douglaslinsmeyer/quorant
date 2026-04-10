@@ -16,4 +16,5 @@ type JurisdictionRuleRepository interface {
 	ListActiveRulesByJurisdiction(ctx context.Context, jurisdiction string) ([]JurisdictionRule, error)
 	ListAllRules(ctx context.Context, jurisdiction string, limit int, afterID *uuid.UUID) ([]JurisdictionRule, bool, error)
 	ListUpcomingRules(ctx context.Context, withinDays int) ([]JurisdictionRule, error)
+	ListRulesEffectiveToday(ctx context.Context) ([]JurisdictionRule, error)
 }

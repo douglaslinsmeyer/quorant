@@ -28,7 +28,7 @@ func setupComplianceTestServer(t *testing.T, svc *ai.ComplianceService, checkRep
 }
 
 func TestComplianceHandler_GetReport(t *testing.T) {
-	// Given an org with State="FL" and all 7 evaluators registered,
+	// Given an org with Jurisdiction="FL" and all 7 evaluators registered,
 	// when GET /api/v1/organizations/{org_id}/compliance is called,
 	// then the response is 200 and the report has 7 results.
 	ruleRepo := &mockJurisdictionRuleRepo{}
@@ -36,14 +36,14 @@ func TestComplianceHandler_GetReport(t *testing.T) {
 	orgLookup := newMockOrgLookup()
 
 	orgID := uuid.New()
-	state := "FL"
+	jurisdiction := "FL"
 	website := "https://myhoaflorida.com"
 	orgLookup.orgs[orgID] = &org.Organization{
-		ID:      orgID,
-		Name:    "Sunset Palms HOA",
-		Type:    "hoa",
-		State:   &state,
-		Website: &website,
+		ID:           orgID,
+		Name:         "Sunset Palms HOA",
+		Type:         "hoa",
+		Jurisdiction: &jurisdiction,
+		Website:      &website,
 	}
 
 	svc := newTestComplianceService(ruleRepo, checkRepo, orgLookup)

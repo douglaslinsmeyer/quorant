@@ -218,6 +218,22 @@ func (r *PostgresJurisdictionRuleRepository) ListUpcomingRules(ctx context.Conte
 	return collectJurisdictionRules(rows, "ListUpcomingRules")
 }
 
+// ListRulesEffectiveToday returns all rules whose effective_date is today and that have not yet expired.
+func (r *PostgresJurisdictionRuleRepository) ListRulesEffectiveToday(ctx context.Context) ([]JurisdictionRule, error) {
+	q := `SELECT ` + jurisdictionRuleCols + `
+		FROM jurisdiction_rules
+		WHERE effective_date = CURRENT_DATE
+		  AND (expiration_date IS NULL OR expiration_date > CURRENT_DATE)
+		ORDER BY jurisdiction, rule_category`
+
+	rows, err := r.pool.Query(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("ai: ListRulesEffectiveToday: %w", err)
+	}
+	defer rows.Close()
+	return collectJurisdictionRules(rows, "ListRulesEffectiveToday")
+}
+
 // ─── Scan helpers ─────────────────────────────────────────────────────────────
 
 func scanJurisdictionRule(row pgx.Row) (*JurisdictionRule, error) {
