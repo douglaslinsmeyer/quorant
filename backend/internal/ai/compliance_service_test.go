@@ -18,7 +18,9 @@ import (
 // ─── mockJurisdictionRuleRepo ─────────────────────────────────────────────────
 
 type mockJurisdictionRuleRepo struct {
-	rules []ai.JurisdictionRule
+	rules         []ai.JurisdictionRule
+	upcomingRules []ai.JurisdictionRule
+	todayRules    []ai.JurisdictionRule
 }
 
 func (m *mockJurisdictionRuleRepo) Create(_ context.Context, rule *ai.JurisdictionRule) (*ai.JurisdictionRule, error) {
@@ -95,10 +97,16 @@ func (m *mockJurisdictionRuleRepo) ListAllRules(_ context.Context, jurisdiction 
 }
 
 func (m *mockJurisdictionRuleRepo) ListUpcomingRules(_ context.Context, withinDays int) ([]ai.JurisdictionRule, error) {
+	if m.upcomingRules != nil {
+		return m.upcomingRules, nil
+	}
 	return nil, nil
 }
 
 func (m *mockJurisdictionRuleRepo) ListRulesEffectiveToday(_ context.Context) ([]ai.JurisdictionRule, error) {
+	if m.todayRules != nil {
+		return m.todayRules, nil
+	}
 	return nil, nil
 }
 
