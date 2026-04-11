@@ -2,6 +2,7 @@ package fin
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -154,4 +155,89 @@ func rulingToStrategy(ruling *AllocationRuling) *ApplicationStrategy {
 //   - Accrual basis, late fee / interest: revenue is recognized when charged.
 func resolveRevenueRecognitionDate(_ RecognitionBasis, tx FinancialTransaction) (time.Time, error) {
 	return tx.EffectiveDate, nil
+}
+
+// validatePeriodBoundary checks whether the transaction's EffectiveDate falls
+// in an open (or soft-closed for adjusting entries) accounting period. When
+// periods is nil, all transactions are allowed (backward compatible).
+func validatePeriodBoundary(ctx context.Context, periods AccountingPeriodRepository, tx FinancialTransaction) error {
+	if periods == nil {
+		return nil
+	}
+
+	period, err := periods.GetPeriodForDate(ctx, tx.OrgID, tx.EffectiveDate)
+	if err != nil {
+		// Period not found — allow (periods may not be set up yet).
+		return nil
+	}
+
+	switch period.Status {
+	case PeriodStatusClosed:
+		return ErrClosedPeriod
+	case PeriodStatusSoftClosed:
+		if tx.Type != TxTypeAdjustingEntry {
+			return ErrSoftClosedPeriod
+		}
+	}
+
+	return nil
+}
+
+// feeCapRuling holds the decoded late_fee_cap policy ruling.
+type feeCapRuling struct {
+	MaxCents *int64 `json:"max_cents"`
+}
+
+// interestCapRuling holds the decoded interest_rate_cap policy ruling.
+type interestCapRuling struct {
+	MaxCents *int64 `json:"max_cents"`
+}
+
+// validateFeeCap checks whether a late fee exceeds the jurisdiction-scoped cap.
+// When the registry is nil or no cap policy is configured, all fees are allowed.
+func validateFeeCap(ctx context.Context, registry *policy.Registry, tx FinancialTransaction) error {
+	if registry == nil {
+		return nil
+	}
+
+	resolution, err := registry.Resolve(ctx, tx.OrgID, nil, "late_fee_cap")
+	if err != nil || resolution == nil || resolution.Ruling == nil {
+		return nil // no cap configured
+	}
+
+	var cap feeCapRuling
+	if err := json.Unmarshal(resolution.Ruling, &cap); err != nil {
+		return nil
+	}
+
+	if cap.MaxCents != nil && tx.AmountCents > *cap.MaxCents {
+		return fmt.Errorf("validate: late fee %d cents exceeds jurisdiction cap of %d cents", tx.AmountCents, *cap.MaxCents)
+	}
+
+	return nil
+}
+
+// validateInterestCap checks whether an interest accrual exceeds the
+// jurisdiction-scoped cap. When the registry is nil or no cap policy is
+// configured, all interest charges are allowed.
+func validateInterestCap(ctx context.Context, registry *policy.Registry, tx FinancialTransaction) error {
+	if registry == nil {
+		return nil
+	}
+
+	resolution, err := registry.Resolve(ctx, tx.OrgID, nil, "interest_rate_cap")
+	if err != nil || resolution == nil || resolution.Ruling == nil {
+		return nil // no cap configured
+	}
+
+	var cap interestCapRuling
+	if err := json.Unmarshal(resolution.Ruling, &cap); err != nil {
+		return nil
+	}
+
+	if cap.MaxCents != nil && tx.AmountCents > *cap.MaxCents {
+		return fmt.Errorf("validate: interest accrual %d cents exceeds jurisdiction cap of %d cents", tx.AmountCents, *cap.MaxCents)
+	}
+
+	return nil
 }

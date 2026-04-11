@@ -15,14 +15,20 @@ type IfrsEngine struct {
 	resolver AccountResolver
 	registry *policy.Registry
 	config   EngineConfig
+	periods  AccountingPeriodRepository
 }
 
 // NewIfrsEngine returns a new IFRS accounting engine.
-func NewIfrsEngine(resolver AccountResolver, registry *policy.Registry, config EngineConfig) *IfrsEngine {
+func NewIfrsEngine(resolver AccountResolver, registry *policy.Registry, config EngineConfig, periods ...AccountingPeriodRepository) *IfrsEngine {
+	var p AccountingPeriodRepository
+	if len(periods) > 0 {
+		p = periods[0]
+	}
 	return &IfrsEngine{
 		resolver: resolver,
 		registry: registry,
 		config:   config,
+		periods:  p,
 	}
 }
 
@@ -71,6 +77,10 @@ func (e *IfrsEngine) RecordTransaction(ctx context.Context, tx FinancialTransact
 		return e.yearEndCloseEffects(ctx, tx)
 	case TxTypeVoidReversal:
 		return e.voidReversalEffects(ctx, tx)
+	case TxTypeInterfundLoan:
+		return e.interfundLoanEffects(ctx, tx)
+	case TxTypeDepreciation:
+		return e.depreciationEffects(ctx, tx)
 	default:
 		return nil, fmt.Errorf("record transaction: unsupported type %q", tx.Type)
 	}
@@ -78,7 +88,7 @@ func (e *IfrsEngine) RecordTransaction(ctx context.Context, tx FinancialTransact
 
 // ValidateTransaction validates a financial transaction against IFRS rules.
 // Modified accrual basis is rejected outright under IFRS.
-func (e *IfrsEngine) ValidateTransaction(_ context.Context, tx FinancialTransaction) error {
+func (e *IfrsEngine) ValidateTransaction(ctx context.Context, tx FinancialTransaction) error {
 	if e.config.RecognitionBasis == RecognitionBasisModifiedAccrual {
 		return fmt.Errorf("validate transaction: IFRS does not support modified_accrual basis")
 	}
@@ -99,6 +109,24 @@ func (e *IfrsEngine) ValidateTransaction(_ context.Context, tx FinancialTransact
 			return fmt.Errorf("validate: payment requires unit_id")
 		}
 	}
+
+	// Period boundary check.
+	if err := validatePeriodBoundary(ctx, e.periods, tx); err != nil {
+		return err
+	}
+
+	// Fee and interest cap enforcement.
+	switch tx.Type {
+	case TxTypeLateFee:
+		if err := validateFeeCap(ctx, e.registry, tx); err != nil {
+			return err
+		}
+	case TxTypeInterestAccrual:
+		if err := validateInterestCap(ctx, e.registry, tx); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -751,6 +779,94 @@ func (e *IfrsEngine) yearEndCloseEffects(ctx context.Context, tx FinancialTransa
 		})
 	}
 
+	return effects, nil
+}
+
+func (e *IfrsEngine) interfundLoanEffects(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error) {
+	effects := &FinancialEffects{}
+
+	// Resolve source and destination cash accounts from FundAllocations.
+	var srcCashNum, dstCashNum int
+	if len(tx.FundAllocations) >= 2 && tx.FundAllocations[0].FundKey != "" {
+		srcCashNum = cashAccountForFundKey(tx.FundAllocations[0].FundKey)
+		dstCashNum = cashAccountForFundKey(tx.FundAllocations[1].FundKey)
+	} else {
+		srcType, _ := tx.Metadata["from_fund_type"].(string)
+		dstType, _ := tx.Metadata["to_fund_type"].(string)
+		srcCashNum = cashAccountForFundType(srcType)
+		dstCashNum = cashAccountForFundType(dstType)
+	}
+
+	srcCashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, srcCashNum)
+	if err != nil {
+		return nil, fmt.Errorf("interfund_loan: resolve source cash account %d: %w", srcCashNum, err)
+	}
+	dstCashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, dstCashNum)
+	if err != nil {
+		return nil, fmt.Errorf("interfund_loan: resolve dest cash account %d: %w", dstCashNum, err)
+	}
+	dueFromAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 1300)
+	if err != nil {
+		return nil, fmt.Errorf("interfund_loan: resolve Due From Other Funds account 1300: %w", err)
+	}
+	dueToAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 2500)
+	if err != nil {
+		return nil, fmt.Errorf("interfund_loan: resolve Due To Other Funds account 2500: %w", err)
+	}
+
+	// GL: DR dest Cash / CR source Cash, DR 1300 (Due From) / CR 2500 (Due To).
+	effects.JournalLines = append(effects.JournalLines,
+		GLJournalLine{AccountID: dstCashAccount.ID, DebitCents: tx.AmountCents},
+		GLJournalLine{AccountID: srcCashAccount.ID, CreditCents: tx.AmountCents},
+		GLJournalLine{AccountID: dueFromAccount.ID, DebitCents: tx.AmountCents},
+		GLJournalLine{AccountID: dueToAccount.ID, CreditCents: tx.AmountCents},
+	)
+
+	// Fund: loan-out from source, loan-in to destination.
+	if len(tx.FundAllocations) >= 2 {
+		effects.FundTransactions = append(effects.FundTransactions,
+			FundTransactionDirective{
+				FundID: tx.FundAllocations[0].FundID, Type: FundTxTypeLoanOut,
+				AmountCents: tx.AmountCents, Description: tx.Memo,
+			},
+			FundTransactionDirective{
+				FundID: tx.FundAllocations[1].FundID, Type: FundTxTypeLoanIn,
+				AmountCents: tx.AmountCents, Description: tx.Memo,
+			},
+		)
+	}
+
+	// No ledger entries — interfund loans don't affect unit balances.
+	return effects, nil
+}
+
+func (e *IfrsEngine) depreciationEffects(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error) {
+	effects := &FinancialEffects{}
+
+	// GL: DR 5220 (Depreciation Expense) / CR 1405 (Accumulated Depreciation).
+	depreciationAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 5220)
+	if err != nil {
+		return nil, fmt.Errorf("depreciation: resolve depreciation expense account 5220: %w", err)
+	}
+	accumDepAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 1405)
+	if err != nil {
+		return nil, fmt.Errorf("depreciation: resolve accumulated depreciation account 1405: %w", err)
+	}
+
+	effects.JournalLines = append(effects.JournalLines,
+		GLJournalLine{AccountID: depreciationAccount.ID, DebitCents: tx.AmountCents},
+		GLJournalLine{AccountID: accumDepAccount.ID, CreditCents: tx.AmountCents},
+	)
+
+	// Optional fund directives if FundAllocations provided.
+	for _, alloc := range tx.FundAllocations {
+		effects.FundTransactions = append(effects.FundTransactions, FundTransactionDirective{
+			FundID: alloc.FundID, Type: "depreciation",
+			AmountCents: alloc.AmountCents, Description: tx.Memo,
+		})
+	}
+
+	// No ledger entries — depreciation doesn't affect unit balances.
 	return effects, nil
 }
 

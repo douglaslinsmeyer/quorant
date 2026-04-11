@@ -208,17 +208,21 @@ func newTestGaapEngineWithResolver(basis RecognitionBasis) (*GaapEngine, *stubAc
 		1030: {ID: uuid.MustParse("00000000-0000-0000-0000-000000001030"), AccountNumber: 1030},
 		1040: {ID: uuid.MustParse("00000000-0000-0000-0000-000000001040"), AccountNumber: 1040},
 		1100: {ID: uuid.MustParse("00000000-0000-0000-0000-000000001100"), AccountNumber: 1100},
+		1300: {ID: uuid.MustParse("00000000-0000-0000-0000-000000001300"), AccountNumber: 1300},
+		1405: {ID: uuid.MustParse("00000000-0000-0000-0000-000000001405"), AccountNumber: 1405},
+		2100: {ID: uuid.MustParse("00000000-0000-0000-0000-000000002100"), AccountNumber: 2100},
+		2500: {ID: uuid.MustParse("00000000-0000-0000-0000-000000002500"), AccountNumber: 2500},
+		3100: {ID: uuid.MustParse("00000000-0000-0000-0000-000000003100"), AccountNumber: 3100},
+		3110: {ID: uuid.MustParse("00000000-0000-0000-0000-000000003110"), AccountNumber: 3110},
 		4010: {ID: uuid.MustParse("00000000-0000-0000-0000-000000004010"), AccountNumber: 4010},
 		4020: {ID: uuid.MustParse("00000000-0000-0000-0000-000000004020"), AccountNumber: 4020},
 		4030: {ID: uuid.MustParse("00000000-0000-0000-0000-000000004030"), AccountNumber: 4030},
 		4040: {ID: uuid.MustParse("00000000-0000-0000-0000-000000004040"), AccountNumber: 4040},
 		4100: {ID: uuid.MustParse("00000000-0000-0000-0000-000000004100"), AccountNumber: 4100},
 		4200: {ID: uuid.MustParse("00000000-0000-0000-0000-000000004200"), AccountNumber: 4200},
-		2100: {ID: uuid.MustParse("00000000-0000-0000-0000-000000002100"), AccountNumber: 2100},
 		5010: {ID: uuid.MustParse("00000000-0000-0000-0000-000000005010"), AccountNumber: 5010},
 		5040: {ID: uuid.MustParse("00000000-0000-0000-0000-000000005040"), AccountNumber: 5040},
-		3100: {ID: uuid.MustParse("00000000-0000-0000-0000-000000003100"), AccountNumber: 3100},
-		3110: {ID: uuid.MustParse("00000000-0000-0000-0000-000000003110"), AccountNumber: 3110},
+		5220: {ID: uuid.MustParse("00000000-0000-0000-0000-000000005220"), AccountNumber: 5220},
 	}}
 	engine := NewGaapEngine(resolver, nil, EngineConfig{RecognitionBasis: basis, FiscalYearStart: 1})
 	return engine, resolver
@@ -440,6 +444,115 @@ func TestGaapEngine_RecordTransaction_FundTransfer(t *testing.T) {
 	assert.Equal(t, int64(50000), effects.FundTransactions[1].AmountCents)
 
 	// Ledger: none — fund transfers don't affect unit balances.
+	assert.Empty(t, effects.LedgerEntries)
+}
+
+// ── Interfund Loan tests ────────────────────────────────────────────
+
+func TestGaapEngine_RecordTransaction_InterfundLoan(t *testing.T) {
+	engine, resolver := newTestGaapEngineWithResolver(RecognitionBasisAccrual)
+	srcFundID := uuid.New()
+	dstFundID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypeInterfundLoan, OrgID: uuid.New(), AmountCents: 100000,
+		EffectiveDate: time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC),
+		SourceID:      uuid.New(),
+		FundAllocations: []FundAllocation{
+			{FundID: srcFundID, FundKey: "operating", AmountCents: 100000},
+			{FundID: dstFundID, FundKey: "reserve", AmountCents: 100000},
+		},
+		Memo: "Interfund loan to reserve",
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// GL: 4 lines — DR 1020 (dest cash), CR 1010 (source cash),
+	//               DR 1300 (Due From), CR 2500 (Due To).
+	require.Len(t, effects.JournalLines, 4)
+	assert.Equal(t, resolver.accounts[1020].ID, effects.JournalLines[0].AccountID)
+	assert.Equal(t, int64(100000), effects.JournalLines[0].DebitCents)
+	assert.Equal(t, resolver.accounts[1010].ID, effects.JournalLines[1].AccountID)
+	assert.Equal(t, int64(100000), effects.JournalLines[1].CreditCents)
+	assert.Equal(t, resolver.accounts[1300].ID, effects.JournalLines[2].AccountID)
+	assert.Equal(t, int64(100000), effects.JournalLines[2].DebitCents)
+	assert.Equal(t, resolver.accounts[2500].ID, effects.JournalLines[3].AccountID)
+	assert.Equal(t, int64(100000), effects.JournalLines[3].CreditCents)
+
+	// Fund: 2 directives — loan-out from source, loan-in to dest.
+	require.Len(t, effects.FundTransactions, 2)
+	assert.Equal(t, srcFundID, effects.FundTransactions[0].FundID)
+	assert.Equal(t, FundTxTypeLoanOut, effects.FundTransactions[0].Type)
+	assert.Equal(t, int64(100000), effects.FundTransactions[0].AmountCents)
+	assert.Equal(t, dstFundID, effects.FundTransactions[1].FundID)
+	assert.Equal(t, FundTxTypeLoanIn, effects.FundTransactions[1].Type)
+	assert.Equal(t, int64(100000), effects.FundTransactions[1].AmountCents)
+
+	// Ledger: none — interfund loans don't affect unit balances.
+	assert.Empty(t, effects.LedgerEntries)
+}
+
+// ── Depreciation tests ──────────────────────────────────────────────
+
+func TestGaapEngine_RecordTransaction_Depreciation(t *testing.T) {
+	engine, resolver := newTestGaapEngineWithResolver(RecognitionBasisAccrual)
+
+	tx := FinancialTransaction{
+		Type: TxTypeDepreciation, OrgID: uuid.New(), AmountCents: 8000,
+		EffectiveDate: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC),
+		SourceID:      uuid.New(),
+		Memo:          "Monthly depreciation",
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// GL: DR 5220 (Depreciation Expense) / CR 1405 (Accumulated Depreciation).
+	require.Len(t, effects.JournalLines, 2)
+	assert.Equal(t, resolver.accounts[5220].ID, effects.JournalLines[0].AccountID)
+	assert.Equal(t, int64(8000), effects.JournalLines[0].DebitCents)
+	assert.Equal(t, resolver.accounts[1405].ID, effects.JournalLines[1].AccountID)
+	assert.Equal(t, int64(8000), effects.JournalLines[1].CreditCents)
+
+	// Fund: none without allocations.
+	assert.Empty(t, effects.FundTransactions)
+
+	// Ledger: none — depreciation doesn't affect unit balances.
+	assert.Empty(t, effects.LedgerEntries)
+}
+
+func TestGaapEngine_RecordTransaction_Depreciation_WithFundAllocation(t *testing.T) {
+	engine, resolver := newTestGaapEngineWithResolver(RecognitionBasisAccrual)
+	fundID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypeDepreciation, OrgID: uuid.New(), AmountCents: 8000,
+		EffectiveDate: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC),
+		SourceID:      uuid.New(),
+		FundAllocations: []FundAllocation{
+			{FundID: fundID, FundKey: "operating", AmountCents: 8000},
+		},
+		Memo: "Monthly depreciation - operating",
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// GL: DR 5220 / CR 1405.
+	require.Len(t, effects.JournalLines, 2)
+	assert.Equal(t, resolver.accounts[5220].ID, effects.JournalLines[0].AccountID)
+	assert.Equal(t, resolver.accounts[1405].ID, effects.JournalLines[1].AccountID)
+
+	// Fund: depreciation directive for the fund.
+	require.Len(t, effects.FundTransactions, 1)
+	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
+	assert.Equal(t, "depreciation", effects.FundTransactions[0].Type)
+	assert.Equal(t, int64(8000), effects.FundTransactions[0].AmountCents)
+
 	assert.Empty(t, effects.LedgerEntries)
 }
 

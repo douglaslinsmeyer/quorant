@@ -137,6 +137,8 @@ func (s FundType) IsValid() bool {
 const (
 	FundTxTypeTransferOut = "transfer_out"
 	FundTxTypeTransferIn  = "transfer_in"
+	FundTxTypeLoanOut     = "loan_out"
+	FundTxTypeLoanIn      = "loan_in"
 )
 
 // FundTransactionRefType constants identify the source entity for a fund transaction.
