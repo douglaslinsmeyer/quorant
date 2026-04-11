@@ -114,6 +114,7 @@ func RegisterRoutes(
 	mux.Handle("POST /api/v1/organizations/{org_id}/gl/journal-entries", permMw("fin.gl.journal.create", glHandler.CreateJournalEntry))
 	mux.Handle("GET /api/v1/organizations/{org_id}/gl/journal-entries", permMw("fin.gl.journal.read", glHandler.ListJournalEntries))
 	mux.Handle("GET /api/v1/organizations/{org_id}/gl/journal-entries/{entry_id}", permMw("fin.gl.journal.read", glHandler.GetJournalEntry))
+	mux.Handle("POST /api/v1/organizations/{org_id}/gl/journal-entries/{entry_id}/reverse", permMw("fin.gl.journal.create", glHandler.ReverseJournalEntry))
 
 	// GL: Reports
 	mux.Handle("GET /api/v1/organizations/{org_id}/gl/trial-balance", permMw("fin.gl.report.read", glHandler.GetTrialBalance))

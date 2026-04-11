@@ -212,6 +212,31 @@ func (h *GLHandler) GetJournalEntry(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, http.StatusOK, entry)
 }
 
+// ReverseJournalEntry handles POST /organizations/{org_id}/gl/journal-entries/{entry_id}/reverse.
+func (h *GLHandler) ReverseJournalEntry(w http.ResponseWriter, r *http.Request) {
+	_, err := parsePathUUID(r, "org_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	entryID, err := parsePathUUID(r, "entry_id")
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	userID := middleware.UserIDFromContext(r.Context())
+	reversal, err := h.glService.ReverseJournalEntry(r.Context(), entryID, userID)
+	if err != nil {
+		h.logger.Error("ReverseJournalEntry failed", "entry_id", entryID, "error", err)
+		api.WriteError(w, err)
+		return
+	}
+
+	api.WriteJSON(w, http.StatusCreated, reversal)
+}
+
 // ── Reporting ────────────────────────────────────────────────────────────────
 
 // GetTrialBalance handles GET /organizations/{org_id}/gl/trial-balance.

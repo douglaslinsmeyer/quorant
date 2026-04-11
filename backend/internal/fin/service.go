@@ -467,6 +467,16 @@ func (s *FinService) VoidAssessment(ctx context.Context, id uuid.UUID, voidedBy 
 		}
 	}
 
+	var uow *db.UnitOfWork
+	if s.uowFactory != nil {
+		var txErr error
+		uow, txErr = s.uowFactory.Begin(ctx)
+		if txErr != nil {
+			return fmt.Errorf("fin: VoidAssessment begin tx: %w", txErr)
+		}
+		defer uow.Rollback(ctx) //nolint:errcheck
+	}
+
 	// Delegate reversal to the accounting engine.
 	engine, engineErr := s.factory.ForOrg(ctx, assessment.OrgID)
 	if engineErr != nil {
@@ -490,7 +500,7 @@ func (s *FinService) VoidAssessment(ctx context.Context, id uuid.UUID, voidedBy 
 	if recErr != nil {
 		return fmt.Errorf("fin: VoidAssessment record: %w", recErr)
 	}
-	if err := s.executeEffects(ctx, nil, assessment.OrgID, GLSourceTypeAssessment, assessment.ID, &assessment.UnitID, ftx.EffectiveDate, ftx.Memo, effects); err != nil {
+	if err := s.executeEffects(ctx, uow, assessment.OrgID, GLSourceTypeAssessment, assessment.ID, &assessment.UnitID, ftx.EffectiveDate, ftx.Memo, effects); err != nil {
 		return fmt.Errorf("fin: VoidAssessment effects: %w", err)
 	}
 
@@ -502,7 +512,14 @@ func (s *FinService) VoidAssessment(ctx context.Context, id uuid.UUID, voidedBy 
 		vbPtr = &voidedBy
 		vatPtr = &now
 	}
-	return s.assessments.UpdateAssessmentStatus(ctx, id, AssessmentStatusVoid, vbPtr, vatPtr)
+	if err := s.assessments.UpdateAssessmentStatus(ctx, id, AssessmentStatusVoid, vbPtr, vatPtr); err != nil {
+		return err
+	}
+
+	if uow != nil {
+		return uow.Commit(ctx)
+	}
+	return nil
 }
 
 // ── Ledger ────────────────────────────────────────────────────────────────────
@@ -753,6 +770,16 @@ func (s *FinService) VoidPayment(ctx context.Context, id uuid.UUID, voidedBy uui
 		)
 	}
 
+	var uow *db.UnitOfWork
+	if s.uowFactory != nil {
+		var txErr error
+		uow, txErr = s.uowFactory.Begin(ctx)
+		if txErr != nil {
+			return fmt.Errorf("fin: VoidPayment begin tx: %w", txErr)
+		}
+		defer uow.Rollback(ctx) //nolint:errcheck
+	}
+
 	// Delegate reversal to the accounting engine.
 	engine, engineErr := s.factory.ForOrg(ctx, payment.OrgID)
 	if engineErr != nil {
@@ -781,7 +808,7 @@ func (s *FinService) VoidPayment(ctx context.Context, id uuid.UUID, voidedBy uui
 	if recErr != nil {
 		return fmt.Errorf("fin: VoidPayment record: %w", recErr)
 	}
-	if err := s.executeEffects(ctx, nil, payment.OrgID, GLSourceTypePayment, payment.ID, &payment.UnitID, ftx.EffectiveDate, ftx.Memo, effects); err != nil {
+	if err := s.executeEffects(ctx, uow, payment.OrgID, GLSourceTypePayment, payment.ID, &payment.UnitID, ftx.EffectiveDate, ftx.Memo, effects); err != nil {
 		return fmt.Errorf("fin: VoidPayment effects: %w", err)
 	}
 
@@ -793,7 +820,14 @@ func (s *FinService) VoidPayment(ctx context.Context, id uuid.UUID, voidedBy uui
 		vbPtr = &voidedBy
 		vatPtr = &now
 	}
-	return s.payments.UpdatePaymentVoid(ctx, id, vbPtr, vatPtr)
+	if err := s.payments.UpdatePaymentVoid(ctx, id, vbPtr, vatPtr); err != nil {
+		return err
+	}
+
+	if uow != nil {
+		return uow.Commit(ctx)
+	}
+	return nil
 }
 
 // ── Budgets ───────────────────────────────────────────────────────────────────
