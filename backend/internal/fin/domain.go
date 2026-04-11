@@ -200,17 +200,18 @@ type Expense struct {
 
 // Fund represents a financial pool (operating, reserve, capital, special).
 type Fund struct {
-	ID                  uuid.UUID  `json:"id"`
-	OrgID               uuid.UUID  `json:"org_id"`
-	CurrencyCode        string     `json:"currency_code"`
-	Name                string   `json:"name"`
-	FundType            FundType `json:"fund_type"`
-	BalanceCents        int64      `json:"balance_cents"`
-	TargetBalanceCents  *int64     `json:"target_balance_cents,omitempty"`
-	IsDefault           bool       `json:"is_default"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
-	DeletedAt           *time.Time `json:"deleted_at,omitempty"`
+	ID                  uuid.UUID      `json:"id"`
+	OrgID               uuid.UUID      `json:"org_id"`
+	CurrencyCode        string         `json:"currency_code"`
+	Name                string         `json:"name"`
+	FundType            FundType       `json:"fund_type"`
+	BalanceCents        int64          `json:"balance_cents"`
+	TargetBalanceCents  *int64         `json:"target_balance_cents,omitempty"`
+	CustodianType       *CustodianType `json:"custodian_type,omitempty"`
+	IsDefault           bool           `json:"is_default"`
+	CreatedAt           time.Time      `json:"created_at"`
+	UpdatedAt           time.Time      `json:"updated_at"`
+	DeletedAt           *time.Time     `json:"deleted_at,omitempty"`
 }
 
 // FundTransaction records a single debit or credit to a fund.
@@ -346,6 +347,7 @@ type GLJournalLine struct {
 	DebitCents     int64     `json:"debit_cents"`
 	CreditCents    int64     `json:"credit_cents"`
 	Memo           *string   `json:"memo,omitempty"`
+	Reconciled     bool      `json:"reconciled"`
 }
 
 // TrialBalanceRow is a single row in a trial balance report.

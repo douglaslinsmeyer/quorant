@@ -199,3 +199,83 @@ func TestAllocate_NoCharges(t *testing.T) {
 	assert.Nil(t, results)
 	assert.Equal(t, int64(5000), credit)
 }
+
+// ── ApplyStrategy tests ─────────────────────────────────────────────
+
+func TestApplyStrategy_OldestFirst(t *testing.T) {
+	now := time.Now()
+	olderID := uuid.New()
+	newerID := uuid.New()
+
+	charges := []fin.OutstandingCharge{
+		{
+			ID:          newerID,
+			ChargeType:  fin.ChargeTypeRegularAssessment,
+			AmountCents: 5000,
+			DueDate:     now.Add(-10 * 24 * time.Hour),
+		},
+		{
+			ID:          olderID,
+			ChargeType:  fin.ChargeTypeRegularAssessment,
+			AmountCents: 5000,
+			DueDate:     now.Add(-60 * 24 * time.Hour),
+		},
+	}
+
+	strategy := &fin.ApplicationStrategy{
+		Method:         fin.ApplicationMethodOldestFirst,
+		WithinPriority: fin.SortOldestFirst,
+	}
+
+	results, credit := fin.ApplyStrategy(strategy, charges, 7000)
+
+	require.Len(t, results, 2)
+	// Older charge allocated first (FIFO by due date).
+	assert.Equal(t, olderID, results[0].ChargeID)
+	assert.Equal(t, int64(5000), results[0].AllocatedCents)
+	// Newer charge gets the remainder.
+	assert.Equal(t, newerID, results[1].ChargeID)
+	assert.Equal(t, int64(2000), results[1].AllocatedCents)
+	assert.Equal(t, int64(0), credit)
+}
+
+func TestApplyStrategy_PriorityFIFO(t *testing.T) {
+	now := time.Now()
+	assessmentID := uuid.New()
+	lateFeeID := uuid.New()
+
+	charges := []fin.OutstandingCharge{
+		{
+			ID:          lateFeeID,
+			ChargeType:  fin.ChargeTypeLateFee,
+			AmountCents: 2000,
+			DueDate:     now.Add(-30 * 24 * time.Hour),
+		},
+		{
+			ID:          assessmentID,
+			ChargeType:  fin.ChargeTypeRegularAssessment,
+			AmountCents: 10000,
+			DueDate:     now.Add(-30 * 24 * time.Hour),
+		},
+	}
+
+	strategy := &fin.ApplicationStrategy{
+		Method: fin.ApplicationMethodPriorityFIFO,
+		PriorityOrder: []fin.ChargeType{
+			fin.ChargeTypeRegularAssessment,
+			fin.ChargeTypeLateFee,
+		},
+		WithinPriority: fin.SortOldestFirst,
+	}
+
+	results, credit := fin.ApplyStrategy(strategy, charges, 11000)
+
+	require.Len(t, results, 2)
+	// Assessment first (higher priority tier).
+	assert.Equal(t, assessmentID, results[0].ChargeID)
+	assert.Equal(t, int64(10000), results[0].AllocatedCents)
+	// Late fee second (lower priority tier, partial).
+	assert.Equal(t, lateFeeID, results[1].ChargeID)
+	assert.Equal(t, int64(1000), results[1].AllocatedCents)
+	assert.Equal(t, int64(0), credit)
+}

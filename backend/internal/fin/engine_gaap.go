@@ -49,6 +49,8 @@ func (e *GaapEngine) RecordTransaction(ctx context.Context, tx FinancialTransact
 		return e.paymentEffects(ctx, tx)
 	case TxTypeFundTransfer:
 		return e.fundTransferEffects(ctx, tx)
+	case TxTypeExpense:
+		return e.expenseEffects(ctx, tx)
 	case TxTypeLateFee:
 		return e.lateFeeEffects(ctx, tx)
 	case TxTypeInterestAccrual:
@@ -244,7 +246,39 @@ func (e *GaapEngine) paymentEffects(ctx context.Context, tx FinancialTransaction
 		})
 	}
 
+	// Overpayment: produce a credit directive for the surplus.
+	// Accrual basis treats overpayments as deferred revenue (prepayment);
+	// cash basis treats them as a simple credit on account.
+	if overpayment, ok := metadataInt64(tx.Metadata, "overpayment_cents"); ok && overpayment > 0 && tx.UnitID != nil {
+		creditType := CreditTypeOnAccount
+		if e.config.RecognitionBasis == RecognitionBasisAccrual {
+			creditType = CreditTypePrepayment
+		}
+		effects.Credits = append(effects.Credits, CreditDirective{
+			UnitID:      *tx.UnitID,
+			AmountCents: overpayment,
+			Type:        creditType,
+		})
+	}
+
 	return effects, nil
+}
+
+// metadataInt64 extracts an int64 from a metadata map, handling both int64
+// (programmatic callers) and float64 (JSON-unmarshaled values).
+func metadataInt64(m map[string]any, key string) (int64, bool) {
+	v, ok := m[key]
+	if !ok {
+		return 0, false
+	}
+	switch n := v.(type) {
+	case int64:
+		return n, true
+	case float64:
+		return int64(n), true
+	default:
+		return 0, false
+	}
 }
 
 // fundTypeToCashAccount maps fund type strings to their cash account numbers.
@@ -417,6 +451,129 @@ func (e *GaapEngine) interestAccrualEffects(ctx context.Context, tx FinancialTra
 	return effects, nil
 }
 
+func (e *GaapEngine) expenseEffects(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error) {
+	effects := &FinancialEffects{}
+
+	status, _ := tx.Metadata["status"].(string)
+
+	// Cash basis, approved: no GL (not recognized until paid).
+	if e.config.RecognitionBasis == RecognitionBasisCash && status == string(ExpenseStatusApproved) {
+		return effects, nil
+	}
+
+	// Resolve expense account from metadata, default to 5010 (Management Fee).
+	expenseAcctNum := 5010
+	if num, ok := metadataInt(tx.Metadata, "expense_account"); ok {
+		expenseAcctNum = num
+	}
+
+	switch {
+	case e.config.RecognitionBasis == RecognitionBasisAccrual && status == string(ExpenseStatusApproved):
+		// Accrual + approved: DR expense-account / CR 2100 (AP).
+		expenseAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, expenseAcctNum)
+		if err != nil {
+			return nil, fmt.Errorf("expense: resolve expense account %d: %w", expenseAcctNum, err)
+		}
+		apAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 2100)
+		if err != nil {
+			return nil, fmt.Errorf("expense: resolve AP account 2100: %w", err)
+		}
+		effects.JournalLines = append(effects.JournalLines,
+			GLJournalLine{AccountID: expenseAccount.ID, DebitCents: tx.AmountCents},
+			GLJournalLine{AccountID: apAccount.ID, CreditCents: tx.AmountCents},
+		)
+
+	case e.config.RecognitionBasis == RecognitionBasisAccrual && status == string(ExpenseStatusPaid):
+		// Accrual + paid: DR 2100 (AP) / CR Cash (fund-dependent).
+		apAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 2100)
+		if err != nil {
+			return nil, fmt.Errorf("expense: resolve AP account 2100: %w", err)
+		}
+		effects.JournalLines = append(effects.JournalLines,
+			GLJournalLine{AccountID: apAccount.ID, DebitCents: tx.AmountCents},
+		)
+		if len(tx.FundAllocations) == 0 {
+			cashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 1010)
+			if err != nil {
+				return nil, fmt.Errorf("expense: resolve cash account 1010: %w", err)
+			}
+			effects.JournalLines = append(effects.JournalLines,
+				GLJournalLine{AccountID: cashAccount.ID, CreditCents: tx.AmountCents},
+			)
+		} else {
+			for _, alloc := range tx.FundAllocations {
+				cashNum := cashAccountForFundKey(alloc.FundKey)
+				cashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, cashNum)
+				if err != nil {
+					return nil, fmt.Errorf("expense: resolve cash account %d: %w", cashNum, err)
+				}
+				effects.JournalLines = append(effects.JournalLines,
+					GLJournalLine{AccountID: cashAccount.ID, CreditCents: alloc.AmountCents},
+				)
+			}
+		}
+
+	case e.config.RecognitionBasis == RecognitionBasisCash && status == string(ExpenseStatusPaid):
+		// Cash + paid: DR expense-account / CR Cash (fund-dependent).
+		expenseAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, expenseAcctNum)
+		if err != nil {
+			return nil, fmt.Errorf("expense: resolve expense account %d: %w", expenseAcctNum, err)
+		}
+		effects.JournalLines = append(effects.JournalLines,
+			GLJournalLine{AccountID: expenseAccount.ID, DebitCents: tx.AmountCents},
+		)
+		if len(tx.FundAllocations) == 0 {
+			cashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 1010)
+			if err != nil {
+				return nil, fmt.Errorf("expense: resolve cash account 1010: %w", err)
+			}
+			effects.JournalLines = append(effects.JournalLines,
+				GLJournalLine{AccountID: cashAccount.ID, CreditCents: tx.AmountCents},
+			)
+		} else {
+			for _, alloc := range tx.FundAllocations {
+				cashNum := cashAccountForFundKey(alloc.FundKey)
+				cashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, cashNum)
+				if err != nil {
+					return nil, fmt.Errorf("expense: resolve cash account %d: %w", cashNum, err)
+				}
+				effects.JournalLines = append(effects.JournalLines,
+					GLJournalLine{AccountID: cashAccount.ID, CreditCents: alloc.AmountCents},
+				)
+			}
+		}
+	}
+
+	// Fund transaction directives for each allocation.
+	for _, alloc := range tx.FundAllocations {
+		effects.FundTransactions = append(effects.FundTransactions, FundTransactionDirective{
+			FundID: alloc.FundID, Type: "expense",
+			AmountCents: alloc.AmountCents, Description: tx.Memo,
+		})
+	}
+
+	return effects, nil
+}
+
+// metadataInt extracts an int from a metadata map, handling int, int64, and
+// float64 (JSON-unmarshaled values).
+func metadataInt(m map[string]any, key string) (int, bool) {
+	v, ok := m[key]
+	if !ok {
+		return 0, false
+	}
+	switch n := v.(type) {
+	case int:
+		return n, true
+	case int64:
+		return int(n), true
+	case float64:
+		return int(n), true
+	default:
+		return 0, false
+	}
+}
+
 // ValidateTransaction validates a financial transaction against GAAP rules.
 func (e *GaapEngine) ValidateTransaction(_ context.Context, tx FinancialTransaction) error {
 	if e.config.RecognitionBasis == RecognitionBasisModifiedAccrual {
@@ -442,23 +599,8 @@ func (e *GaapEngine) ValidateTransaction(_ context.Context, tx FinancialTransact
 	return nil
 }
 
-// PaymentApplicationStrategy determines how a payment should be applied.
-// Not yet implemented; returns ErrNotImplemented.
-func (e *GaapEngine) PaymentApplicationStrategy(_ context.Context, _ PaymentContext) (*ApplicationStrategy, error) {
-	return nil, ErrNotImplemented
-}
-
-// PaymentTerms computes payment terms for a payable.
-// Not yet implemented; returns ErrNotImplemented.
-func (e *GaapEngine) PaymentTerms(_ context.Context, _ PayableContext) (*PaymentTermsResult, error) {
-	return nil, ErrNotImplemented
-}
-
-// PayableRecognitionDate determines when an expense should be recognized as a payable.
-// Not yet implemented; returns ErrNotImplemented.
-func (e *GaapEngine) PayableRecognitionDate(_ context.Context, _ ExpenseContext) (time.Time, error) {
-	return time.Time{}, ErrNotImplemented
-}
+// PaymentTerms is implemented in engine_terms.go.
+// PayableRecognitionDate is implemented in engine_terms.go.
 
 // RevenueRecognitionDate determines when revenue should be recognized.
 // Not yet implemented; returns ErrNotImplemented.

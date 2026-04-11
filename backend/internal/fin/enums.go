@@ -173,13 +173,14 @@ const (
 	GLSourceTypeAssessment GLSourceType = "assessment"
 	GLSourceTypePayment    GLSourceType = "payment"
 	GLSourceTypeTransfer   GLSourceType = "transfer"
+	GLSourceTypeExpense    GLSourceType = "expense"
 	GLSourceTypeManual     GLSourceType = "manual"
 )
 
 // IsValid returns true if the GLSourceType value is one of the defined constants.
 func (s GLSourceType) IsValid() bool {
 	switch s {
-	case GLSourceTypeAssessment, GLSourceTypePayment, GLSourceTypeTransfer, GLSourceTypeManual:
+	case GLSourceTypeAssessment, GLSourceTypePayment, GLSourceTypeTransfer, GLSourceTypeExpense, GLSourceTypeManual:
 		return true
 	}
 	return false
@@ -306,6 +307,23 @@ const (
 func (s AmountStrategy) IsValid() bool {
 	switch s {
 	case AmountStrategyFlat, AmountStrategyPerUnitType, AmountStrategyPerSqft, AmountStrategyCustom:
+		return true
+	}
+	return false
+}
+
+// CustodianType identifies who holds custody of a fund's assets.
+type CustodianType string
+
+const (
+	CustodianAssociationHeld       CustodianType = "association_held"
+	CustodianManagementCompanyHeld CustodianType = "management_company_held"
+)
+
+// IsValid returns true if the CustodianType value is one of the defined constants.
+func (s CustodianType) IsValid() bool {
+	switch s {
+	case CustodianAssociationHeld, CustodianManagementCompanyHeld:
 		return true
 	}
 	return false

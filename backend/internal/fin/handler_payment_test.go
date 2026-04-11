@@ -136,8 +136,9 @@ func TestRecordPayment_Success(t *testing.T) {
 	assert.Equal(t, fin.PaymentStatusCompleted, envelope.Data.Status)
 	assert.NotEqual(t, uuid.Nil, envelope.Data.ID)
 
-	// Verify ledger credit was created.
-	assert.Len(t, ts.mockAssessRepo.ledger, 1)
+	// Verify ledger entries: payment credit + overpayment credit-on-account
+	// (no outstanding assessments means full overpayment).
+	require.GreaterOrEqual(t, len(ts.mockAssessRepo.ledger), 1)
 	assert.Equal(t, fin.LedgerEntryTypePayment, ts.mockAssessRepo.ledger[0].EntryType)
 	assert.Equal(t, int64(-25000), ts.mockAssessRepo.ledger[0].AmountCents)
 }

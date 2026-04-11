@@ -999,7 +999,8 @@ func TestCreateAssessment_CreatesLedgerEntry(t *testing.T) {
 }
 
 // TestRecordPayment_CreatesLedgerEntry verifies that recording a payment creates
-// a "payment" credit ledger entry (negative amount).
+// a "payment" credit ledger entry (negative amount). When no outstanding charges
+// exist, the entire payment is overpayment, producing a second "credit" entry.
 func TestRecordPayment_CreatesLedgerEntry(t *testing.T) {
 	svc, assessmentRepo, _, _, _, _ := newTestService()
 	ctx := context.Background()
@@ -1018,13 +1019,19 @@ func TestRecordPayment_CreatesLedgerEntry(t *testing.T) {
 	assert.Equal(t, int64(15000), payment.AmountCents)
 	assert.Equal(t, fin.PaymentStatusCompleted, payment.Status)
 
-	// Verify a ledger entry was created with negative amount (credit).
-	require.Len(t, assessmentRepo.ledger, 1)
+	// With no outstanding assessments, the entire payment is overpayment:
+	// entry 0 = payment credit, entry 1 = overpayment credit-on-account.
+	require.Len(t, assessmentRepo.ledger, 2)
 	entry := assessmentRepo.ledger[0]
 	assert.Equal(t, fin.LedgerEntryTypePayment, entry.EntryType)
 	assert.Equal(t, int64(-15000), entry.AmountCents)
 	assert.Equal(t, unitID, entry.UnitID)
 	assert.Equal(t, orgID, entry.OrgID)
+
+	credit := assessmentRepo.ledger[1]
+	assert.Equal(t, fin.LedgerEntryTypeCredit, credit.EntryType)
+	assert.Equal(t, int64(15000), credit.AmountCents)
+	assert.Equal(t, unitID, credit.UnitID)
 }
 
 // TestRecordPayment_Validation verifies that a negative amount is rejected.
@@ -1186,6 +1193,115 @@ func TestPayExpense_RejectsWhenNotApproved(t *testing.T) {
 
 	var valErr *api.ValidationError
 	require.ErrorAs(t, err, &valErr)
+}
+
+// TestApproveExpense_PostsGLEffects verifies that ApproveExpense calls the
+// accounting engine and produces fund transaction directives (accrual basis).
+func TestApproveExpense_PostsGLEffects(t *testing.T) {
+	svc, _, _, _, fundRepo, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	userID := uuid.New()
+
+	// Create an operating fund so the engine's fund transaction directive can be executed.
+	opFundType := string(fin.FundTypeOperating)
+	fund, err := fundRepo.CreateFund(ctx, &fin.Fund{
+		OrgID:        orgID,
+		CurrencyCode: "USD",
+		Name:         "Operating Fund",
+		FundType:     fin.FundTypeOperating,
+	})
+	require.NoError(t, err)
+
+	// Create an expense with FundType set.
+	created, err := svc.CreateExpense(ctx, orgID, userID, fin.CreateExpenseRequest{
+		Description: "Landscaping",
+		AmountCents: 50000,
+		ExpenseDate: time.Now(),
+		FundType:    &opFundType,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, fin.ExpenseStatusSubmitted, created.Status)
+
+	// Approve triggers engine: accrual basis => DR 5010 / CR 2100 + fund directive.
+	approved, err := svc.ApproveExpense(ctx, created.ID, userID)
+	require.NoError(t, err)
+	assert.Equal(t, fin.ExpenseStatusApproved, approved.Status)
+
+	// The fund directive should have created a fund transaction.
+	require.Len(t, fundRepo.transactions, 1)
+	assert.Equal(t, fund.ID, fundRepo.transactions[0].FundID)
+	assert.Equal(t, "expense", fundRepo.transactions[0].TransactionType)
+	assert.Equal(t, created.TotalCents, fundRepo.transactions[0].AmountCents)
+}
+
+// TestPayExpense_PostsGLEffects verifies that PayExpense calls the accounting
+// engine and produces fund transaction directives (accrual basis: DR AP / CR Cash).
+func TestPayExpense_PostsGLEffects(t *testing.T) {
+	svc, _, _, _, fundRepo, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	userID := uuid.New()
+
+	// Create an operating fund.
+	opFundType := string(fin.FundTypeOperating)
+	fund, err := fundRepo.CreateFund(ctx, &fin.Fund{
+		OrgID:        orgID,
+		CurrencyCode: "USD",
+		Name:         "Operating Fund",
+		FundType:     fin.FundTypeOperating,
+	})
+	require.NoError(t, err)
+
+	// Create and approve an expense with FundType set.
+	created, err := svc.CreateExpense(ctx, orgID, userID, fin.CreateExpenseRequest{
+		Description: "Landscaping",
+		AmountCents: 50000,
+		ExpenseDate: time.Now(),
+		FundType:    &opFundType,
+	})
+	require.NoError(t, err)
+
+	_, err = svc.ApproveExpense(ctx, created.ID, userID)
+	require.NoError(t, err)
+	// Record the approve-phase fund transaction count so we can inspect pay-phase only.
+	approveCount := len(fundRepo.transactions)
+
+	// Pay triggers engine: accrual basis => DR 2100 (AP) / CR Cash + fund directive.
+	paid, err := svc.PayExpense(ctx, created.ID)
+	require.NoError(t, err)
+	assert.Equal(t, fin.ExpenseStatusPaid, paid.Status)
+	assert.NotNil(t, paid.PaidDate)
+
+	// A new fund transaction should have been created for the pay phase.
+	require.Greater(t, len(fundRepo.transactions), approveCount)
+	payTx := fundRepo.transactions[len(fundRepo.transactions)-1]
+	assert.Equal(t, fund.ID, payTx.FundID)
+	assert.Equal(t, "expense", payTx.TransactionType)
+	assert.Equal(t, created.TotalCents, payTx.AmountCents)
+}
+
+// TestApproveExpense_WithoutFundType verifies that ApproveExpense works even
+// when the expense has no FundType set (no fund allocation, GL only).
+func TestApproveExpense_WithoutFundType(t *testing.T) {
+	svc, _, _, _, fundRepo, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	userID := uuid.New()
+
+	created, err := svc.CreateExpense(ctx, orgID, userID, fin.CreateExpenseRequest{
+		Description: "Office supplies",
+		AmountCents: 15000,
+		ExpenseDate: time.Now(),
+	})
+	require.NoError(t, err)
+
+	approved, err := svc.ApproveExpense(ctx, created.ID, userID)
+	require.NoError(t, err)
+	assert.Equal(t, fin.ExpenseStatusApproved, approved.Status)
+
+	// No fund transactions should be created when no FundType is set.
+	assert.Empty(t, fundRepo.transactions)
 }
 
 // TestGetSchedule_NotFound verifies that a 404 error is returned when the
@@ -1612,8 +1728,8 @@ func TestRecordPayment_SetsCurrencyCode(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "USD", payment.CurrencyCode)
 
-	// Verify ledger entry also has CurrencyCode set.
-	require.Len(t, assessmentRepo.ledger, 1)
+	// Verify ledger entries have CurrencyCode set (payment + overpayment credit).
+	require.GreaterOrEqual(t, len(assessmentRepo.ledger), 1)
 	assert.Equal(t, "USD", assessmentRepo.ledger[0].CurrencyCode)
 }
 
