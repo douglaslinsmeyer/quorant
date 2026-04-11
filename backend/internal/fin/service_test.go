@@ -2488,3 +2488,24 @@ func TestVoidPayment_AlreadyVoid(t *testing.T) {
 	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, valErr.MsgKey(), "invalid_void_status")
 }
+
+func TestRecordPayment_NilIdempotencyKey_AllowsDuplicates(t *testing.T) {
+	svc, _, paymentRepo, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	userID := uuid.New()
+
+	req := fin.CreatePaymentRequest{
+		UnitID:      uuid.New(),
+		AmountCents: 5000,
+	}
+
+	first, err := svc.RecordPayment(ctx, orgID, userID, req)
+	require.NoError(t, err)
+
+	second, err := svc.RecordPayment(ctx, orgID, userID, req)
+	require.NoError(t, err)
+
+	assert.NotEqual(t, first.ID, second.ID, "nil key should create separate payments")
+	assert.Len(t, paymentRepo.payments, 2)
+}
