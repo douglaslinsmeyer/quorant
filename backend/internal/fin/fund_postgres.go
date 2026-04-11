@@ -34,12 +34,13 @@ func (r *PostgresFundRepository) WithTx(tx pgx.Tx) FundRepository {
 func (r *PostgresFundRepository) CreateFund(ctx context.Context, f *Fund) (*Fund, error) {
 	const q = `
 		INSERT INTO funds (
-			org_id, currency_code, name, fund_type, balance_cents, target_balance_cents, is_default
+			org_id, currency_code, name, fund_type, balance_cents, target_balance_cents,
+			custodian_type, is_default
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7
+			$1, $2, $3, $4, $5, $6, $7, $8
 		)
 		RETURNING id, org_id, currency_code, name, fund_type, balance_cents, target_balance_cents,
-		          is_default, created_at, updated_at, deleted_at`
+		          custodian_type, is_default, created_at, updated_at, deleted_at`
 
 	row := r.db.QueryRow(ctx, q,
 		f.OrgID,
@@ -48,6 +49,7 @@ func (r *PostgresFundRepository) CreateFund(ctx context.Context, f *Fund) (*Fund
 		f.FundType,
 		f.BalanceCents,
 		f.TargetBalanceCents,
+		f.CustodianType,
 		f.IsDefault,
 	)
 
@@ -63,7 +65,7 @@ func (r *PostgresFundRepository) CreateFund(ctx context.Context, f *Fund) (*Fund
 func (r *PostgresFundRepository) FindFundByID(ctx context.Context, id uuid.UUID) (*Fund, error) {
 	const q = `
 		SELECT id, org_id, currency_code, name, fund_type, balance_cents, target_balance_cents,
-		       is_default, created_at, updated_at, deleted_at
+		       custodian_type, is_default, created_at, updated_at, deleted_at
 		FROM funds
 		WHERE id = $1 AND deleted_at IS NULL`
 
@@ -83,7 +85,7 @@ func (r *PostgresFundRepository) FindFundByID(ctx context.Context, id uuid.UUID)
 func (r *PostgresFundRepository) ListFundsByOrg(ctx context.Context, orgID uuid.UUID) ([]Fund, error) {
 	const q = `
 		SELECT id, org_id, currency_code, name, fund_type, balance_cents, target_balance_cents,
-		       is_default, created_at, updated_at, deleted_at
+		       custodian_type, is_default, created_at, updated_at, deleted_at
 		FROM funds
 		WHERE org_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at`
@@ -106,11 +108,12 @@ func (r *PostgresFundRepository) UpdateFund(ctx context.Context, f *Fund) (*Fund
 			fund_type            = $3,
 			balance_cents        = $4,
 			target_balance_cents = $5,
-			is_default           = $6,
+			custodian_type       = $6,
+			is_default           = $7,
 			updated_at           = now()
-		WHERE id = $7 AND deleted_at IS NULL
+		WHERE id = $8 AND deleted_at IS NULL
 		RETURNING id, org_id, currency_code, name, fund_type, balance_cents, target_balance_cents,
-		          is_default, created_at, updated_at, deleted_at`
+		          custodian_type, is_default, created_at, updated_at, deleted_at`
 
 	row := r.db.QueryRow(ctx, q,
 		f.CurrencyCode,
@@ -118,6 +121,7 @@ func (r *PostgresFundRepository) UpdateFund(ctx context.Context, f *Fund) (*Fund
 		f.FundType,
 		f.BalanceCents,
 		f.TargetBalanceCents,
+		f.CustodianType,
 		f.IsDefault,
 		f.ID,
 	)
@@ -283,6 +287,7 @@ func scanFund(row pgx.Row) (*Fund, error) {
 		&f.FundType,
 		&f.BalanceCents,
 		&f.TargetBalanceCents,
+		&f.CustodianType,
 		&f.IsDefault,
 		&f.CreatedAt,
 		&f.UpdatedAt,
@@ -307,6 +312,7 @@ func collectFunds(rows pgx.Rows, op string) ([]Fund, error) {
 			&f.FundType,
 			&f.BalanceCents,
 			&f.TargetBalanceCents,
+			&f.CustodianType,
 			&f.IsDefault,
 			&f.CreatedAt,
 			&f.UpdatedAt,

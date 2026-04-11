@@ -312,6 +312,23 @@ func (s AmountStrategy) IsValid() bool {
 	return false
 }
 
+// CustodianType identifies who holds custody of a fund's assets.
+type CustodianType string
+
+const (
+	CustodianAssociationHeld       CustodianType = "association_held"
+	CustodianManagementCompanyHeld CustodianType = "management_company_held"
+)
+
+// IsValid returns true if the CustodianType value is one of the defined constants.
+func (s CustodianType) IsValid() bool {
+	switch s {
+	case CustodianAssociationHeld, CustodianManagementCompanyHeld:
+		return true
+	}
+	return false
+}
+
 // BudgetCategoryType classifies a budget category.
 type BudgetCategoryType string
 
