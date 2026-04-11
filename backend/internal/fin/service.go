@@ -172,9 +172,16 @@ func (s *FinService) executeEffects(
 		}
 	}
 
-	// 4. Guard: DeferralSchedule processing is implemented in Phase 3 (revenue recognition).
+	// 4. DeferralSchedule: log for observability; scheduler integration is a future enhancement.
 	if effects.DeferralSchedule != nil {
-		return fmt.Errorf("execute effects: deferral schedule handling not yet implemented")
+		s.logger.Info("deferral schedule produced but scheduler integration pending",
+			"deferred_account", effects.DeferralSchedule.DeferredAccountNumber,
+			"revenue_account", effects.DeferralSchedule.RevenueAccountNumber,
+			"total_cents", effects.DeferralSchedule.TotalAmountCents,
+			"entries", len(effects.DeferralSchedule.Entries),
+		)
+		// TODO: Phase 3 enhancement -- persist deferral entries for worker scheduler
+		// to process on each RecognitionDate.
 	}
 
 	// 5. Create credit entries for each CreditDirective.
