@@ -314,3 +314,254 @@ func TestGaapEngine_RecordTransaction_Assessment_SplitFund(t *testing.T) {
 	require.Len(t, effects.LedgerEntries, 1)
 	assert.Equal(t, int64(25000), effects.LedgerEntries[0].AmountCents)
 }
+
+// ── Payment tests ────────────────────────────────────────────────────
+
+func TestGaapEngine_RecordTransaction_Payment_Accrual(t *testing.T) {
+	engine, resolver := newTestGaapEngineWithResolver(RecognitionBasisAccrual)
+	unitID := uuid.New()
+	fundID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypePayment, OrgID: uuid.New(), AmountCents: 15000,
+		EffectiveDate: time.Date(2026, 4, 5, 0, 0, 0, 0, time.UTC),
+		SourceID: uuid.New(), UnitID: &unitID,
+		FundAllocations: []FundAllocation{{FundID: fundID, AmountCents: 15000}},
+		Memo:            "Monthly payment",
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// GL: DR 1010 (Cash-Operating) / CR 1100 (AR).
+	require.Len(t, effects.JournalLines, 2)
+	assert.Equal(t, resolver.accounts[1010].ID, effects.JournalLines[0].AccountID)
+	assert.Equal(t, int64(15000), effects.JournalLines[0].DebitCents)
+	assert.Equal(t, int64(0), effects.JournalLines[0].CreditCents)
+	assert.Equal(t, resolver.accounts[1100].ID, effects.JournalLines[1].AccountID)
+	assert.Equal(t, int64(0), effects.JournalLines[1].DebitCents)
+	assert.Equal(t, int64(15000), effects.JournalLines[1].CreditCents)
+
+	// Fund: payment directive.
+	require.Len(t, effects.FundTransactions, 1)
+	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
+	assert.Equal(t, "payment", effects.FundTransactions[0].Type)
+	assert.Equal(t, int64(15000), effects.FundTransactions[0].AmountCents)
+
+	// Ledger: payment entry on unit.
+	require.Len(t, effects.LedgerEntries, 1)
+	assert.Equal(t, unitID, effects.LedgerEntries[0].UnitID)
+	assert.Equal(t, LedgerEntryTypePayment, effects.LedgerEntries[0].Type)
+	assert.Equal(t, int64(15000), effects.LedgerEntries[0].AmountCents)
+	assert.Equal(t, tx.SourceID, effects.LedgerEntries[0].SourceID)
+}
+
+func TestGaapEngine_RecordTransaction_Payment_CashBasis(t *testing.T) {
+	engine, resolver := newTestGaapEngineWithResolver(RecognitionBasisCash)
+	unitID := uuid.New()
+	fundID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypePayment, OrgID: uuid.New(), AmountCents: 15000,
+		EffectiveDate: time.Date(2026, 4, 5, 0, 0, 0, 0, time.UTC),
+		SourceID: uuid.New(), UnitID: &unitID,
+		FundAllocations: []FundAllocation{{FundID: fundID, AmountCents: 15000}},
+		Memo:            "Monthly payment",
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// Cash basis: DR Cash / CR Revenue (revenue recognized at receipt, not AR).
+	require.Len(t, effects.JournalLines, 2)
+	assert.Equal(t, resolver.accounts[1010].ID, effects.JournalLines[0].AccountID)
+	assert.Equal(t, int64(15000), effects.JournalLines[0].DebitCents)
+	assert.Equal(t, resolver.accounts[4010].ID, effects.JournalLines[1].AccountID)
+	assert.Equal(t, int64(15000), effects.JournalLines[1].CreditCents)
+
+	// Fund: revenue directive (not payment — revenue recognized at receipt).
+	require.Len(t, effects.FundTransactions, 1)
+	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
+	assert.Equal(t, "revenue", effects.FundTransactions[0].Type)
+	assert.Equal(t, int64(15000), effects.FundTransactions[0].AmountCents)
+
+	// Ledger: payment entry on unit.
+	require.Len(t, effects.LedgerEntries, 1)
+	assert.Equal(t, LedgerEntryTypePayment, effects.LedgerEntries[0].Type)
+	assert.Equal(t, int64(15000), effects.LedgerEntries[0].AmountCents)
+}
+
+// ── Fund Transfer tests ──────────────────────────────────────────────
+
+func TestGaapEngine_RecordTransaction_FundTransfer(t *testing.T) {
+	engine, resolver := newTestGaapEngineWithResolver(RecognitionBasisAccrual)
+	srcFundID := uuid.New()
+	dstFundID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypeFundTransfer, OrgID: uuid.New(), AmountCents: 50000,
+		EffectiveDate: time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC),
+		SourceID:      uuid.New(),
+		FundAllocations: []FundAllocation{
+			{FundID: srcFundID, AmountCents: 50000},
+			{FundID: dstFundID, AmountCents: 50000},
+		},
+		Memo: "Transfer to reserve",
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// GL: 4 lines — DR 3100 (Interfund Out), CR 1010 (source cash),
+	//               DR 1020 (dest cash), CR 3110 (Interfund In).
+	require.Len(t, effects.JournalLines, 4)
+	assert.Equal(t, resolver.accounts[3100].ID, effects.JournalLines[0].AccountID)
+	assert.Equal(t, int64(50000), effects.JournalLines[0].DebitCents)
+	assert.Equal(t, resolver.accounts[1010].ID, effects.JournalLines[1].AccountID)
+	assert.Equal(t, int64(50000), effects.JournalLines[1].CreditCents)
+	assert.Equal(t, resolver.accounts[1020].ID, effects.JournalLines[2].AccountID)
+	assert.Equal(t, int64(50000), effects.JournalLines[2].DebitCents)
+	assert.Equal(t, resolver.accounts[3110].ID, effects.JournalLines[3].AccountID)
+	assert.Equal(t, int64(50000), effects.JournalLines[3].CreditCents)
+
+	// Fund: 2 directives — withdrawal from source, deposit to dest.
+	require.Len(t, effects.FundTransactions, 2)
+	assert.Equal(t, srcFundID, effects.FundTransactions[0].FundID)
+	assert.Equal(t, FundTxTypeTransferOut, effects.FundTransactions[0].Type)
+	assert.Equal(t, int64(50000), effects.FundTransactions[0].AmountCents)
+	assert.Equal(t, dstFundID, effects.FundTransactions[1].FundID)
+	assert.Equal(t, FundTxTypeTransferIn, effects.FundTransactions[1].Type)
+	assert.Equal(t, int64(50000), effects.FundTransactions[1].AmountCents)
+
+	// Ledger: none — fund transfers don't affect unit balances.
+	assert.Empty(t, effects.LedgerEntries)
+}
+
+// ── Late Fee tests ───────────────────────────────────────────────────
+
+func TestGaapEngine_RecordTransaction_LateFee(t *testing.T) {
+	engine, resolver := newTestGaapEngineWithResolver(RecognitionBasisAccrual)
+	unitID := uuid.New()
+	fundID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypeLateFee, OrgID: uuid.New(), AmountCents: 2500,
+		EffectiveDate: time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC),
+		SourceID: uuid.New(), UnitID: &unitID,
+		FundAllocations: []FundAllocation{{FundID: fundID, AmountCents: 2500}},
+		Memo:            "Late fee",
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// GL: DR 1100 (AR) / CR 4100 (Late Fee Revenue).
+	require.Len(t, effects.JournalLines, 2)
+	assert.Equal(t, resolver.accounts[1100].ID, effects.JournalLines[0].AccountID)
+	assert.Equal(t, int64(2500), effects.JournalLines[0].DebitCents)
+	assert.Equal(t, int64(0), effects.JournalLines[0].CreditCents)
+	assert.Equal(t, resolver.accounts[4100].ID, effects.JournalLines[1].AccountID)
+	assert.Equal(t, int64(0), effects.JournalLines[1].DebitCents)
+	assert.Equal(t, int64(2500), effects.JournalLines[1].CreditCents)
+
+	// Fund: late_fee directive.
+	require.Len(t, effects.FundTransactions, 1)
+	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
+	assert.Equal(t, "late_fee", effects.FundTransactions[0].Type)
+	assert.Equal(t, int64(2500), effects.FundTransactions[0].AmountCents)
+
+	// Ledger: late fee entry on unit.
+	require.Len(t, effects.LedgerEntries, 1)
+	assert.Equal(t, unitID, effects.LedgerEntries[0].UnitID)
+	assert.Equal(t, LedgerEntryTypeLateFee, effects.LedgerEntries[0].Type)
+	assert.Equal(t, int64(2500), effects.LedgerEntries[0].AmountCents)
+	assert.Equal(t, tx.SourceID, effects.LedgerEntries[0].SourceID)
+}
+
+func TestGaapEngine_RecordTransaction_LateFee_CashBasis(t *testing.T) {
+	engine, _ := newTestGaapEngineWithResolver(RecognitionBasisCash)
+	unitID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypeLateFee, OrgID: uuid.New(), AmountCents: 2500,
+		EffectiveDate: time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC),
+		SourceID: uuid.New(), UnitID: &unitID,
+		FundAllocations: []FundAllocation{{FundID: uuid.New(), AmountCents: 2500}},
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+
+	// Cash basis: no GL, no fund transactions. Ledger only.
+	assert.Empty(t, effects.JournalLines)
+	assert.Empty(t, effects.FundTransactions)
+	require.Len(t, effects.LedgerEntries, 1)
+	assert.Equal(t, LedgerEntryTypeLateFee, effects.LedgerEntries[0].Type)
+}
+
+// ── Interest Accrual tests ───────────────────────────────────────────
+
+func TestGaapEngine_RecordTransaction_InterestAccrual(t *testing.T) {
+	engine, resolver := newTestGaapEngineWithResolver(RecognitionBasisAccrual)
+	unitID := uuid.New()
+	fundID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypeInterestAccrual, OrgID: uuid.New(), AmountCents: 1200,
+		EffectiveDate: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC),
+		SourceID: uuid.New(), UnitID: &unitID,
+		FundAllocations: []FundAllocation{{FundID: fundID, AmountCents: 1200}},
+		Memo:            "Interest accrual",
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// GL: DR 1100 (AR) / CR 4200 (Interest Income).
+	require.Len(t, effects.JournalLines, 2)
+	assert.Equal(t, resolver.accounts[1100].ID, effects.JournalLines[0].AccountID)
+	assert.Equal(t, int64(1200), effects.JournalLines[0].DebitCents)
+	assert.Equal(t, int64(0), effects.JournalLines[0].CreditCents)
+	assert.Equal(t, resolver.accounts[4200].ID, effects.JournalLines[1].AccountID)
+	assert.Equal(t, int64(0), effects.JournalLines[1].DebitCents)
+	assert.Equal(t, int64(1200), effects.JournalLines[1].CreditCents)
+
+	// Fund: interest directive.
+	require.Len(t, effects.FundTransactions, 1)
+	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
+	assert.Equal(t, "interest", effects.FundTransactions[0].Type)
+	assert.Equal(t, int64(1200), effects.FundTransactions[0].AmountCents)
+
+	// Ledger: charge entry on unit.
+	require.Len(t, effects.LedgerEntries, 1)
+	assert.Equal(t, unitID, effects.LedgerEntries[0].UnitID)
+	assert.Equal(t, LedgerEntryTypeCharge, effects.LedgerEntries[0].Type)
+	assert.Equal(t, int64(1200), effects.LedgerEntries[0].AmountCents)
+	assert.Equal(t, tx.SourceID, effects.LedgerEntries[0].SourceID)
+}
+
+func TestGaapEngine_RecordTransaction_InterestAccrual_CashBasis(t *testing.T) {
+	engine, _ := newTestGaapEngineWithResolver(RecognitionBasisCash)
+	unitID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypeInterestAccrual, OrgID: uuid.New(), AmountCents: 1200,
+		EffectiveDate: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC),
+		SourceID: uuid.New(), UnitID: &unitID,
+		FundAllocations: []FundAllocation{{FundID: uuid.New(), AmountCents: 1200}},
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+
+	// Cash basis: no GL, no fund transactions. Ledger only.
+	assert.Empty(t, effects.JournalLines)
+	assert.Empty(t, effects.FundTransactions)
+	require.Len(t, effects.LedgerEntries, 1)
+	assert.Equal(t, LedgerEntryTypeCharge, effects.LedgerEntries[0].Type)
+}

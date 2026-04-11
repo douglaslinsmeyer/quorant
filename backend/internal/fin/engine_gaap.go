@@ -42,6 +42,14 @@ func (e *GaapEngine) RecordTransaction(ctx context.Context, tx FinancialTransact
 	switch tx.Type {
 	case TxTypeAssessment:
 		return e.assessmentEffects(ctx, tx)
+	case TxTypePayment:
+		return e.paymentEffects(ctx, tx)
+	case TxTypeFundTransfer:
+		return e.fundTransferEffects(ctx, tx)
+	case TxTypeLateFee:
+		return e.lateFeeEffects(ctx, tx)
+	case TxTypeInterestAccrual:
+		return e.interestAccrualEffects(ctx, tx)
 	default:
 		return nil, fmt.Errorf("record transaction: unsupported type %q", tx.Type)
 	}
@@ -55,6 +63,16 @@ func revenueAccountForFundIndex(idx int) int {
 		return num
 	}
 	return 4010
+}
+
+// fundIndexToCashAccount maps fund allocation index to cash account number.
+var fundIndexToCashAccount = map[int]int{0: 1010, 1: 1020, 2: 1030, 3: 1040}
+
+func cashAccountForFundIndex(idx int) int {
+	if num, ok := fundIndexToCashAccount[idx]; ok {
+		return num
+	}
+	return 1010
 }
 
 func (e *GaapEngine) assessmentEffects(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error) {
@@ -110,6 +128,277 @@ func (e *GaapEngine) assessmentEffects(ctx context.Context, tx FinancialTransact
 				AmountCents: alloc.AmountCents, Description: tx.Memo,
 			})
 		}
+	}
+
+	return effects, nil
+}
+
+func (e *GaapEngine) paymentEffects(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error) {
+	effects := &FinancialEffects{}
+
+	// Ledger entry always created regardless of basis.
+	if tx.UnitID != nil {
+		desc := tx.Memo
+		if desc == "" {
+			desc = "Payment received"
+		}
+		effects.LedgerEntries = append(effects.LedgerEntries, LedgerEntryDirective{
+			UnitID: *tx.UnitID, Type: LedgerEntryTypePayment,
+			AmountCents: tx.AmountCents, Description: desc, SourceID: tx.SourceID,
+		})
+	}
+
+	if e.config.RecognitionBasis == RecognitionBasisCash {
+		// Cash basis: DR Cash, CR Revenue per fund (revenue recognized at receipt).
+		if len(tx.FundAllocations) == 0 {
+			// No fund allocations: default to operating cash (1010) and revenue (4010).
+			cashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 1010)
+			if err != nil {
+				return nil, fmt.Errorf("payment: resolve cash account 1010: %w", err)
+			}
+			revenueAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 4010)
+			if err != nil {
+				return nil, fmt.Errorf("payment: resolve revenue account 4010: %w", err)
+			}
+			effects.JournalLines = append(effects.JournalLines,
+				GLJournalLine{AccountID: cashAccount.ID, DebitCents: tx.AmountCents},
+				GLJournalLine{AccountID: revenueAccount.ID, CreditCents: tx.AmountCents},
+			)
+		} else {
+			for i, alloc := range tx.FundAllocations {
+				cashNum := cashAccountForFundIndex(i)
+				cashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, cashNum)
+				if err != nil {
+					return nil, fmt.Errorf("payment: resolve cash account %d: %w", cashNum, err)
+				}
+				effects.JournalLines = append(effects.JournalLines, GLJournalLine{
+					AccountID: cashAccount.ID, DebitCents: alloc.AmountCents,
+				})
+
+				revenueNum := revenueAccountForFundIndex(i)
+				revenueAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, revenueNum)
+				if err != nil {
+					return nil, fmt.Errorf("payment: resolve revenue account %d: %w", revenueNum, err)
+				}
+				effects.JournalLines = append(effects.JournalLines, GLJournalLine{
+					AccountID: revenueAccount.ID, CreditCents: alloc.AmountCents,
+				})
+
+				effects.FundTransactions = append(effects.FundTransactions, FundTransactionDirective{
+					FundID: alloc.FundID, Type: "revenue",
+					AmountCents: alloc.AmountCents, Description: tx.Memo,
+				})
+			}
+		}
+		return effects, nil
+	}
+
+	// Accrual: DR Cash (fund-dependent), CR AR.
+	arAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 1100)
+	if err != nil {
+		return nil, fmt.Errorf("payment: resolve AR account 1100: %w", err)
+	}
+
+	if len(tx.FundAllocations) == 0 {
+		// No fund allocations: default to operating cash (1010) for full amount.
+		cashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 1010)
+		if err != nil {
+			return nil, fmt.Errorf("payment: resolve cash account 1010: %w", err)
+		}
+		effects.JournalLines = append(effects.JournalLines,
+			GLJournalLine{AccountID: cashAccount.ID, DebitCents: tx.AmountCents},
+			GLJournalLine{AccountID: arAccount.ID, CreditCents: tx.AmountCents},
+		)
+	} else {
+		for i, alloc := range tx.FundAllocations {
+			cashNum := cashAccountForFundIndex(i)
+			cashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, cashNum)
+			if err != nil {
+				return nil, fmt.Errorf("payment: resolve cash account %d: %w", cashNum, err)
+			}
+			effects.JournalLines = append(effects.JournalLines, GLJournalLine{
+				AccountID: cashAccount.ID, DebitCents: alloc.AmountCents,
+			})
+
+			effects.FundTransactions = append(effects.FundTransactions, FundTransactionDirective{
+				FundID: alloc.FundID, Type: "payment",
+				AmountCents: alloc.AmountCents, Description: tx.Memo,
+			})
+		}
+
+		effects.JournalLines = append(effects.JournalLines, GLJournalLine{
+			AccountID: arAccount.ID, CreditCents: tx.AmountCents,
+		})
+	}
+
+	return effects, nil
+}
+
+// fundTypeToCashAccount maps fund type strings to their cash account numbers.
+var fundTypeToCashAccount = map[string]int{
+	"operating": 1010,
+	"reserve":   1020,
+	"capital":   1030,
+	"special":   1040,
+}
+
+func cashAccountForFundType(fundType string) int {
+	if num, ok := fundTypeToCashAccount[fundType]; ok {
+		return num
+	}
+	return 1010
+}
+
+func (e *GaapEngine) fundTransferEffects(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error) {
+	effects := &FinancialEffects{}
+
+	// Resolve source and destination cash accounts.
+	// When FundAllocations are provided, use index-based mapping.
+	// Otherwise, fall back to Metadata fund type strings set by the service layer.
+	var srcCashNum, dstCashNum int
+	if len(tx.FundAllocations) >= 2 {
+		srcCashNum = cashAccountForFundIndex(0)
+		dstCashNum = cashAccountForFundIndex(1)
+	} else {
+		srcType, _ := tx.Metadata["from_fund_type"].(string)
+		dstType, _ := tx.Metadata["to_fund_type"].(string)
+		srcCashNum = cashAccountForFundType(srcType)
+		dstCashNum = cashAccountForFundType(dstType)
+	}
+
+	transferOutAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 3100)
+	if err != nil {
+		return nil, fmt.Errorf("fund_transfer: resolve interfund transfer out account 3100: %w", err)
+	}
+	srcCashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, srcCashNum)
+	if err != nil {
+		return nil, fmt.Errorf("fund_transfer: resolve source cash account %d: %w", srcCashNum, err)
+	}
+	dstCashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, dstCashNum)
+	if err != nil {
+		return nil, fmt.Errorf("fund_transfer: resolve dest cash account %d: %w", dstCashNum, err)
+	}
+	transferInAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 3110)
+	if err != nil {
+		return nil, fmt.Errorf("fund_transfer: resolve interfund transfer in account 3110: %w", err)
+	}
+
+	// GL: DR 3100 (Interfund Out), CR source Cash, DR dest Cash, CR 3110 (Interfund In).
+	effects.JournalLines = append(effects.JournalLines,
+		GLJournalLine{AccountID: transferOutAccount.ID, DebitCents: tx.AmountCents},
+		GLJournalLine{AccountID: srcCashAccount.ID, CreditCents: tx.AmountCents},
+		GLJournalLine{AccountID: dstCashAccount.ID, DebitCents: tx.AmountCents},
+		GLJournalLine{AccountID: transferInAccount.ID, CreditCents: tx.AmountCents},
+	)
+
+	// Fund directives: only when fund allocations are provided (engine-level tests).
+	// The service layer handles fund transactions independently.
+	if len(tx.FundAllocations) >= 2 {
+		effects.FundTransactions = append(effects.FundTransactions,
+			FundTransactionDirective{
+				FundID: tx.FundAllocations[0].FundID, Type: FundTxTypeTransferOut,
+				AmountCents: tx.AmountCents, Description: tx.Memo,
+			},
+			FundTransactionDirective{
+				FundID: tx.FundAllocations[1].FundID, Type: FundTxTypeTransferIn,
+				AmountCents: tx.AmountCents, Description: tx.Memo,
+			},
+		)
+	}
+
+	// No ledger entries — fund transfers don't affect unit balances.
+	return effects, nil
+}
+
+func (e *GaapEngine) lateFeeEffects(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error) {
+	effects := &FinancialEffects{}
+
+	// Ledger entry always created regardless of basis.
+	if tx.UnitID != nil {
+		desc := tx.Memo
+		if desc == "" {
+			desc = "Late fee"
+		}
+		effects.LedgerEntries = append(effects.LedgerEntries, LedgerEntryDirective{
+			UnitID: *tx.UnitID, Type: LedgerEntryTypeLateFee,
+			AmountCents: tx.AmountCents, Description: desc, SourceID: tx.SourceID,
+		})
+	}
+
+	// Cash basis: ledger only, no GL.
+	if e.config.RecognitionBasis == RecognitionBasisCash {
+		return effects, nil
+	}
+
+	// Accrual: DR AR, CR Late Fee Revenue per fund.
+	arAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 1100)
+	if err != nil {
+		return nil, fmt.Errorf("late_fee: resolve AR account 1100: %w", err)
+	}
+	effects.JournalLines = append(effects.JournalLines, GLJournalLine{
+		AccountID: arAccount.ID, DebitCents: tx.AmountCents,
+	})
+
+	lateFeeAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 4100)
+	if err != nil {
+		return nil, fmt.Errorf("late_fee: resolve late fee revenue account 4100: %w", err)
+	}
+	effects.JournalLines = append(effects.JournalLines, GLJournalLine{
+		AccountID: lateFeeAccount.ID, CreditCents: tx.AmountCents,
+	})
+
+	for _, alloc := range tx.FundAllocations {
+		effects.FundTransactions = append(effects.FundTransactions, FundTransactionDirective{
+			FundID: alloc.FundID, Type: "late_fee",
+			AmountCents: alloc.AmountCents, Description: tx.Memo,
+		})
+	}
+
+	return effects, nil
+}
+
+func (e *GaapEngine) interestAccrualEffects(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error) {
+	effects := &FinancialEffects{}
+
+	// Ledger entry always created regardless of basis.
+	if tx.UnitID != nil {
+		desc := tx.Memo
+		if desc == "" {
+			desc = "Interest accrual"
+		}
+		effects.LedgerEntries = append(effects.LedgerEntries, LedgerEntryDirective{
+			UnitID: *tx.UnitID, Type: LedgerEntryTypeCharge,
+			AmountCents: tx.AmountCents, Description: desc, SourceID: tx.SourceID,
+		})
+	}
+
+	// Cash basis: ledger only, no GL.
+	if e.config.RecognitionBasis == RecognitionBasisCash {
+		return effects, nil
+	}
+
+	// Accrual: DR AR, CR Interest Income per fund.
+	arAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 1100)
+	if err != nil {
+		return nil, fmt.Errorf("interest_accrual: resolve AR account 1100: %w", err)
+	}
+	effects.JournalLines = append(effects.JournalLines, GLJournalLine{
+		AccountID: arAccount.ID, DebitCents: tx.AmountCents,
+	})
+
+	interestAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 4200)
+	if err != nil {
+		return nil, fmt.Errorf("interest_accrual: resolve interest income account 4200: %w", err)
+	}
+	effects.JournalLines = append(effects.JournalLines, GLJournalLine{
+		AccountID: interestAccount.ID, CreditCents: tx.AmountCents,
+	})
+
+	for _, alloc := range tx.FundAllocations {
+		effects.FundTransactions = append(effects.FundTransactions, FundTransactionDirective{
+			FundID: alloc.FundID, Type: "interest",
+			AmountCents: alloc.AmountCents, Description: tx.Memo,
+		})
 	}
 
 	return effects, nil
