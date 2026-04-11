@@ -2142,10 +2142,10 @@ func TestVoidAssessment(t *testing.T) {
 	assert.Equal(t, voidedBy, *voided.VoidedBy)
 	require.NotNil(t, voided.VoidedAt)
 
-	// Verify ledger has 2 entries: original charge + reversal.
+	// Verify ledger has 2 entries: original charge + engine adjustment reversal.
 	require.Len(t, assessmentRepo.ledger, 2)
 	reversal := assessmentRepo.ledger[1]
-	assert.Equal(t, fin.LedgerEntryTypeReversal, reversal.EntryType)
+	assert.Equal(t, fin.LedgerEntryTypeAdjustment, reversal.EntryType)
 	assert.Equal(t, int64(-15000), reversal.AmountCents)
 	assert.Equal(t, int64(0), reversal.BalanceCents)
 }
@@ -2270,10 +2270,10 @@ func TestVoidPayment(t *testing.T) {
 	assert.Equal(t, voidedBy, *voided.VoidedBy)
 	require.NotNil(t, voided.VoidedAt)
 
-	// Verify ledger has 3 entries: charge, payment, reversal of payment.
+	// Verify ledger has 3 entries: charge, payment, engine adjustment reversal.
 	require.Len(t, assessmentRepo.ledger, 3)
 	reversal := assessmentRepo.ledger[2]
-	assert.Equal(t, fin.LedgerEntryTypeReversal, reversal.EntryType)
+	assert.Equal(t, fin.LedgerEntryTypeAdjustment, reversal.EntryType)
 	assert.Equal(t, int64(15000), reversal.AmountCents) // positive: reverses negative payment
 	assert.Equal(t, int64(15000), reversal.BalanceCents) // back to charge balance
 }

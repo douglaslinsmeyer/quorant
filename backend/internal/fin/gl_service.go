@@ -149,6 +149,7 @@ func (s *GLService) PostSystemJournalEntry(
 	sourceID *uuid.UUID,
 	unitID *uuid.UUID,
 	lines []GLJournalLine,
+	isReversal ...bool,
 ) (*GLJournalEntry, error) {
 	if len(lines) < 2 {
 		return nil, fmt.Errorf("gl: journal entry requires at least 2 lines")
@@ -172,6 +173,9 @@ func (s *GLService) PostSystemJournalEntry(
 		UnitID:     unitID,
 		PostedBy:   postedBy,
 		Lines:      lines,
+	}
+	if len(isReversal) > 0 && isReversal[0] {
+		entry.IsReversal = true
 	}
 	return s.gl.PostJournalEntry(ctx, entry)
 }

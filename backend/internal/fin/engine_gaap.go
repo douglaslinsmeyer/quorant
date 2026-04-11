@@ -3,7 +3,6 @@ package fin
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/quorant/quorant/internal/platform/policy"
 )
@@ -55,6 +54,16 @@ func (e *GaapEngine) RecordTransaction(ctx context.Context, tx FinancialTransact
 		return e.lateFeeEffects(ctx, tx)
 	case TxTypeInterestAccrual:
 		return e.interestAccrualEffects(ctx, tx)
+	case TxTypeBadDebtProvision:
+		return e.badDebtProvisionEffects(ctx, tx)
+	case TxTypeBadDebtWriteOff:
+		return e.badDebtWriteOffEffects(ctx, tx)
+	case TxTypeBadDebtRecovery:
+		return e.badDebtRecoveryEffects(ctx, tx)
+	case TxTypeYearEndClose:
+		return e.yearEndCloseEffects(ctx, tx)
+	case TxTypeVoidReversal:
+		return e.voidReversalEffects(ctx, tx)
 	default:
 		return nil, fmt.Errorf("record transaction: unsupported type %q", tx.Type)
 	}
@@ -579,7 +588,7 @@ func (e *GaapEngine) ValidateTransaction(_ context.Context, tx FinancialTransact
 	if e.config.RecognitionBasis == RecognitionBasisModifiedAccrual {
 		return fmt.Errorf("validate transaction: modified_accrual basis not yet implemented (Phase 1 supports cash and accrual)")
 	}
-	if tx.Type != TxTypeAdjustingEntry && tx.AmountCents <= 0 {
+	if tx.Type != TxTypeAdjustingEntry && tx.Type != TxTypeYearEndClose && tx.Type != TxTypeVoidReversal && tx.AmountCents <= 0 {
 		return fmt.Errorf("validate: amount_cents must be positive, got %d", tx.AmountCents)
 	}
 	switch tx.Type {
@@ -601,12 +610,7 @@ func (e *GaapEngine) ValidateTransaction(_ context.Context, tx FinancialTransact
 
 // PaymentTerms is implemented in engine_terms.go.
 // PayableRecognitionDate is implemented in engine_terms.go.
-
-// RevenueRecognitionDate determines when revenue should be recognized.
-// Not yet implemented; returns ErrNotImplemented.
-func (e *GaapEngine) RevenueRecognitionDate(_ context.Context, _ FinancialTransaction) (time.Time, error) {
-	return time.Time{}, ErrNotImplemented
-}
+// RevenueRecognitionDate is implemented in engine_revenue.go.
 
 // gaapChartOfAccounts defines the standard GAAP chart of accounts for HOA fund accounting.
 // 5 headers + 51 detail accounts = 56 total.

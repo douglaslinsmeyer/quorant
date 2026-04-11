@@ -14,6 +14,7 @@ type FinancialEffects struct {
 	LedgerEntries    []LedgerEntryDirective
 	Credits          []CreditDirective
 	DeferralSchedule *DeferralSchedule
+	IsReversal       bool
 }
 
 // FundTransactionDirective instructs FinService to create a fund transaction.
