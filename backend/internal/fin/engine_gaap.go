@@ -60,6 +60,8 @@ func (e *GaapEngine) RecordTransaction(ctx context.Context, tx FinancialTransact
 		return e.badDebtWriteOffEffects(ctx, tx)
 	case TxTypeBadDebtRecovery:
 		return e.badDebtRecoveryEffects(ctx, tx)
+	case TxTypeYearEndClose:
+		return e.yearEndCloseEffects(ctx, tx)
 	default:
 		return nil, fmt.Errorf("record transaction: unsupported type %q", tx.Type)
 	}
@@ -584,7 +586,7 @@ func (e *GaapEngine) ValidateTransaction(_ context.Context, tx FinancialTransact
 	if e.config.RecognitionBasis == RecognitionBasisModifiedAccrual {
 		return fmt.Errorf("validate transaction: modified_accrual basis not yet implemented (Phase 1 supports cash and accrual)")
 	}
-	if tx.Type != TxTypeAdjustingEntry && tx.AmountCents <= 0 {
+	if tx.Type != TxTypeAdjustingEntry && tx.Type != TxTypeYearEndClose && tx.Type != TxTypeVoidReversal && tx.AmountCents <= 0 {
 		return fmt.Errorf("validate: amount_cents must be positive, got %d", tx.AmountCents)
 	}
 	switch tx.Type {
