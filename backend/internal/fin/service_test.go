@@ -293,6 +293,16 @@ func (m *mockPaymentRepo) FindPaymentByID(_ context.Context, id uuid.UUID) (*fin
 	return nil, nil
 }
 
+func (m *mockPaymentRepo) FindPaymentByIdempotencyKey(_ context.Context, orgID uuid.UUID, key string) (*fin.Payment, error) {
+	for i := range m.payments {
+		if m.payments[i].OrgID == orgID && m.payments[i].IdempotencyKey != nil && *m.payments[i].IdempotencyKey == key {
+			out := m.payments[i]
+			return &out, nil
+		}
+	}
+	return nil, nil
+}
+
 func (m *mockPaymentRepo) ListPaymentsByOrg(_ context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]fin.Payment, bool, error) {
 	var result []fin.Payment
 	for _, p := range m.payments {
@@ -2487,4 +2497,27 @@ func TestVoidPayment_AlreadyVoid(t *testing.T) {
 	var valErr *api.ValidationError
 	require.ErrorAs(t, err, &valErr)
 	assert.Contains(t, valErr.MsgKey(), "invalid_void_status")
+}
+
+func TestRecordPayment_IdempotencyKey_DeduplicatesPayment(t *testing.T) {
+	svc, _, paymentRepo, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	userID := uuid.New()
+	key := "txn-abc-123"
+
+	req := fin.CreatePaymentRequest{
+		UnitID:         uuid.New(),
+		AmountCents:    10000,
+		IdempotencyKey: &key,
+	}
+
+	first, err := svc.RecordPayment(ctx, orgID, userID, req)
+	require.NoError(t, err)
+
+	second, err := svc.RecordPayment(ctx, orgID, userID, req)
+	require.NoError(t, err)
+
+	assert.Equal(t, first.ID, second.ID, "second call should return the original payment")
+	assert.Len(t, paymentRepo.payments, 1, "only one payment should exist")
 }

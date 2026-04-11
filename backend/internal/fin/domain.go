@@ -98,6 +98,7 @@ type Payment struct {
 	Status          PaymentStatus `json:"status"`
 	ProviderRef     *string       `json:"provider_ref,omitempty"`
 	Description     *string    `json:"description,omitempty"`
+	IdempotencyKey  *string    `json:"idempotency_key,omitempty"`
 	PaidAt          *time.Time `json:"paid_at,omitempty"`
 	VoidedBy        *uuid.UUID `json:"voided_by,omitempty"`
 	VoidedAt        *time.Time `json:"voided_at,omitempty"`

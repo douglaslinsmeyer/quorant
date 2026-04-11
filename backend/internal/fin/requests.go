@@ -82,6 +82,7 @@ type CreatePaymentRequest struct {
 	AmountCents     int64      `json:"amount_cents"`       // required, positive
 	PaymentMethodID *uuid.UUID `json:"payment_method_id,omitempty"`
 	Description     *string    `json:"description,omitempty"`
+	IdempotencyKey  *string    `json:"idempotency_key,omitempty"`
 }
 
 // Validate checks that unit_id is set and amount_cents is positive.

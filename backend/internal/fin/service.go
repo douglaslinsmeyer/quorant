@@ -592,6 +592,17 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 		return nil, err
 	}
 
+	// Idempotency: if the caller supplied a key, check for an existing payment.
+	if req.IdempotencyKey != nil {
+		existing, findErr := s.payments.FindPaymentByIdempotencyKey(ctx, orgID, *req.IdempotencyKey)
+		if findErr != nil {
+			return nil, fmt.Errorf("fin: RecordPayment idempotency lookup: %w", findErr)
+		}
+		if existing != nil {
+			return existing, nil
+		}
+	}
+
 	now := time.Now()
 	p := &Payment{
 		OrgID:           orgID,
@@ -602,6 +613,7 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 		AmountCents:     req.AmountCents,
 		Status:          PaymentStatusCompleted,
 		Description:     req.Description,
+		IdempotencyKey:  req.IdempotencyKey,
 		PaidAt:          &now,
 	}
 
