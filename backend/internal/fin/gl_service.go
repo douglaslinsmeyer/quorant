@@ -281,7 +281,7 @@ func (s *GLService) SeedDefaultAccounts(ctx context.Context, orgID uuid.UUID, op
 			OrgID:         orgID,
 			AccountNumber: seed.Number,
 			Name:          seed.Name,
-			AccountType:   seed.Type,
+			AccountType:   GLAccountType(seed.Type),
 			IsHeader:      seed.IsHeader,
 			IsSystem:      seed.IsSystem,
 			FundID:        fundMap[seed.FundKey],

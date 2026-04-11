@@ -26,6 +26,19 @@ const (
 	TxTypeDepreciation     TransactionType = "depreciation"
 )
 
+// IsValid returns true if the TransactionType value is one of the defined constants.
+func (t TransactionType) IsValid() bool {
+	switch t {
+	case TxTypeAssessment, TxTypePayment, TxTypeFundTransfer, TxTypeInterfundLoan,
+		TxTypeExpense, TxTypeLateFee, TxTypeInterestAccrual, TxTypeBadDebtProvision,
+		TxTypeBadDebtWriteOff, TxTypeBadDebtRecovery, TxTypeYearEndClose,
+		TxTypeVoidReversal, TxTypeAdjustingEntry, TxTypeDepreciation:
+		return true
+	default:
+		return false
+	}
+}
+
 // AccountingStandard identifies which accounting standard an engine implements.
 type AccountingStandard string
 
@@ -33,6 +46,16 @@ const (
 	AccountingStandardGAAP AccountingStandard = "gaap"
 	AccountingStandardIFRS AccountingStandard = "ifrs"
 )
+
+// IsValid returns true if the AccountingStandard value is one of the defined constants.
+func (s AccountingStandard) IsValid() bool {
+	switch s {
+	case AccountingStandardGAAP, AccountingStandardIFRS:
+		return true
+	default:
+		return false
+	}
+}
 
 // RecognitionBasis determines how revenue and expenses are recognized.
 type RecognitionBasis string

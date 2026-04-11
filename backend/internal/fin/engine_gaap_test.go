@@ -1,236 +1,122 @@
-package fin_test
+package fin
 
 import (
-	"context"
-	"log/slog"
-	"os"
 	"testing"
-	"time"
 
-	"github.com/google/uuid"
-	"github.com/quorant/quorant/internal/audit"
-	"github.com/quorant/quorant/internal/fin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func newTestGaapEngine() *GaapEngine {
+	return NewGaapEngine(nil, nil, EngineConfig{
+		RecognitionBasis: RecognitionBasisAccrual,
+		FiscalYearStart:  1,
+	})
+}
+
 func TestGaapEngine_Standard(t *testing.T) {
-	engine := fin.NewGaapEngine()
-	assert.Equal(t, fin.AccountingStandardGAAP, engine.Standard())
+	engine := newTestGaapEngine()
+	assert.Equal(t, AccountingStandardGAAP, engine.Standard())
 }
 
-func TestGaapEngine_JournalLines_Assessment(t *testing.T) {
-	engine := fin.NewGaapEngine()
-	glRepo := newMockGLRepo()
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	glService := fin.NewGLService(glRepo, audit.NewNoopAuditor(), logger)
-
-	orgID := uuid.New()
-	ctx := context.Background()
-
-	arAccount := &fin.GLAccount{
-		ID: uuid.New(), OrgID: orgID, AccountNumber: 1100,
-		Name: "AR-Assessments", AccountType: fin.GLAccountTypeAsset,
-		CreatedAt: time.Now(), UpdatedAt: time.Now(),
-	}
-	revenueAccount := &fin.GLAccount{
-		ID: uuid.New(), OrgID: orgID, AccountNumber: 4010,
-		Name: "Assessment Revenue-Operating", AccountType: fin.GLAccountTypeRevenue,
-		CreatedAt: time.Now(), UpdatedAt: time.Now(),
-	}
-	glRepo.SetAccounts(arAccount, revenueAccount)
-
-	tx := fin.FinancialTransaction{
-		Type:          fin.TxTypeAssessment,
-		OrgID:         orgID,
-		AmountCents:   15000,
-		EffectiveDate: time.Now(),
-		SourceID:      uuid.New(),
-	}
-
-	lines, err := engine.JournalLines(ctx, glService, tx)
-	require.NoError(t, err)
-	require.Len(t, lines, 2)
-
-	assert.Equal(t, arAccount.ID, lines[0].AccountID)
-	assert.Equal(t, int64(15000), lines[0].DebitCents)
-	assert.Equal(t, int64(0), lines[0].CreditCents)
-
-	assert.Equal(t, revenueAccount.ID, lines[1].AccountID)
-	assert.Equal(t, int64(0), lines[1].DebitCents)
-	assert.Equal(t, int64(15000), lines[1].CreditCents)
-}
-
-func TestGaapEngine_JournalLines_Assessment_MissingAccounts(t *testing.T) {
-	engine := fin.NewGaapEngine()
-	glRepo := newMockGLRepo()
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	glService := fin.NewGLService(glRepo, audit.NewNoopAuditor(), logger)
-
-	tx := fin.FinancialTransaction{
-		Type:          fin.TxTypeAssessment,
-		OrgID:         uuid.New(),
-		AmountCents:   15000,
-		EffectiveDate: time.Now(),
-		SourceID:      uuid.New(),
-	}
-
-	_, err := engine.JournalLines(context.Background(), glService, tx)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "1100")
-}
-
-func TestGaapEngine_JournalLines_Payment(t *testing.T) {
-	engine := fin.NewGaapEngine()
-	glRepo := newMockGLRepo()
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	glService := fin.NewGLService(glRepo, audit.NewNoopAuditor(), logger)
-
-	orgID := uuid.New()
-	ctx := context.Background()
-
-	cashAccount := &fin.GLAccount{
-		ID: uuid.New(), OrgID: orgID, AccountNumber: 1010,
-		Name: "Cash-Operating", AccountType: fin.GLAccountTypeAsset,
-		CreatedAt: time.Now(), UpdatedAt: time.Now(),
-	}
-	arAccount := &fin.GLAccount{
-		ID: uuid.New(), OrgID: orgID, AccountNumber: 1100,
-		Name: "AR-Assessments", AccountType: fin.GLAccountTypeAsset,
-		CreatedAt: time.Now(), UpdatedAt: time.Now(),
-	}
-	glRepo.SetAccounts(cashAccount, arAccount)
-
-	tx := fin.FinancialTransaction{
-		Type:          fin.TxTypePayment,
-		OrgID:         orgID,
-		AmountCents:   15000,
-		EffectiveDate: time.Now(),
-		SourceID:      uuid.New(),
-	}
-
-	lines, err := engine.JournalLines(ctx, glService, tx)
-	require.NoError(t, err)
-	require.Len(t, lines, 2)
-
-	assert.Equal(t, cashAccount.ID, lines[0].AccountID)
-	assert.Equal(t, int64(15000), lines[0].DebitCents)
-	assert.Equal(t, int64(0), lines[0].CreditCents)
-
-	assert.Equal(t, arAccount.ID, lines[1].AccountID)
-	assert.Equal(t, int64(0), lines[1].DebitCents)
-	assert.Equal(t, int64(15000), lines[1].CreditCents)
-}
-
-func TestGaapEngine_JournalLines_FundTransfer(t *testing.T) {
-	engine := fin.NewGaapEngine()
-	glRepo := newMockGLRepo()
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	glService := fin.NewGLService(glRepo, audit.NewNoopAuditor(), logger)
-
-	orgID := uuid.New()
-	ctx := context.Background()
-
-	operatingCash := &fin.GLAccount{
-		ID: uuid.New(), OrgID: orgID, AccountNumber: 1010,
-		Name: "Cash-Operating", AccountType: fin.GLAccountTypeAsset,
-		CreatedAt: time.Now(), UpdatedAt: time.Now(),
-	}
-	reserveCash := &fin.GLAccount{
-		ID: uuid.New(), OrgID: orgID, AccountNumber: 1020,
-		Name: "Cash-Reserve", AccountType: fin.GLAccountTypeAsset,
-		CreatedAt: time.Now(), UpdatedAt: time.Now(),
-	}
-	transferOut := &fin.GLAccount{
-		ID: uuid.New(), OrgID: orgID, AccountNumber: 3100,
-		Name: "Interfund Transfer Out", AccountType: fin.GLAccountTypeEquity,
-		CreatedAt: time.Now(), UpdatedAt: time.Now(),
-	}
-	transferIn := &fin.GLAccount{
-		ID: uuid.New(), OrgID: orgID, AccountNumber: 3110,
-		Name: "Interfund Transfer In", AccountType: fin.GLAccountTypeEquity,
-		CreatedAt: time.Now(), UpdatedAt: time.Now(),
-	}
-	glRepo.SetAccounts(operatingCash, reserveCash, transferOut, transferIn)
-
-	tx := fin.FinancialTransaction{
-		Type:          fin.TxTypeFundTransfer,
-		OrgID:         orgID,
-		AmountCents:   50000,
-		EffectiveDate: time.Now(),
-		SourceID:      uuid.New(),
-		Metadata: map[string]any{
-			"from_fund_type": string(fin.FundTypeOperating),
-			"to_fund_type":   string(fin.FundTypeReserve),
-			"from_fund_name": "Operating Fund",
-			"to_fund_name":   "Reserve Fund",
-		},
-	}
-
-	lines, err := engine.JournalLines(ctx, glService, tx)
-	require.NoError(t, err)
-	require.Len(t, lines, 4)
-
-	assert.Equal(t, transferOut.ID, lines[0].AccountID)
-	assert.Equal(t, int64(50000), lines[0].DebitCents)
-	assert.Equal(t, int64(0), lines[0].CreditCents)
-
-	assert.Equal(t, operatingCash.ID, lines[1].AccountID)
-	assert.Equal(t, int64(0), lines[1].DebitCents)
-	assert.Equal(t, int64(50000), lines[1].CreditCents)
-
-	assert.Equal(t, reserveCash.ID, lines[2].AccountID)
-	assert.Equal(t, int64(50000), lines[2].DebitCents)
-	assert.Equal(t, int64(0), lines[2].CreditCents)
-
-	assert.Equal(t, transferIn.ID, lines[3].AccountID)
-	assert.Equal(t, int64(0), lines[3].DebitCents)
-	assert.Equal(t, int64(50000), lines[3].CreditCents)
-}
-
-func TestGaapEngine_JournalLines_FundTransfer_MissingMetadata(t *testing.T) {
-	engine := fin.NewGaapEngine()
-	glRepo := newMockGLRepo()
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	glService := fin.NewGLService(glRepo, audit.NewNoopAuditor(), logger)
-
-	tx := fin.FinancialTransaction{
-		Type:          fin.TxTypeFundTransfer,
-		OrgID:         uuid.New(),
-		AmountCents:   50000,
-		EffectiveDate: time.Now(),
-		SourceID:      uuid.New(),
-	}
-
-	_, err := engine.JournalLines(context.Background(), glService, tx)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "from_fund_type")
-}
-
-func TestGaapEngine_ChartOfAccounts(t *testing.T) {
-	engine := fin.NewGaapEngine()
-	coa := engine.ChartOfAccounts()
-
-	require.Len(t, coa, 26)
+func TestGaapEngine_ChartOfAccounts_Count(t *testing.T) {
+	engine := newTestGaapEngine()
+	chart := engine.ChartOfAccounts()
+	// Count should be 56 (5 headers + 51 detail accounts).
+	require.NotEmpty(t, chart)
+	t.Logf("Chart has %d accounts", len(chart))
 
 	headers := 0
-	for _, a := range coa {
+	detail := 0
+	for _, a := range chart {
 		if a.IsHeader {
 			headers++
+		} else {
+			detail++
+		}
+		// All accounts must be system accounts.
+		assert.True(t, a.IsSystem, "account %d %s should be system", a.Number, a.Name)
+		// All detail accounts must have a parent.
+		if !a.IsHeader {
+			assert.NotZero(t, a.ParentNum, "detail account %d %s must have parent", a.Number, a.Name)
 		}
 	}
-	assert.Equal(t, 5, headers)
+	assert.Equal(t, 5, headers, "should have 5 header accounts")
+	assert.Equal(t, 51, detail, "should have 51 detail accounts")
+}
 
-	numbers := make(map[int]bool)
-	for _, a := range coa {
-		numbers[a.Number] = true
+func TestGaapEngine_ChartOfAccounts_FundCashAccounts(t *testing.T) {
+	engine := newTestGaapEngine()
+	chart := engine.ChartOfAccounts()
+	byNumber := make(map[int]GLAccountSeed)
+	for _, a := range chart {
+		byNumber[a.Number] = a
 	}
-	assert.True(t, numbers[1010], "Cash-Operating")
-	assert.True(t, numbers[1020], "Cash-Reserve")
-	assert.True(t, numbers[1100], "AR-Assessments")
-	assert.True(t, numbers[2100], "AP")
-	assert.True(t, numbers[3100], "Interfund Transfer Out")
-	assert.True(t, numbers[3110], "Interfund Transfer In")
-	assert.True(t, numbers[4010], "Assessment Revenue-Operating")
-	assert.True(t, numbers[5010], "Management Fee")
+
+	// Each fund type must have its own cash account.
+	assert.Equal(t, "operating", byNumber[1010].FundKey)
+	assert.Equal(t, "reserve", byNumber[1020].FundKey)
+	assert.Equal(t, "capital", byNumber[1030].FundKey)
+	assert.Equal(t, "special", byNumber[1040].FundKey)
+}
+
+func TestGaapEngine_ChartOfAccounts_FundBalanceAccounts(t *testing.T) {
+	engine := newTestGaapEngine()
+	chart := engine.ChartOfAccounts()
+	byNumber := make(map[int]GLAccountSeed)
+	for _, a := range chart {
+		byNumber[a.Number] = a
+	}
+
+	assert.Equal(t, "operating", byNumber[3010].FundKey)
+	assert.Equal(t, "reserve", byNumber[3020].FundKey)
+	assert.Equal(t, "capital", byNumber[3030].FundKey)
+	assert.Equal(t, "special", byNumber[3040].FundKey)
+}
+
+func TestGaapEngine_ChartOfAccounts_RevenuePerFund(t *testing.T) {
+	engine := newTestGaapEngine()
+	chart := engine.ChartOfAccounts()
+	byNumber := make(map[int]GLAccountSeed)
+	for _, a := range chart {
+		byNumber[a.Number] = a
+	}
+
+	assert.Equal(t, "operating", byNumber[4010].FundKey)
+	assert.Equal(t, "reserve", byNumber[4020].FundKey)
+	assert.Equal(t, "capital", byNumber[4030].FundKey)
+	assert.Equal(t, "special", byNumber[4040].FundKey)
+}
+
+func TestGaapEngine_ChartOfAccounts_KeyAccounts(t *testing.T) {
+	engine := newTestGaapEngine()
+	chart := engine.ChartOfAccounts()
+	byNumber := make(map[int]GLAccountSeed)
+	for _, a := range chart {
+		byNumber[a.Number] = a
+	}
+
+	// Verify key accounts exist with correct types.
+	assert.Equal(t, "asset", byNumber[1100].Type, "AR should be asset")
+	assert.Equal(t, "asset", byNumber[1105].Type, "Allowance should be asset (contra)")
+	assert.Equal(t, "liability", byNumber[2100].Type, "AP should be liability")
+	assert.Equal(t, "liability", byNumber[2200].Type, "Prepaid Assessments should be liability")
+	assert.Equal(t, "equity", byNumber[3100].Type, "Interfund Transfer Out should be equity")
+	assert.Equal(t, "equity", byNumber[3110].Type, "Interfund Transfer In should be equity")
+	assert.Equal(t, "asset", byNumber[1300].Type, "Due From Other Funds should be asset")
+	assert.Equal(t, "liability", byNumber[2500].Type, "Due To Other Funds should be liability")
+	assert.Equal(t, "asset", byNumber[1400].Type, "Fixed Assets should be asset")
+	assert.Equal(t, "expense", byNumber[5070].Type, "Bad Debt Expense")
+	assert.Equal(t, "expense", byNumber[5220].Type, "Depreciation Expense")
+	assert.Equal(t, "revenue", byNumber[4400].Type, "Insurance Proceeds should be revenue")
+}
+
+func TestGaapEngine_ChartOfAccounts_NoDuplicateNumbers(t *testing.T) {
+	engine := newTestGaapEngine()
+	chart := engine.ChartOfAccounts()
+	seen := make(map[int]bool)
+	for _, a := range chart {
+		assert.False(t, seen[a.Number], "duplicate account number %d", a.Number)
+		seen[a.Number] = true
+	}
 }

@@ -461,7 +461,7 @@ func TestGLService_SeedDefaultAccounts(t *testing.T) {
 	operatingFundID := uuid.New()
 	reserveFundID := uuid.New()
 
-	err := svc.SeedDefaultAccounts(ctx, orgID, operatingFundID, reserveFundID, fin.NewGaapEngine())
+	err := svc.SeedDefaultAccounts(ctx, orgID, operatingFundID, reserveFundID, fin.NewGaapEngine(nil, nil, fin.EngineConfig{}))
 	require.NoError(t, err)
 
 	// Count accounts belonging to this org.
@@ -471,7 +471,7 @@ func TestGLService_SeedDefaultAccounts(t *testing.T) {
 			count++
 		}
 	}
-	assert.Equal(t, 26, count)
+	assert.Equal(t, 56, count)
 
 	// Verify headers are marked correctly.
 	headers := 0

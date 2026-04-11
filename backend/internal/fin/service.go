@@ -250,12 +250,12 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 			UnitID:        &req.UnitID,
 			Memo:          fmt.Sprintf("Assessment: %s", created.Description),
 		}
-		lines, glErr := s.engine.JournalLines(ctx, gl, ftx)
+		effects, glErr := s.engine.RecordTransaction(ctx, ftx)
 		if glErr != nil {
 			return nil, fmt.Errorf("fin: CreateAssessment GL entry: %w", glErr)
 		}
 		sourceType := GLSourceTypeAssessment
-		if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, created.DueDate, ftx.Memo, &sourceType, &created.ID, &req.UnitID, lines); glErr != nil {
+		if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, created.DueDate, ftx.Memo, &sourceType, &created.ID, &req.UnitID, effects.JournalLines); glErr != nil {
 			return nil, fmt.Errorf("fin: CreateAssessment GL entry: %w", glErr)
 		}
 	}
@@ -500,12 +500,12 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 			UnitID:        &req.UnitID,
 			Memo:          memo,
 		}
-		lines, glErr := s.engine.JournalLines(ctx, gl, ftx)
+		effects, glErr := s.engine.RecordTransaction(ctx, ftx)
 		if glErr != nil {
 			return nil, fmt.Errorf("fin: RecordPayment GL entry: %w", glErr)
 		}
 		sourceType := GLSourceTypePayment
-		if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, userID, now, ftx.Memo, &sourceType, &created.ID, &req.UnitID, lines); glErr != nil {
+		if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, userID, now, ftx.Memo, &sourceType, &created.ID, &req.UnitID, effects.JournalLines); glErr != nil {
 			return nil, fmt.Errorf("fin: RecordPayment GL entry: %w", glErr)
 		}
 	}
@@ -994,12 +994,12 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 					"to_fund_name":   toFund.Name,
 				},
 			}
-			lines, glErr := s.engine.JournalLines(ctx, gl, ftx)
+			effects, glErr := s.engine.RecordTransaction(ctx, ftx)
 			if glErr != nil {
 				return nil, fmt.Errorf("fin: CreateFundTransfer GL entry: %w", glErr)
 			}
 			sourceType := GLSourceTypeTransfer
-			if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, now, ftx.Memo, &sourceType, &created.ID, nil, lines); glErr != nil {
+			if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, now, ftx.Memo, &sourceType, &created.ID, nil, effects.JournalLines); glErr != nil {
 				return nil, fmt.Errorf("fin: CreateFundTransfer GL entry: %w", glErr)
 			}
 		}
