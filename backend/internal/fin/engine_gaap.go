@@ -442,12 +442,6 @@ func (e *GaapEngine) ValidateTransaction(_ context.Context, tx FinancialTransact
 	return nil
 }
 
-// PaymentApplicationStrategy determines how a payment should be applied.
-// Not yet implemented; returns ErrNotImplemented.
-func (e *GaapEngine) PaymentApplicationStrategy(_ context.Context, _ PaymentContext) (*ApplicationStrategy, error) {
-	return nil, ErrNotImplemented
-}
-
 // PaymentTerms computes payment terms for a payable.
 // Not yet implemented; returns ErrNotImplemented.
 func (e *GaapEngine) PaymentTerms(_ context.Context, _ PayableContext) (*PaymentTermsResult, error) {
