@@ -1028,8 +1028,9 @@ func (s *FinService) ApproveExpense(ctx context.Context, id uuid.UUID, approvedB
 	return updated, nil
 }
 
-// PayExpense transitions an expense to "paid" status, sets paid_date, and posts
-// GL entries via the accounting engine (accrual: DR AP / CR Cash; cash: DR expense / CR Cash).
+// PayExpense transitions an expense to "paid" status, sets paid_date, posts
+// GL entries via the accounting engine (accrual: DR AP / CR Cash; cash: DR expense / CR Cash),
+// and updates the matching budget line item actuals.
 func (s *FinService) PayExpense(ctx context.Context, id uuid.UUID) (*Expense, error) {
 	e, err := s.GetExpense(ctx, id)
 	if err != nil {
@@ -1042,12 +1043,25 @@ func (s *FinService) PayExpense(ctx context.Context, id uuid.UUID) (*Expense, er
 	e.Status = ExpenseStatusPaid
 	e.PaidDate = &now
 
-	updated, err := s.budgets.UpdateExpense(ctx, e)
+	var uow *db.UnitOfWork
+	budgets := s.budgets
+
+	if s.uowFactory != nil {
+		var txErr error
+		uow, txErr = s.uowFactory.Begin(ctx)
+		if txErr != nil {
+			return nil, fmt.Errorf("fin: PayExpense begin tx: %w", txErr)
+		}
+		defer uow.Rollback(ctx) //nolint:errcheck
+		budgets = s.budgets.WithTx(uow.Tx())
+	}
+
+	updated, err := budgets.UpdateExpense(ctx, e)
 	if err != nil {
 		return nil, err
 	}
 
-	// Post GL entries via accounting engine.
+	// Post GL entries and fund transactions via accounting engine.
 	if s.factory != nil {
 		engine, engineErr := s.factory.ForOrg(ctx, updated.OrgID)
 		if engineErr != nil {
@@ -1064,8 +1078,31 @@ func (s *FinService) PayExpense(ctx context.Context, id uuid.UUID) (*Expense, er
 		if recErr != nil {
 			return nil, fmt.Errorf("fin: PayExpense record: %w", recErr)
 		}
-		if err := s.executeEffects(ctx, nil, updated.OrgID, GLSourceTypeExpense, updated.ID, nil, now, ftx.Memo, effects); err != nil {
+		if err := s.executeEffects(ctx, uow, updated.OrgID, GLSourceTypeExpense, updated.ID, nil, now, ftx.Memo, effects); err != nil {
 			return nil, fmt.Errorf("fin: PayExpense effects: %w", err)
+		}
+	}
+
+	// Update budget line item actuals when the expense is linked to a budget.
+	if updated.BudgetID != nil && updated.CategoryID != nil {
+		lineItems, listErr := budgets.ListLineItemsByBudget(ctx, *updated.BudgetID)
+		if listErr != nil {
+			return nil, fmt.Errorf("fin: PayExpense list line items: %w", listErr)
+		}
+		for _, li := range lineItems {
+			if li.CategoryID == *updated.CategoryID {
+				li.ActualCents += updated.TotalCents
+				if _, updateErr := budgets.UpdateLineItem(ctx, &li); updateErr != nil {
+					return nil, fmt.Errorf("fin: PayExpense update line item actuals: %w", updateErr)
+				}
+				break
+			}
+		}
+	}
+
+	if uow != nil {
+		if err := uow.Commit(ctx); err != nil {
+			return nil, fmt.Errorf("fin: PayExpense commit: %w", err)
 		}
 	}
 
@@ -1091,21 +1128,23 @@ func (s *FinService) buildExpenseTransaction(ctx context.Context, expense *Expen
 		},
 	}
 
-	// Resolve fund allocation from expense FundType.
+	// Resolve fund allocation from expense FundType, defaulting to operating.
+	targetFundType := FundTypeOperating
 	if expense.FundType != nil {
-		funds, err := s.funds.ListFundsByOrg(ctx, expense.OrgID)
-		if err != nil {
-			return FinancialTransaction{}, fmt.Errorf("fin: build expense transaction: list funds: %w", err)
-		}
-		for _, f := range funds {
-			if f.FundType == *expense.FundType {
-				ftx.FundAllocations = []FundAllocation{{
-					FundID:      f.ID,
-					FundKey:     string(f.FundType),
-					AmountCents: expense.TotalCents,
-				}}
-				break
-			}
+		targetFundType = *expense.FundType
+	}
+	funds, err := s.funds.ListFundsByOrg(ctx, expense.OrgID)
+	if err != nil {
+		return FinancialTransaction{}, fmt.Errorf("fin: build expense transaction: list funds: %w", err)
+	}
+	for _, f := range funds {
+		if f.FundType == targetFundType {
+			ftx.FundAllocations = []FundAllocation{{
+				FundID:      f.ID,
+				FundKey:     string(f.FundType),
+				AmountCents: expense.TotalCents,
+			}}
+			break
 		}
 	}
 

@@ -1281,6 +1281,94 @@ func TestPayExpense_PostsGLEffects(t *testing.T) {
 	assert.Equal(t, created.TotalCents, payTx.AmountCents)
 }
 
+// TestPayExpense_DefaultsToOperatingFund verifies that PayExpense creates a fund
+// transaction against the operating fund when the expense has no FundType set.
+func TestPayExpense_DefaultsToOperatingFund(t *testing.T) {
+	svc, _, _, _, fundRepo, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	userID := uuid.New()
+
+	// Create an operating fund so the default allocation can find it.
+	fund, err := fundRepo.CreateFund(ctx, &fin.Fund{
+		OrgID:        orgID,
+		CurrencyCode: "USD",
+		Name:         "Operating Fund",
+		FundType:     fin.FundTypeOperating,
+		BalanceCents: 100000,
+	})
+	require.NoError(t, err)
+
+	// Create and approve an expense WITHOUT FundType.
+	created, err := svc.CreateExpense(ctx, orgID, userID, fin.CreateExpenseRequest{
+		Description: "Landscaping",
+		AmountCents: 50000,
+		ExpenseDate: time.Now(),
+	})
+	require.NoError(t, err)
+
+	_, err = svc.ApproveExpense(ctx, created.ID, userID)
+	require.NoError(t, err)
+	approveCount := len(fundRepo.transactions)
+
+	paid, err := svc.PayExpense(ctx, created.ID)
+	require.NoError(t, err)
+	assert.Equal(t, fin.ExpenseStatusPaid, paid.Status)
+
+	// A fund transaction should have been created against the operating fund.
+	require.Greater(t, len(fundRepo.transactions), approveCount)
+	payTx := fundRepo.transactions[len(fundRepo.transactions)-1]
+	assert.Equal(t, fund.ID, payTx.FundID)
+}
+
+// TestPayExpense_UpdatesBudgetActuals verifies that PayExpense increments the
+// matching budget line item's ActualCents when the expense has BudgetID and CategoryID.
+func TestPayExpense_UpdatesBudgetActuals(t *testing.T) {
+	svc, _, _, budgetRepo, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	userID := uuid.New()
+
+	// Create a budget and a line item.
+	budget, err := budgetRepo.CreateBudget(ctx, &fin.Budget{
+		OrgID:      orgID,
+		Name:       "2026 Operating",
+		FiscalYear: 2026,
+		Status:     fin.BudgetStatusApproved,
+	})
+	require.NoError(t, err)
+
+	categoryID := uuid.New()
+	lineItem, err := budgetRepo.CreateLineItem(ctx, &fin.BudgetLineItem{
+		BudgetID:     budget.ID,
+		CategoryID:   categoryID,
+		PlannedCents: 100000,
+		ActualCents:  0,
+	})
+	require.NoError(t, err)
+
+	// Create an expense linked to the budget and category.
+	created, err := svc.CreateExpense(ctx, orgID, userID, fin.CreateExpenseRequest{
+		Description: "Landscaping",
+		AmountCents: 50000,
+		ExpenseDate: time.Now(),
+		BudgetID:    &budget.ID,
+		CategoryID:  &categoryID,
+	})
+	require.NoError(t, err)
+
+	_, err = svc.ApproveExpense(ctx, created.ID, userID)
+	require.NoError(t, err)
+
+	_, err = svc.PayExpense(ctx, created.ID)
+	require.NoError(t, err)
+
+	// The line item's ActualCents should have been incremented.
+	updated, err := budgetRepo.FindLineItemByID(ctx, lineItem.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(50000), updated.ActualCents)
+}
+
 // TestApproveExpense_WithoutFundType verifies that ApproveExpense works even
 // when the expense has no FundType set (no fund allocation, GL only).
 func TestApproveExpense_WithoutFundType(t *testing.T) {
