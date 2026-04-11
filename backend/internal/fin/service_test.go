@@ -2598,3 +2598,49 @@ func TestCreateAssessment_ComplianceCapsLateFee(t *testing.T) {
 	require.NotNil(t, result.LateFeeCents)
 	assert.Equal(t, int64(2500), *result.LateFeeCents, "late fee should be capped at compliance limit")
 }
+
+// TestCreateFundTransfer_ComplianceBlocksReserveWithdrawal verifies that when a
+// ComplianceResolver returns a min_reserve_balance_cents rule, a fund transfer
+// that would drop the reserve fund below that minimum is rejected.
+func TestCreateFundTransfer_ComplianceBlocksReserveWithdrawal(t *testing.T) {
+	assessments := &mockAssessmentRepo{}
+	payments := &mockPaymentRepo{}
+	budgets := &mockBudgetRepo{}
+	funds := &mockFundRepo{}
+	collections := &mockCollectionRepo{}
+	factory := wildcardTestFactory()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	compliance := &mockComplianceResolver{
+		rules: map[string][]ai.RuleValue{
+			"reserve_study": {
+				{Key: "min_reserve_balance_cents", ValueType: "integer", Value: json.RawMessage(`100000`)},
+			},
+		},
+	}
+
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, factory, ai.NewNoopPolicyResolver(), compliance, nil, logger, nil)
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	// Create a reserve fund with 150000 balance.
+	fromFundID := uuid.New()
+	toFundID := uuid.New()
+	funds.funds = []fin.Fund{
+		{ID: fromFundID, OrgID: orgID, Name: "Reserve", FundType: fin.FundTypeReserve, BalanceCents: 150000},
+		{ID: toFundID, OrgID: orgID, Name: "Operating", FundType: fin.FundTypeOperating, BalanceCents: 50000},
+	}
+
+	// Transfer 60000 from reserve — would leave 90000, below the 100000 minimum.
+	desc := "Emergency transfer"
+	req := fin.CreateFundTransferRequest{
+		FromFundID:  fromFundID,
+		ToFundID:    toFundID,
+		AmountCents: 60000,
+		Description: &desc,
+	}
+
+	_, err := svc.CreateFundTransfer(ctx, orgID, req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "reserve_minimum")
+}

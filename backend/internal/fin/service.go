@@ -1353,6 +1353,29 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 		)
 	}
 
+	// Compliance: enforce reserve fund withdrawal minimums if applicable.
+	if s.compliance != nil && fromFund.FundType == FundTypeReserve {
+		result, compErr := s.compliance.CheckCompliance(ctx, orgID, "reserve_study")
+		if compErr == nil && result != nil {
+			for _, rule := range result.Rules {
+				if rule.Key == "min_reserve_balance_cents" {
+					var minBalance int64
+					if jsonErr := json.Unmarshal(rule.Value, &minBalance); jsonErr == nil && minBalance > 0 {
+						balanceAfter := fromFund.BalanceCents - req.AmountCents
+						if balanceAfter < minBalance {
+							return nil, api.NewValidationError(
+								"fin.fund_transfer.compliance_reserve_minimum", "amount_cents",
+								api.P("min_balance", minBalance),
+								api.P("balance_after", balanceAfter),
+								api.P("rule", "reserve_study"),
+							)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	created, err := funds.CreateTransfer(ctx, t)
 	if err != nil {
 		return nil, err
