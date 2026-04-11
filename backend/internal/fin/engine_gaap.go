@@ -2,6 +2,7 @@ package fin
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/quorant/quorant/internal/platform/policy"
@@ -37,15 +38,103 @@ func (e *GaapEngine) ChartOfAccounts() []GLAccountSeed {
 }
 
 // RecordTransaction records a financial transaction and returns the resulting effects.
-// Not yet implemented; returns ErrNotImplemented.
-func (e *GaapEngine) RecordTransaction(_ context.Context, _ FinancialTransaction) (*FinancialEffects, error) {
-	return nil, ErrNotImplemented
+func (e *GaapEngine) RecordTransaction(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error) {
+	switch tx.Type {
+	case TxTypeAssessment:
+		return e.assessmentEffects(ctx, tx)
+	default:
+		return nil, fmt.Errorf("record transaction: unsupported type %q", tx.Type)
+	}
+}
+
+// fundIndexToRevenueAccount maps fund allocation index to revenue account number.
+var fundIndexToRevenueAccount = map[int]int{0: 4010, 1: 4020, 2: 4030, 3: 4040}
+
+func revenueAccountForFundIndex(idx int) int {
+	if num, ok := fundIndexToRevenueAccount[idx]; ok {
+		return num
+	}
+	return 4010
+}
+
+func (e *GaapEngine) assessmentEffects(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error) {
+	effects := &FinancialEffects{}
+
+	// Ledger entry always created regardless of basis.
+	if tx.UnitID != nil {
+		desc := tx.Memo
+		if desc == "" {
+			desc = "Assessment charge"
+		}
+		effects.LedgerEntries = append(effects.LedgerEntries, LedgerEntryDirective{
+			UnitID: *tx.UnitID, Type: LedgerEntryTypeCharge,
+			AmountCents: tx.AmountCents, Description: desc, SourceID: tx.SourceID,
+		})
+	}
+
+	// Cash basis: no GL, no fund transactions.
+	if e.config.RecognitionBasis == RecognitionBasisCash {
+		return effects, nil
+	}
+
+	// Accrual: DR AR, CR Revenue per fund.
+	arAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 1100)
+	if err != nil {
+		return nil, fmt.Errorf("assessment: resolve AR account 1100: %w", err)
+	}
+	effects.JournalLines = append(effects.JournalLines, GLJournalLine{
+		AccountID: arAccount.ID, DebitCents: tx.AmountCents,
+	})
+
+	if len(tx.FundAllocations) == 0 {
+		// No fund allocations: default to operating revenue (4010) for full amount.
+		revenueAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 4010)
+		if err != nil {
+			return nil, fmt.Errorf("assessment: resolve revenue account 4010: %w", err)
+		}
+		effects.JournalLines = append(effects.JournalLines, GLJournalLine{
+			AccountID: revenueAccount.ID, CreditCents: tx.AmountCents,
+		})
+	} else {
+		for i, alloc := range tx.FundAllocations {
+			revenueNum := revenueAccountForFundIndex(i)
+			revenueAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, revenueNum)
+			if err != nil {
+				return nil, fmt.Errorf("assessment: resolve revenue account %d: %w", revenueNum, err)
+			}
+			effects.JournalLines = append(effects.JournalLines, GLJournalLine{
+				AccountID: revenueAccount.ID, CreditCents: alloc.AmountCents,
+			})
+			effects.FundTransactions = append(effects.FundTransactions, FundTransactionDirective{
+				FundID: alloc.FundID, Type: "assessment",
+				AmountCents: alloc.AmountCents, Description: tx.Memo,
+			})
+		}
+	}
+
+	return effects, nil
 }
 
 // ValidateTransaction validates a financial transaction against GAAP rules.
-// Not yet implemented; returns ErrNotImplemented.
-func (e *GaapEngine) ValidateTransaction(_ context.Context, _ FinancialTransaction) error {
-	return ErrNotImplemented
+func (e *GaapEngine) ValidateTransaction(_ context.Context, tx FinancialTransaction) error {
+	if tx.Type != TxTypeAdjustingEntry && tx.AmountCents <= 0 {
+		return fmt.Errorf("validate: amount_cents must be positive, got %d", tx.AmountCents)
+	}
+	switch tx.Type {
+	case TxTypeAssessment, TxTypeLateFee, TxTypeInterestAccrual:
+		if tx.UnitID == nil {
+			return fmt.Errorf("validate: %s requires unit_id", tx.Type)
+		}
+	case TxTypeFundTransfer, TxTypeInterfundLoan:
+		if len(tx.FundAllocations) < 2 {
+			return fmt.Errorf("validate: %s requires at least 2 fund_allocations (source and destination)", tx.Type)
+		}
+	case TxTypePayment:
+		if tx.UnitID == nil {
+			return fmt.Errorf("validate: payment requires unit_id")
+		}
+	}
+	return nil
 }
 
 // PaymentApplicationStrategy determines how a payment should be applied.

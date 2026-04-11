@@ -1,8 +1,12 @@
 package fin
 
 import (
+	"context"
+	"fmt"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -119,4 +123,194 @@ func TestGaapEngine_ChartOfAccounts_NoDuplicateNumbers(t *testing.T) {
 		assert.False(t, seen[a.Number], "duplicate account number %d", a.Number)
 		seen[a.Number] = true
 	}
+}
+
+func ptr[T any](v T) *T { return &v }
+
+func TestGaapEngine_ValidateTransaction(t *testing.T) {
+	engine := newTestGaapEngine()
+
+	t.Run("valid assessment", func(t *testing.T) {
+		tx := FinancialTransaction{
+			Type: TxTypeAssessment, OrgID: uuid.New(), AmountCents: 10000,
+			EffectiveDate: time.Now(), SourceID: uuid.New(), UnitID: ptr(uuid.New()),
+			FundAllocations: []FundAllocation{{FundID: uuid.New(), AmountCents: 10000}},
+		}
+		assert.NoError(t, engine.ValidateTransaction(context.Background(), tx))
+	})
+
+	t.Run("negative amount rejected", func(t *testing.T) {
+		tx := FinancialTransaction{
+			Type: TxTypeAssessment, OrgID: uuid.New(), AmountCents: -100,
+			SourceID: uuid.New(), UnitID: ptr(uuid.New()),
+		}
+		err := engine.ValidateTransaction(context.Background(), tx)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "positive")
+	})
+
+	t.Run("assessment requires UnitID", func(t *testing.T) {
+		tx := FinancialTransaction{
+			Type: TxTypeAssessment, OrgID: uuid.New(), AmountCents: 10000,
+			SourceID: uuid.New(),
+		}
+		err := engine.ValidateTransaction(context.Background(), tx)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unit_id")
+	})
+
+	t.Run("fund transfer requires 2 FundAllocations", func(t *testing.T) {
+		tx := FinancialTransaction{
+			Type: TxTypeFundTransfer, OrgID: uuid.New(), AmountCents: 5000,
+			SourceID: uuid.New(),
+		}
+		err := engine.ValidateTransaction(context.Background(), tx)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "fund_allocations")
+	})
+
+	t.Run("adjusting entry allows zero amount", func(t *testing.T) {
+		tx := FinancialTransaction{
+			Type: TxTypeAdjustingEntry, OrgID: uuid.New(), AmountCents: 0,
+			SourceID: uuid.New(),
+		}
+		assert.NoError(t, engine.ValidateTransaction(context.Background(), tx))
+	})
+
+	t.Run("payment requires UnitID", func(t *testing.T) {
+		tx := FinancialTransaction{
+			Type: TxTypePayment, OrgID: uuid.New(), AmountCents: 5000,
+			SourceID: uuid.New(),
+		}
+		err := engine.ValidateTransaction(context.Background(), tx)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unit_id")
+	})
+}
+
+// stubAccountResolver provides in-memory account lookups for tests.
+type stubAccountResolver struct {
+	accounts map[int]*GLAccount
+}
+
+func (s *stubAccountResolver) FindAccountByOrgAndNumber(_ context.Context, _ uuid.UUID, number int) (*GLAccount, error) {
+	a, ok := s.accounts[number]
+	if !ok {
+		return nil, fmt.Errorf("account %d not found", number)
+	}
+	return a, nil
+}
+
+func newTestGaapEngineWithResolver(basis RecognitionBasis) (*GaapEngine, *stubAccountResolver) {
+	resolver := &stubAccountResolver{accounts: map[int]*GLAccount{
+		1010: {ID: uuid.MustParse("00000000-0000-0000-0000-000000001010"), AccountNumber: 1010},
+		1020: {ID: uuid.MustParse("00000000-0000-0000-0000-000000001020"), AccountNumber: 1020},
+		1030: {ID: uuid.MustParse("00000000-0000-0000-0000-000000001030"), AccountNumber: 1030},
+		1040: {ID: uuid.MustParse("00000000-0000-0000-0000-000000001040"), AccountNumber: 1040},
+		1100: {ID: uuid.MustParse("00000000-0000-0000-0000-000000001100"), AccountNumber: 1100},
+		4010: {ID: uuid.MustParse("00000000-0000-0000-0000-000000004010"), AccountNumber: 4010},
+		4020: {ID: uuid.MustParse("00000000-0000-0000-0000-000000004020"), AccountNumber: 4020},
+		4030: {ID: uuid.MustParse("00000000-0000-0000-0000-000000004030"), AccountNumber: 4030},
+		4040: {ID: uuid.MustParse("00000000-0000-0000-0000-000000004040"), AccountNumber: 4040},
+		4100: {ID: uuid.MustParse("00000000-0000-0000-0000-000000004100"), AccountNumber: 4100},
+		4200: {ID: uuid.MustParse("00000000-0000-0000-0000-000000004200"), AccountNumber: 4200},
+		3100: {ID: uuid.MustParse("00000000-0000-0000-0000-000000003100"), AccountNumber: 3100},
+		3110: {ID: uuid.MustParse("00000000-0000-0000-0000-000000003110"), AccountNumber: 3110},
+	}}
+	engine := NewGaapEngine(resolver, nil, EngineConfig{RecognitionBasis: basis, FiscalYearStart: 1})
+	return engine, resolver
+}
+
+func TestGaapEngine_RecordTransaction_Assessment_Accrual(t *testing.T) {
+	engine, resolver := newTestGaapEngineWithResolver(RecognitionBasisAccrual)
+	unitID := uuid.New()
+	fundID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypeAssessment, OrgID: uuid.New(), AmountCents: 25000,
+		EffectiveDate: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+		SourceID: uuid.New(), UnitID: &unitID,
+		FundAllocations: []FundAllocation{{FundID: fundID, AmountCents: 25000}},
+		Memo:            "Monthly assessment",
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// GL: DR 1100 (AR) / CR 4010 (Revenue).
+	require.Len(t, effects.JournalLines, 2)
+	assert.Equal(t, resolver.accounts[1100].ID, effects.JournalLines[0].AccountID)
+	assert.Equal(t, int64(25000), effects.JournalLines[0].DebitCents)
+	assert.Equal(t, int64(0), effects.JournalLines[0].CreditCents)
+	assert.Equal(t, resolver.accounts[4010].ID, effects.JournalLines[1].AccountID)
+	assert.Equal(t, int64(0), effects.JournalLines[1].DebitCents)
+	assert.Equal(t, int64(25000), effects.JournalLines[1].CreditCents)
+
+	// Fund: credit to fund.
+	require.Len(t, effects.FundTransactions, 1)
+	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
+	assert.Equal(t, int64(25000), effects.FundTransactions[0].AmountCents)
+
+	// Ledger: charge entry.
+	require.Len(t, effects.LedgerEntries, 1)
+	assert.Equal(t, unitID, effects.LedgerEntries[0].UnitID)
+	assert.Equal(t, LedgerEntryTypeCharge, effects.LedgerEntries[0].Type)
+	assert.Equal(t, int64(25000), effects.LedgerEntries[0].AmountCents)
+	assert.Equal(t, tx.SourceID, effects.LedgerEntries[0].SourceID)
+}
+
+func TestGaapEngine_RecordTransaction_Assessment_CashBasis(t *testing.T) {
+	engine, _ := newTestGaapEngineWithResolver(RecognitionBasisCash)
+	unitID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypeAssessment, OrgID: uuid.New(), AmountCents: 25000,
+		EffectiveDate: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+		SourceID: uuid.New(), UnitID: &unitID,
+		FundAllocations: []FundAllocation{{FundID: uuid.New(), AmountCents: 25000}},
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+
+	// Cash basis: no GL, no fund transactions. Ledger only.
+	assert.Empty(t, effects.JournalLines)
+	assert.Empty(t, effects.FundTransactions)
+	require.Len(t, effects.LedgerEntries, 1)
+	assert.Equal(t, LedgerEntryTypeCharge, effects.LedgerEntries[0].Type)
+}
+
+func TestGaapEngine_RecordTransaction_Assessment_SplitFund(t *testing.T) {
+	engine, resolver := newTestGaapEngineWithResolver(RecognitionBasisAccrual)
+	unitID := uuid.New()
+	opFundID := uuid.New()
+	resFundID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypeAssessment, OrgID: uuid.New(), AmountCents: 25000,
+		EffectiveDate: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+		SourceID: uuid.New(), UnitID: &unitID,
+		FundAllocations: []FundAllocation{
+			{FundID: opFundID, AmountCents: 20000},
+			{FundID: resFundID, AmountCents: 5000},
+		},
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+
+	// GL: DR 1100 $250, CR 4010 $200, CR 4020 $50.
+	require.Len(t, effects.JournalLines, 3)
+	assert.Equal(t, resolver.accounts[1100].ID, effects.JournalLines[0].AccountID)
+	assert.Equal(t, int64(25000), effects.JournalLines[0].DebitCents)
+	assert.Equal(t, int64(20000), effects.JournalLines[1].CreditCents)
+	assert.Equal(t, int64(5000), effects.JournalLines[2].CreditCents)
+
+	// Fund: 2 directives.
+	require.Len(t, effects.FundTransactions, 2)
+
+	// Ledger: 1 charge for total.
+	require.Len(t, effects.LedgerEntries, 1)
+	assert.Equal(t, int64(25000), effects.LedgerEntries[0].AmountCents)
 }
