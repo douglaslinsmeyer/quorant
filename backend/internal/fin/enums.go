@@ -137,19 +137,25 @@ func (s FundType) IsValid() bool {
 type FundTransactionType string
 
 const (
-	FundTxTypeTransferOut FundTransactionType = "transfer_out"
-	FundTxTypeTransferIn  FundTransactionType = "transfer_in"
-	FundTxTypeLoanOut     FundTransactionType = "loan_out"
-	FundTxTypeLoanIn      FundTransactionType = "loan_in"
-	FundTxTypeRevenue     FundTransactionType = "revenue"
-	FundTxTypeExpense     FundTransactionType = "expense"
+	FundTxTypeTransferOut  FundTransactionType = "transfer_out"
+	FundTxTypeTransferIn   FundTransactionType = "transfer_in"
+	FundTxTypeLoanOut      FundTransactionType = "loan_out"
+	FundTxTypeLoanIn       FundTransactionType = "loan_in"
+	FundTxTypeRevenue      FundTransactionType = "revenue"
+	FundTxTypeExpense      FundTransactionType = "expense"
+	FundTxTypeAssessment   FundTransactionType = "assessment"
+	FundTxTypePayment      FundTransactionType = "payment"
+	FundTxTypeLateFee      FundTransactionType = "late_fee"
+	FundTxTypeInterest     FundTransactionType = "interest"
+	FundTxTypeDepreciation FundTransactionType = "depreciation"
 )
 
 // IsValid returns true if the FundTransactionType value is one of the defined constants.
 func (s FundTransactionType) IsValid() bool {
 	switch s {
 	case FundTxTypeTransferOut, FundTxTypeTransferIn, FundTxTypeLoanOut, FundTxTypeLoanIn,
-		FundTxTypeRevenue, FundTxTypeExpense:
+		FundTxTypeRevenue, FundTxTypeExpense, FundTxTypeAssessment, FundTxTypePayment,
+		FundTxTypeLateFee, FundTxTypeInterest, FundTxTypeDepreciation:
 		return true
 	}
 	return false

@@ -332,6 +332,11 @@ func TestFundTransactionType_IsValid(t *testing.T) {
 		{FundTxTypeLoanIn, true},
 		{FundTxTypeRevenue, true},
 		{FundTxTypeExpense, true},
+		{FundTxTypeAssessment, true},
+		{FundTxTypePayment, true},
+		{FundTxTypeLateFee, true},
+		{FundTxTypeInterest, true},
+		{FundTxTypeDepreciation, true},
 		{FundTransactionType("bogus"), false},
 	}
 	for _, tt := range tests {

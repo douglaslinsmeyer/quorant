@@ -49,7 +49,7 @@ func TestIfrsEngine_ChartOfAccounts_RetainedEarnings(t *testing.T) {
 	re, ok := byNumber[3010]
 	require.True(t, ok, "account 3010 must exist")
 	assert.Equal(t, "Retained Earnings", re.Name)
-	assert.Equal(t, "equity", re.Type)
+	assert.Equal(t, GLAccountTypeEquity, re.Type)
 
 	// Per-fund balance accounts should NOT exist in the IFRS chart.
 	_, has3020 := byNumber[3020]
@@ -60,8 +60,8 @@ func TestIfrsEngine_ChartOfAccounts_RetainedEarnings(t *testing.T) {
 	assert.False(t, has3040, "IFRS chart should not have per-fund balance 3040")
 
 	// Interfund transfer accounts should still exist.
-	assert.Equal(t, "equity", byNumber[3100].Type, "Interfund Transfer Out should be equity")
-	assert.Equal(t, "equity", byNumber[3110].Type, "Interfund Transfer In should be equity")
+	assert.Equal(t, GLAccountTypeEquity, byNumber[3100].Type, "Interfund Transfer Out should be equity")
+	assert.Equal(t, GLAccountTypeEquity, byNumber[3110].Type, "Interfund Transfer In should be equity")
 }
 
 func TestIfrsEngine_ChartOfAccounts_NoDuplicateNumbers(t *testing.T) {
@@ -188,7 +188,7 @@ func TestIfrsEngine_RecordTransaction_Payment_Accrual(t *testing.T) {
 	// Fund: payment directive.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, FundTransactionType("payment"), effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTxTypePayment, effects.FundTransactions[0].Type)
 
 	// Ledger: payment entry on unit.
 	require.Len(t, effects.LedgerEntries, 1)
@@ -398,7 +398,7 @@ func TestIfrsEngine_RecordTransaction_Depreciation_WithFundAllocation(t *testing
 	// Fund: depreciation directive for the fund.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, FundTransactionType("depreciation"), effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTxTypeDepreciation, effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(8000), effects.FundTransactions[0].AmountCents)
 
 	assert.Empty(t, effects.LedgerEntries)

@@ -158,7 +158,7 @@ func (e *GaapEngine) assessmentEffects(ctx context.Context, tx FinancialTransact
 				AccountID: revenueAccount.ID, CreditCents: alloc.AmountCents,
 			})
 			effects.FundTransactions = append(effects.FundTransactions, FundTransactionDirective{
-				FundID: alloc.FundID, Type: "assessment",
+				FundID: alloc.FundID, Type: FundTxTypeAssessment,
 				AmountCents: alloc.AmountCents, Description: tx.Memo,
 			})
 		}
@@ -219,7 +219,7 @@ func (e *GaapEngine) paymentEffects(ctx context.Context, tx FinancialTransaction
 				})
 
 				effects.FundTransactions = append(effects.FundTransactions, FundTransactionDirective{
-					FundID: alloc.FundID, Type: "revenue",
+					FundID: alloc.FundID, Type: FundTxTypeRevenue,
 					AmountCents: alloc.AmountCents, Description: tx.Memo,
 				})
 			}
@@ -255,7 +255,7 @@ func (e *GaapEngine) paymentEffects(ctx context.Context, tx FinancialTransaction
 			})
 
 			effects.FundTransactions = append(effects.FundTransactions, FundTransactionDirective{
-				FundID: alloc.FundID, Type: "payment",
+				FundID: alloc.FundID, Type: FundTxTypePayment,
 				AmountCents: alloc.AmountCents, Description: tx.Memo,
 			})
 		}
@@ -415,7 +415,7 @@ func (e *GaapEngine) lateFeeEffects(ctx context.Context, tx FinancialTransaction
 
 	for _, alloc := range tx.FundAllocations {
 		effects.FundTransactions = append(effects.FundTransactions, FundTransactionDirective{
-			FundID: alloc.FundID, Type: "late_fee",
+			FundID: alloc.FundID, Type: FundTxTypeLateFee,
 			AmountCents: alloc.AmountCents, Description: tx.Memo,
 		})
 	}
@@ -462,7 +462,7 @@ func (e *GaapEngine) interestAccrualEffects(ctx context.Context, tx FinancialTra
 
 	for _, alloc := range tx.FundAllocations {
 		effects.FundTransactions = append(effects.FundTransactions, FundTransactionDirective{
-			FundID: alloc.FundID, Type: "interest",
+			FundID: alloc.FundID, Type: FundTxTypeInterest,
 			AmountCents: alloc.AmountCents, Description: tx.Memo,
 		})
 	}
@@ -566,7 +566,7 @@ func (e *GaapEngine) expenseEffects(ctx context.Context, tx FinancialTransaction
 	// Fund transaction directives for each allocation.
 	for _, alloc := range tx.FundAllocations {
 		effects.FundTransactions = append(effects.FundTransactions, FundTransactionDirective{
-			FundID: alloc.FundID, Type: "expense",
+			FundID: alloc.FundID, Type: FundTxTypeExpense,
 			AmountCents: alloc.AmountCents, Description: tx.Memo,
 		})
 	}
@@ -723,7 +723,7 @@ func (e *GaapEngine) depreciationEffects(ctx context.Context, tx FinancialTransa
 	// Optional fund directives if FundAllocations provided.
 	for _, alloc := range tx.FundAllocations {
 		effects.FundTransactions = append(effects.FundTransactions, FundTransactionDirective{
-			FundID: alloc.FundID, Type: "depreciation",
+			FundID: alloc.FundID, Type: FundTxTypeDepreciation,
 			AmountCents: alloc.AmountCents, Description: tx.Memo,
 		})
 	}
@@ -740,70 +740,70 @@ func (e *GaapEngine) depreciationEffects(ctx context.Context, tx FinancialTransa
 // 5 headers + 51 detail accounts = 56 total.
 var gaapChartOfAccounts = []GLAccountSeed{
 	// ── Headers ──────────────────────────────────────────────────────
-	{Number: 1000, Name: "Assets", Type: "asset", IsHeader: true, IsSystem: true},
-	{Number: 2000, Name: "Liabilities", Type: "liability", IsHeader: true, IsSystem: true},
-	{Number: 3000, Name: "Fund Balances", Type: "equity", IsHeader: true, IsSystem: true},
-	{Number: 4000, Name: "Revenue", Type: "revenue", IsHeader: true, IsSystem: true},
-	{Number: 5000, Name: "Operating Expenses", Type: "expense", IsHeader: true, IsSystem: true},
+	{Number: 1000, Name: "Assets", Type: GLAccountTypeAsset, IsHeader: true, IsSystem: true},
+	{Number: 2000, Name: "Liabilities", Type: GLAccountTypeLiability, IsHeader: true, IsSystem: true},
+	{Number: 3000, Name: "Fund Balances", Type: GLAccountTypeEquity, IsHeader: true, IsSystem: true},
+	{Number: 4000, Name: "Revenue", Type: GLAccountTypeRevenue, IsHeader: true, IsSystem: true},
+	{Number: 5000, Name: "Operating Expenses", Type: GLAccountTypeExpense, IsHeader: true, IsSystem: true},
 
 	// ── Assets (13) ─────────────────────────────────────────────────
-	{Number: 1010, ParentNum: 1000, Name: "Cash-Operating", Type: "asset", IsSystem: true, FundKey: "operating"},
-	{Number: 1020, ParentNum: 1000, Name: "Cash-Reserve", Type: "asset", IsSystem: true, FundKey: "reserve"},
-	{Number: 1030, ParentNum: 1000, Name: "Cash-Capital", Type: "asset", IsSystem: true, FundKey: "capital"},
-	{Number: 1040, ParentNum: 1000, Name: "Cash-Special", Type: "asset", IsSystem: true, FundKey: "special"},
-	{Number: 1100, ParentNum: 1000, Name: "AR-Assessments", Type: "asset", IsSystem: true},
-	{Number: 1105, ParentNum: 1000, Name: "Allowance for Doubtful Accounts", Type: "asset", IsSystem: true},
-	{Number: 1110, ParentNum: 1000, Name: "AR-Other", Type: "asset", IsSystem: true},
-	{Number: 1150, ParentNum: 1000, Name: "Accrued Interest Receivable", Type: "asset", IsSystem: true},
-	{Number: 1200, ParentNum: 1000, Name: "Prepaid Expenses", Type: "asset", IsSystem: true},
-	{Number: 1300, ParentNum: 1000, Name: "Due From Other Funds", Type: "asset", IsSystem: true},
-	{Number: 1400, ParentNum: 1000, Name: "Fixed Assets", Type: "asset", IsSystem: true},
-	{Number: 1405, ParentNum: 1000, Name: "Accumulated Depreciation", Type: "asset", IsSystem: true},
-	{Number: 1500, ParentNum: 1000, Name: "Insurance Claim Receivable", Type: "asset", IsSystem: true},
+	{Number: 1010, ParentNum: 1000, Name: "Cash-Operating", Type: GLAccountTypeAsset, IsSystem: true, FundKey: "operating"},
+	{Number: 1020, ParentNum: 1000, Name: "Cash-Reserve", Type: GLAccountTypeAsset, IsSystem: true, FundKey: "reserve"},
+	{Number: 1030, ParentNum: 1000, Name: "Cash-Capital", Type: GLAccountTypeAsset, IsSystem: true, FundKey: "capital"},
+	{Number: 1040, ParentNum: 1000, Name: "Cash-Special", Type: GLAccountTypeAsset, IsSystem: true, FundKey: "special"},
+	{Number: 1100, ParentNum: 1000, Name: "AR-Assessments", Type: GLAccountTypeAsset, IsSystem: true},
+	{Number: 1105, ParentNum: 1000, Name: "Allowance for Doubtful Accounts", Type: GLAccountTypeAsset, IsSystem: true},
+	{Number: 1110, ParentNum: 1000, Name: "AR-Other", Type: GLAccountTypeAsset, IsSystem: true},
+	{Number: 1150, ParentNum: 1000, Name: "Accrued Interest Receivable", Type: GLAccountTypeAsset, IsSystem: true},
+	{Number: 1200, ParentNum: 1000, Name: "Prepaid Expenses", Type: GLAccountTypeAsset, IsSystem: true},
+	{Number: 1300, ParentNum: 1000, Name: "Due From Other Funds", Type: GLAccountTypeAsset, IsSystem: true},
+	{Number: 1400, ParentNum: 1000, Name: "Fixed Assets", Type: GLAccountTypeAsset, IsSystem: true},
+	{Number: 1405, ParentNum: 1000, Name: "Accumulated Depreciation", Type: GLAccountTypeAsset, IsSystem: true},
+	{Number: 1500, ParentNum: 1000, Name: "Insurance Claim Receivable", Type: GLAccountTypeAsset, IsSystem: true},
 
 	// ── Liabilities (7) ─────────────────────────────────────────────
-	{Number: 2100, ParentNum: 2000, Name: "AP", Type: "liability", IsSystem: true},
-	{Number: 2110, ParentNum: 2000, Name: "Accrued Expenses", Type: "liability", IsSystem: true},
-	{Number: 2200, ParentNum: 2000, Name: "Prepaid Assessments", Type: "liability", IsSystem: true},
-	{Number: 2300, ParentNum: 2000, Name: "Owner Deposits", Type: "liability", IsSystem: true},
-	{Number: 2400, ParentNum: 2000, Name: "Deferred Revenue-Other", Type: "liability", IsSystem: true},
-	{Number: 2500, ParentNum: 2000, Name: "Due To Other Funds", Type: "liability", IsSystem: true},
-	{Number: 2600, ParentNum: 2000, Name: "Income Tax Payable", Type: "liability", IsSystem: true},
+	{Number: 2100, ParentNum: 2000, Name: "AP", Type: GLAccountTypeLiability, IsSystem: true},
+	{Number: 2110, ParentNum: 2000, Name: "Accrued Expenses", Type: GLAccountTypeLiability, IsSystem: true},
+	{Number: 2200, ParentNum: 2000, Name: "Prepaid Assessments", Type: GLAccountTypeLiability, IsSystem: true},
+	{Number: 2300, ParentNum: 2000, Name: "Owner Deposits", Type: GLAccountTypeLiability, IsSystem: true},
+	{Number: 2400, ParentNum: 2000, Name: "Deferred Revenue-Other", Type: GLAccountTypeLiability, IsSystem: true},
+	{Number: 2500, ParentNum: 2000, Name: "Due To Other Funds", Type: GLAccountTypeLiability, IsSystem: true},
+	{Number: 2600, ParentNum: 2000, Name: "Income Tax Payable", Type: GLAccountTypeLiability, IsSystem: true},
 
 	// ── Equity / Fund Balances (6) ──────────────────────────────────
-	{Number: 3010, ParentNum: 3000, Name: "Operating Fund Balance", Type: "equity", IsSystem: true, FundKey: "operating"},
-	{Number: 3020, ParentNum: 3000, Name: "Reserve Fund Balance", Type: "equity", IsSystem: true, FundKey: "reserve"},
-	{Number: 3030, ParentNum: 3000, Name: "Capital Fund Balance", Type: "equity", IsSystem: true, FundKey: "capital"},
-	{Number: 3040, ParentNum: 3000, Name: "Special Fund Balance", Type: "equity", IsSystem: true, FundKey: "special"},
-	{Number: 3100, ParentNum: 3000, Name: "Interfund Transfer Out", Type: "equity", IsSystem: true},
-	{Number: 3110, ParentNum: 3000, Name: "Interfund Transfer In", Type: "equity", IsSystem: true},
+	{Number: 3010, ParentNum: 3000, Name: "Operating Fund Balance", Type: GLAccountTypeEquity, IsSystem: true, FundKey: "operating"},
+	{Number: 3020, ParentNum: 3000, Name: "Reserve Fund Balance", Type: GLAccountTypeEquity, IsSystem: true, FundKey: "reserve"},
+	{Number: 3030, ParentNum: 3000, Name: "Capital Fund Balance", Type: GLAccountTypeEquity, IsSystem: true, FundKey: "capital"},
+	{Number: 3040, ParentNum: 3000, Name: "Special Fund Balance", Type: GLAccountTypeEquity, IsSystem: true, FundKey: "special"},
+	{Number: 3100, ParentNum: 3000, Name: "Interfund Transfer Out", Type: GLAccountTypeEquity, IsSystem: true},
+	{Number: 3110, ParentNum: 3000, Name: "Interfund Transfer In", Type: GLAccountTypeEquity, IsSystem: true},
 
 	// ── Revenue (11) ────────────────────────────────────────────────
-	{Number: 4010, ParentNum: 4000, Name: "Assessment Revenue-Operating", Type: "revenue", IsSystem: true, FundKey: "operating"},
-	{Number: 4020, ParentNum: 4000, Name: "Assessment Revenue-Reserve", Type: "revenue", IsSystem: true, FundKey: "reserve"},
-	{Number: 4030, ParentNum: 4000, Name: "Assessment Revenue-Capital", Type: "revenue", IsSystem: true, FundKey: "capital"},
-	{Number: 4040, ParentNum: 4000, Name: "Assessment Revenue-Special", Type: "revenue", IsSystem: true, FundKey: "special"},
-	{Number: 4100, ParentNum: 4000, Name: "Late Fee Revenue", Type: "revenue", IsSystem: true},
-	{Number: 4200, ParentNum: 4000, Name: "Interest Income", Type: "revenue", IsSystem: true},
-	{Number: 4310, ParentNum: 4000, Name: "Facility Rental Income", Type: "revenue", IsSystem: true},
-	{Number: 4320, ParentNum: 4000, Name: "Parking and Amenity Fees", Type: "revenue", IsSystem: true},
-	{Number: 4330, ParentNum: 4000, Name: "Move-In/Move-Out Fees", Type: "revenue", IsSystem: true},
-	{Number: 4400, ParentNum: 4000, Name: "Insurance Proceeds", Type: "revenue", IsSystem: true},
-	{Number: 4900, ParentNum: 4000, Name: "Other Income", Type: "revenue", IsSystem: true},
+	{Number: 4010, ParentNum: 4000, Name: "Assessment Revenue-Operating", Type: GLAccountTypeRevenue, IsSystem: true, FundKey: "operating"},
+	{Number: 4020, ParentNum: 4000, Name: "Assessment Revenue-Reserve", Type: GLAccountTypeRevenue, IsSystem: true, FundKey: "reserve"},
+	{Number: 4030, ParentNum: 4000, Name: "Assessment Revenue-Capital", Type: GLAccountTypeRevenue, IsSystem: true, FundKey: "capital"},
+	{Number: 4040, ParentNum: 4000, Name: "Assessment Revenue-Special", Type: GLAccountTypeRevenue, IsSystem: true, FundKey: "special"},
+	{Number: 4100, ParentNum: 4000, Name: "Late Fee Revenue", Type: GLAccountTypeRevenue, IsSystem: true},
+	{Number: 4200, ParentNum: 4000, Name: "Interest Income", Type: GLAccountTypeRevenue, IsSystem: true},
+	{Number: 4310, ParentNum: 4000, Name: "Facility Rental Income", Type: GLAccountTypeRevenue, IsSystem: true},
+	{Number: 4320, ParentNum: 4000, Name: "Parking and Amenity Fees", Type: GLAccountTypeRevenue, IsSystem: true},
+	{Number: 4330, ParentNum: 4000, Name: "Move-In/Move-Out Fees", Type: GLAccountTypeRevenue, IsSystem: true},
+	{Number: 4400, ParentNum: 4000, Name: "Insurance Proceeds", Type: GLAccountTypeRevenue, IsSystem: true},
+	{Number: 4900, ParentNum: 4000, Name: "Other Income", Type: GLAccountTypeRevenue, IsSystem: true},
 
 	// ── Expenses (14) ───────────────────────────────────────────────
-	{Number: 5010, ParentNum: 5000, Name: "Management Fee", Type: "expense", IsSystem: true},
-	{Number: 5020, ParentNum: 5000, Name: "Insurance Premium", Type: "expense", IsSystem: true},
-	{Number: 5030, ParentNum: 5000, Name: "Utilities", Type: "expense", IsSystem: true},
-	{Number: 5040, ParentNum: 5000, Name: "Landscaping", Type: "expense", IsSystem: true},
-	{Number: 5050, ParentNum: 5000, Name: "Maintenance and Repairs", Type: "expense", IsSystem: true},
-	{Number: 5060, ParentNum: 5000, Name: "Professional Services", Type: "expense", IsSystem: true},
-	{Number: 5070, ParentNum: 5000, Name: "Bad Debt Expense", Type: "expense", IsSystem: true},
-	{Number: 5100, ParentNum: 5000, Name: "Administrative Expenses", Type: "expense", IsSystem: true},
-	{Number: 5110, ParentNum: 5000, Name: "Payroll and Salaries", Type: "expense", IsSystem: true},
-	{Number: 5120, ParentNum: 5000, Name: "Payroll Taxes and Benefits", Type: "expense", IsSystem: true},
-	{Number: 5200, ParentNum: 5000, Name: "Reserve Expenses", Type: "expense", IsSystem: true, FundKey: "reserve"},
-	{Number: 5210, ParentNum: 5000, Name: "Casualty Loss", Type: "expense", IsSystem: true},
-	{Number: 5220, ParentNum: 5000, Name: "Depreciation Expense", Type: "expense", IsSystem: true},
-	{Number: 5300, ParentNum: 5000, Name: "Insurance Deductible", Type: "expense", IsSystem: true},
+	{Number: 5010, ParentNum: 5000, Name: "Management Fee", Type: GLAccountTypeExpense, IsSystem: true},
+	{Number: 5020, ParentNum: 5000, Name: "Insurance Premium", Type: GLAccountTypeExpense, IsSystem: true},
+	{Number: 5030, ParentNum: 5000, Name: "Utilities", Type: GLAccountTypeExpense, IsSystem: true},
+	{Number: 5040, ParentNum: 5000, Name: "Landscaping", Type: GLAccountTypeExpense, IsSystem: true},
+	{Number: 5050, ParentNum: 5000, Name: "Maintenance and Repairs", Type: GLAccountTypeExpense, IsSystem: true},
+	{Number: 5060, ParentNum: 5000, Name: "Professional Services", Type: GLAccountTypeExpense, IsSystem: true},
+	{Number: 5070, ParentNum: 5000, Name: "Bad Debt Expense", Type: GLAccountTypeExpense, IsSystem: true},
+	{Number: 5100, ParentNum: 5000, Name: "Administrative Expenses", Type: GLAccountTypeExpense, IsSystem: true},
+	{Number: 5110, ParentNum: 5000, Name: "Payroll and Salaries", Type: GLAccountTypeExpense, IsSystem: true},
+	{Number: 5120, ParentNum: 5000, Name: "Payroll Taxes and Benefits", Type: GLAccountTypeExpense, IsSystem: true},
+	{Number: 5200, ParentNum: 5000, Name: "Reserve Expenses", Type: GLAccountTypeExpense, IsSystem: true, FundKey: "reserve"},
+	{Number: 5210, ParentNum: 5000, Name: "Casualty Loss", Type: GLAccountTypeExpense, IsSystem: true},
+	{Number: 5220, ParentNum: 5000, Name: "Depreciation Expense", Type: GLAccountTypeExpense, IsSystem: true},
+	{Number: 5300, ParentNum: 5000, Name: "Insurance Deductible", Type: GLAccountTypeExpense, IsSystem: true},
 }
