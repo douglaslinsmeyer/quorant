@@ -284,6 +284,9 @@ func run() error {
 		fin.AccountingStandardGAAP: func(config fin.EngineConfig) fin.AccountingEngine {
 			return fin.NewGaapEngine(glService, policyRegistry, config)
 		},
+		fin.AccountingStandardIFRS: func(config fin.EngineConfig) fin.AccountingEngine {
+			return fin.NewIfrsEngine(glService, policyRegistry, config)
+		},
 	}
 	engineFactory := fin.NewEngineFactory(engineBuilders, orgConfigRepo)
 	finService := fin.NewFinService(assessmentRepo, paymentRepo, budgetRepo, fundRepo, collectionRepo, glService, engineFactory, policyResolver, complianceService, policyRegistry, logger, uowFactory)

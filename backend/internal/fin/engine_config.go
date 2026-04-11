@@ -48,6 +48,24 @@ func (f *EngineFactory) ForOrgAtDate(ctx context.Context, orgID uuid.UUID, date 
 	}), nil
 }
 
+// ValidateStandardSwitch checks whether changing accounting standards is safe.
+// Changing standards requires all periods in the current fiscal year to be closed
+// under the old standard first.
+func ValidateStandardSwitch(ctx context.Context, periods AccountingPeriodRepository, orgID uuid.UUID, currentConfig *OrgAccountingConfig, newStandard AccountingStandard) error {
+	if currentConfig.Standard == newStandard {
+		return nil
+	}
+	fiscalYear := currentConfig.EffectiveDate.Year()
+	allClosed, err := periods.AllPeriodsClosedForYear(ctx, orgID, fiscalYear)
+	if err != nil {
+		return fmt.Errorf("validate standard switch: %w", err)
+	}
+	if !allClosed {
+		return fmt.Errorf("validate standard switch: all periods in fiscal year %d must be closed before changing from %s to %s", fiscalYear, currentConfig.Standard, newStandard)
+	}
+	return nil
+}
+
 // OrgAccountingConfig is an effective-dated, versioned accounting configuration per org.
 type OrgAccountingConfig struct {
 	ID                     uuid.UUID          `json:"id"`

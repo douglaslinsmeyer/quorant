@@ -50,6 +50,64 @@ func (s *stubConfigRepo) ListConfigsByOrg(_ context.Context, orgID uuid.UUID) ([
 	return result, nil
 }
 
+// ── Stub period repository ─────────────────────────────────────────────────
+
+type stubPeriodRepo struct {
+	allClosed bool
+	err       error
+}
+
+func (s *stubPeriodRepo) CreatePeriod(_ context.Context, p *AccountingPeriod) (*AccountingPeriod, error) {
+	return p, nil
+}
+
+func (s *stubPeriodRepo) GetPeriodForDate(_ context.Context, _ uuid.UUID, _ time.Time) (*AccountingPeriod, error) {
+	return nil, nil
+}
+
+func (s *stubPeriodRepo) ListPeriodsByFiscalYear(_ context.Context, _ uuid.UUID, _ int) ([]AccountingPeriod, error) {
+	return nil, nil
+}
+
+func (s *stubPeriodRepo) UpdatePeriodStatus(_ context.Context, _ uuid.UUID, _ PeriodStatus, _ *uuid.UUID) error {
+	return nil
+}
+
+func (s *stubPeriodRepo) AllPeriodsClosedForYear(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
+	return s.allClosed, s.err
+}
+
+// ── ValidateStandardSwitch tests ───────────────────────────────────────────
+
+func TestValidateStandardSwitch_SameStandard(t *testing.T) {
+	cfg := &OrgAccountingConfig{Standard: AccountingStandardGAAP}
+	err := ValidateStandardSwitch(context.Background(), nil, uuid.New(), cfg, AccountingStandardGAAP)
+	assert.NoError(t, err) // same standard, no validation needed
+}
+
+func TestValidateStandardSwitch_PeriodsNotClosed(t *testing.T) {
+	periods := &stubPeriodRepo{allClosed: false}
+	cfg := &OrgAccountingConfig{Standard: AccountingStandardGAAP, EffectiveDate: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}
+	err := ValidateStandardSwitch(context.Background(), periods, uuid.New(), cfg, AccountingStandardIFRS)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "must be closed")
+}
+
+func TestValidateStandardSwitch_PeriodsClosed(t *testing.T) {
+	periods := &stubPeriodRepo{allClosed: true}
+	cfg := &OrgAccountingConfig{Standard: AccountingStandardGAAP, EffectiveDate: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}
+	err := ValidateStandardSwitch(context.Background(), periods, uuid.New(), cfg, AccountingStandardIFRS)
+	assert.NoError(t, err)
+}
+
+func TestValidateStandardSwitch_RepoError(t *testing.T) {
+	periods := &stubPeriodRepo{err: fmt.Errorf("db connection failed")}
+	cfg := &OrgAccountingConfig{Standard: AccountingStandardGAAP, EffectiveDate: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}
+	err := ValidateStandardSwitch(context.Background(), periods, uuid.New(), cfg, AccountingStandardIFRS)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "db connection failed")
+}
+
 // ── EngineFactory tests ─────────────────────────────────────────────────────
 
 func TestEngineFactory_ForOrg(t *testing.T) {
