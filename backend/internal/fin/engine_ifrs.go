@@ -71,6 +71,10 @@ func (e *IfrsEngine) RecordTransaction(ctx context.Context, tx FinancialTransact
 		return e.yearEndCloseEffects(ctx, tx)
 	case TxTypeVoidReversal:
 		return e.voidReversalEffects(ctx, tx)
+	case TxTypeInterfundLoan:
+		return e.interfundLoanEffects(ctx, tx)
+	case TxTypeDepreciation:
+		return e.depreciationEffects(ctx, tx)
 	default:
 		return nil, fmt.Errorf("record transaction: unsupported type %q", tx.Type)
 	}
@@ -751,6 +755,94 @@ func (e *IfrsEngine) yearEndCloseEffects(ctx context.Context, tx FinancialTransa
 		})
 	}
 
+	return effects, nil
+}
+
+func (e *IfrsEngine) interfundLoanEffects(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error) {
+	effects := &FinancialEffects{}
+
+	// Resolve source and destination cash accounts from FundAllocations.
+	var srcCashNum, dstCashNum int
+	if len(tx.FundAllocations) >= 2 && tx.FundAllocations[0].FundKey != "" {
+		srcCashNum = cashAccountForFundKey(tx.FundAllocations[0].FundKey)
+		dstCashNum = cashAccountForFundKey(tx.FundAllocations[1].FundKey)
+	} else {
+		srcType, _ := tx.Metadata["from_fund_type"].(string)
+		dstType, _ := tx.Metadata["to_fund_type"].(string)
+		srcCashNum = cashAccountForFundType(srcType)
+		dstCashNum = cashAccountForFundType(dstType)
+	}
+
+	srcCashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, srcCashNum)
+	if err != nil {
+		return nil, fmt.Errorf("interfund_loan: resolve source cash account %d: %w", srcCashNum, err)
+	}
+	dstCashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, dstCashNum)
+	if err != nil {
+		return nil, fmt.Errorf("interfund_loan: resolve dest cash account %d: %w", dstCashNum, err)
+	}
+	dueFromAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 1300)
+	if err != nil {
+		return nil, fmt.Errorf("interfund_loan: resolve Due From Other Funds account 1300: %w", err)
+	}
+	dueToAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 2500)
+	if err != nil {
+		return nil, fmt.Errorf("interfund_loan: resolve Due To Other Funds account 2500: %w", err)
+	}
+
+	// GL: DR dest Cash / CR source Cash, DR 1300 (Due From) / CR 2500 (Due To).
+	effects.JournalLines = append(effects.JournalLines,
+		GLJournalLine{AccountID: dstCashAccount.ID, DebitCents: tx.AmountCents},
+		GLJournalLine{AccountID: srcCashAccount.ID, CreditCents: tx.AmountCents},
+		GLJournalLine{AccountID: dueFromAccount.ID, DebitCents: tx.AmountCents},
+		GLJournalLine{AccountID: dueToAccount.ID, CreditCents: tx.AmountCents},
+	)
+
+	// Fund: loan-out from source, loan-in to destination.
+	if len(tx.FundAllocations) >= 2 {
+		effects.FundTransactions = append(effects.FundTransactions,
+			FundTransactionDirective{
+				FundID: tx.FundAllocations[0].FundID, Type: FundTxTypeLoanOut,
+				AmountCents: tx.AmountCents, Description: tx.Memo,
+			},
+			FundTransactionDirective{
+				FundID: tx.FundAllocations[1].FundID, Type: FundTxTypeLoanIn,
+				AmountCents: tx.AmountCents, Description: tx.Memo,
+			},
+		)
+	}
+
+	// No ledger entries — interfund loans don't affect unit balances.
+	return effects, nil
+}
+
+func (e *IfrsEngine) depreciationEffects(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error) {
+	effects := &FinancialEffects{}
+
+	// GL: DR 5220 (Depreciation Expense) / CR 1405 (Accumulated Depreciation).
+	depreciationAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 5220)
+	if err != nil {
+		return nil, fmt.Errorf("depreciation: resolve depreciation expense account 5220: %w", err)
+	}
+	accumDepAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, 1405)
+	if err != nil {
+		return nil, fmt.Errorf("depreciation: resolve accumulated depreciation account 1405: %w", err)
+	}
+
+	effects.JournalLines = append(effects.JournalLines,
+		GLJournalLine{AccountID: depreciationAccount.ID, DebitCents: tx.AmountCents},
+		GLJournalLine{AccountID: accumDepAccount.ID, CreditCents: tx.AmountCents},
+	)
+
+	// Optional fund directives if FundAllocations provided.
+	for _, alloc := range tx.FundAllocations {
+		effects.FundTransactions = append(effects.FundTransactions, FundTransactionDirective{
+			FundID: alloc.FundID, Type: "depreciation",
+			AmountCents: alloc.AmountCents, Description: tx.Memo,
+		})
+	}
+
+	// No ledger entries — depreciation doesn't affect unit balances.
 	return effects, nil
 }
 
