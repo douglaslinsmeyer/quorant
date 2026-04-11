@@ -861,6 +861,65 @@ func newTestService() (*fin.FinService, *mockAssessmentRepo, *mockPaymentRepo, *
 	return svc, assessments, payments, budgets, funds, collections
 }
 
+// testConfigRepo is a minimal OrgAccountingConfigRepository for service tests.
+type testConfigRepo struct {
+	configs []fin.OrgAccountingConfig
+}
+
+func (r *testConfigRepo) CreateConfig(_ context.Context, cfg *fin.OrgAccountingConfig) (*fin.OrgAccountingConfig, error) {
+	cfg.ID = uuid.New()
+	cfg.CreatedAt = time.Now()
+	r.configs = append(r.configs, *cfg)
+	return cfg, nil
+}
+
+func (r *testConfigRepo) GetEffectiveConfig(_ context.Context, orgID uuid.UUID, asOfDate time.Time) (*fin.OrgAccountingConfig, error) {
+	var best *fin.OrgAccountingConfig
+	for i := range r.configs {
+		c := &r.configs[i]
+		if c.OrgID == orgID && !c.EffectiveDate.After(asOfDate) {
+			if best == nil || c.EffectiveDate.After(best.EffectiveDate) {
+				best = c
+			}
+		}
+	}
+	if best == nil {
+		return nil, fmt.Errorf("no config found for org %s at %s", orgID, asOfDate.Format("2006-01-02"))
+	}
+	return best, nil
+}
+
+func (r *testConfigRepo) ListConfigsByOrg(_ context.Context, orgID uuid.UUID) ([]fin.OrgAccountingConfig, error) {
+	var result []fin.OrgAccountingConfig
+	for _, c := range r.configs {
+		if c.OrgID == orgID {
+			result = append(result, c)
+		}
+	}
+	return result, nil
+}
+
+// newTestFactory creates an EngineFactory for service tests using the given
+// AccountResolver. The factory is pre-configured with a GAAP engine builder
+// and an org accounting config for the given orgID using accrual basis.
+func newTestFactory(orgID uuid.UUID, resolver fin.AccountResolver) *fin.EngineFactory {
+	repo := &testConfigRepo{
+		configs: []fin.OrgAccountingConfig{{
+			OrgID:            orgID,
+			Standard:         fin.AccountingStandardGAAP,
+			RecognitionBasis: fin.RecognitionBasisAccrual,
+			FiscalYearStart:  time.January,
+			EffectiveDate:    time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+		}},
+	}
+	builders := map[fin.AccountingStandard]fin.EngineBuilder{
+		fin.AccountingStandardGAAP: func(config fin.EngineConfig) fin.AccountingEngine {
+			return fin.NewGaapEngine(resolver, nil, config)
+		},
+	}
+	return fin.NewEngineFactory(builders, repo)
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 // TestCreateAssessment_CreatesLedgerEntry verifies that creating an assessment
@@ -1213,7 +1272,8 @@ func TestCreateAssessment_PostsJournalEntry(t *testing.T) {
 	glRepo.accounts[arAccount.ID] = arAccount
 	glRepo.accounts[revenueAccount.ID] = revenueAccount
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, fin.NewGaapEngine(glService, nil, fin.EngineConfig{RecognitionBasis: fin.RecognitionBasisAccrual}), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	factory := newTestFactory(orgID, glService)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, factory, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 
 	unitID := uuid.New()
 	req := fin.CreateAssessmentRequest{
@@ -1268,7 +1328,8 @@ func TestCreateAssessment_GLFailureReturnsError(t *testing.T) {
 	glRepo.SetAccounts(arAccount, revenueAccount)
 	glRepo.SetPostError(fmt.Errorf("simulated GL failure"))
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, fin.NewGaapEngine(glService, nil, fin.EngineConfig{RecognitionBasis: fin.RecognitionBasisAccrual}), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	factory := newTestFactory(orgID, glService)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, factory, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 
 	_, err := svc.CreateAssessment(context.Background(), orgID, fin.CreateAssessmentRequest{
 		UnitID:      uuid.New(),
@@ -1308,7 +1369,8 @@ func TestRecordPayment_PostsJournalEntry(t *testing.T) {
 	glRepo.accounts[cashAccount.ID] = cashAccount
 	glRepo.accounts[arAccount.ID] = arAccount
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, fin.NewGaapEngine(glService, nil, fin.EngineConfig{RecognitionBasis: fin.RecognitionBasisAccrual}), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	factory := newTestFactory(orgID, glService)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, factory, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 
 	unitID := uuid.New()
 	userID := uuid.New()
@@ -1387,7 +1449,8 @@ func TestRecordPayment_GLFailureReturnsError(t *testing.T) {
 	glRepo.SetAccounts(cashAccount, arAccount)
 	glRepo.SetPostError(fmt.Errorf("simulated GL failure"))
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, fin.NewGaapEngine(glService, nil, fin.EngineConfig{RecognitionBasis: fin.RecognitionBasisAccrual}), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	factory := newTestFactory(orgID, glService)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, factory, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 
 	desc := "Test payment"
 	_, err := svc.RecordPayment(context.Background(), orgID, userID, fin.CreatePaymentRequest{
@@ -1427,7 +1490,8 @@ func TestCreateFundTransfer_GLFailureReturnsError(t *testing.T) {
 	glRepo.SetAccounts(fromCash, toCash, transferOut, transferIn)
 	glRepo.SetPostError(fmt.Errorf("simulated GL failure"))
 
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, fin.NewGaapEngine(glService, nil, fin.EngineConfig{RecognitionBasis: fin.RecognitionBasisAccrual}), ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	factory := newTestFactory(orgID, glService)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, glService, factory, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 
 	desc := "Test transfer"
 	_, err := svc.CreateFundTransfer(context.Background(), orgID, fin.CreateFundTransferRequest{

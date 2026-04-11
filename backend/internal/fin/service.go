@@ -37,7 +37,7 @@ type FinService struct {
 	funds       FundRepository
 	collections CollectionRepository
 	gl          *GLService
-	engine      AccountingEngine
+	factory     *EngineFactory
 	policy      ai.PolicyResolver
 	compliance  ai.ComplianceResolver
 	registry    *policy.Registry
@@ -53,7 +53,7 @@ func NewFinService(
 	funds FundRepository,
 	collections CollectionRepository,
 	gl *GLService,
-	engine AccountingEngine,
+	factory *EngineFactory,
 	policy ai.PolicyResolver,
 	compliance ai.ComplianceResolver,
 	registry *policy.Registry,
@@ -67,13 +67,104 @@ func NewFinService(
 		funds:       funds,
 		collections: collections,
 		gl:          gl,
-		engine:      engine,
+		factory:     factory,
 		policy:      policy,
 		compliance:  compliance,
 		registry:    registry,
 		logger:      logger,
 		uowFactory:  uowFactory,
 	}
+}
+
+// ── Effects Execution ────────────────────────────────────────────────────────
+
+// executeEffects persists all directives from a FinancialEffects bundle.
+// When uow is non-nil, transactional repo copies are used; otherwise the
+// service's own repos are used directly (unit-test path).
+func (s *FinService) executeEffects(
+	ctx context.Context,
+	uow *db.UnitOfWork,
+	orgID uuid.UUID,
+	sourceType GLSourceType,
+	sourceID uuid.UUID,
+	unitID *uuid.UUID,
+	effectiveDate time.Time,
+	memo string,
+	effects *FinancialEffects,
+) error {
+	assessments := s.assessments
+	funds := s.funds
+	gl := s.gl
+
+	if uow != nil {
+		assessments = s.assessments.WithTx(uow.Tx())
+		funds = s.funds.WithTx(uow.Tx())
+		if s.gl != nil {
+			gl = s.gl.WithTx(uow.Tx())
+		}
+	}
+
+	// 1. Post GL journal entry (if JournalLines non-empty).
+	if gl != nil && len(effects.JournalLines) > 0 {
+		st := sourceType
+		if _, err := gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, effectiveDate, memo, &st, &sourceID, unitID, effects.JournalLines); err != nil {
+			return fmt.Errorf("fin: executeEffects GL entry: %w", err)
+		}
+	}
+
+	// 2. Create fund transactions for each FundTransactionDirective.
+	for _, ftd := range effects.FundTransactions {
+		if _, err := funds.CreateTransaction(ctx, &FundTransaction{
+			FundID:          ftd.FundID,
+			OrgID:           orgID,
+			CurrencyCode:    "USD",
+			TransactionType: ftd.Type,
+			AmountCents:     ftd.AmountCents,
+			Description:     &ftd.Description,
+			EffectiveDate:   effectiveDate,
+		}); err != nil {
+			return fmt.Errorf("fin: executeEffects fund transaction: %w", err)
+		}
+	}
+
+	// 3. Create ledger entries for each LedgerEntryDirective.
+	for _, led := range effects.LedgerEntries {
+		desc := led.Description
+		entry := &LedgerEntry{
+			OrgID:         orgID,
+			CurrencyCode:  "USD",
+			UnitID:        led.UnitID,
+			EntryType:     led.Type,
+			AmountCents:   led.AmountCents,
+			Description:   &desc,
+			EffectiveDate: effectiveDate,
+		}
+		// Link assessment charges to the source assessment.
+		if led.Type == LedgerEntryTypeCharge && led.SourceID != uuid.Nil {
+			entry.AssessmentID = &led.SourceID
+		}
+		if _, err := assessments.CreateLedgerEntry(ctx, entry); err != nil {
+			return fmt.Errorf("fin: executeEffects ledger entry: %w", err)
+		}
+	}
+
+	// 4. Create credit entries for each CreditDirective.
+	for _, cd := range effects.Credits {
+		desc := fmt.Sprintf("Credit: %s", cd.Type)
+		if _, err := assessments.CreateLedgerEntry(ctx, &LedgerEntry{
+			OrgID:         orgID,
+			CurrencyCode:  "USD",
+			UnitID:        cd.UnitID,
+			EntryType:     LedgerEntryTypeCredit,
+			AmountCents:   cd.AmountCents,
+			Description:   &desc,
+			EffectiveDate: effectiveDate,
+		}); err != nil {
+			return fmt.Errorf("fin: executeEffects credit entry: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // ── Assessment Schedules ──────────────────────────────────────────────────────
@@ -240,7 +331,11 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 	}
 
 	// Post GL journal entry via accounting engine.
-	if gl != nil && s.engine != nil {
+	if gl != nil && s.factory != nil {
+		engine, engineErr := s.factory.ForOrg(ctx, orgID)
+		if engineErr != nil {
+			return nil, fmt.Errorf("fin: CreateAssessment engine: %w", engineErr)
+		}
 		ftx := FinancialTransaction{
 			Type:          TxTypeAssessment,
 			OrgID:         orgID,
@@ -250,7 +345,7 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 			UnitID:        &req.UnitID,
 			Memo:          fmt.Sprintf("Assessment: %s", created.Description),
 		}
-		effects, glErr := s.engine.RecordTransaction(ctx, ftx)
+		effects, glErr := engine.RecordTransaction(ctx, ftx)
 		if glErr != nil {
 			return nil, fmt.Errorf("fin: CreateAssessment GL entry: %w", glErr)
 		}
@@ -486,7 +581,11 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 	}
 
 	// Post GL journal entry via accounting engine.
-	if gl != nil && s.engine != nil {
+	if gl != nil && s.factory != nil {
+		engine, engineErr := s.factory.ForOrg(ctx, orgID)
+		if engineErr != nil {
+			return nil, fmt.Errorf("fin: RecordPayment engine: %w", engineErr)
+		}
 		memo := "Payment received"
 		if req.Description != nil {
 			memo = *req.Description
@@ -500,7 +599,7 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 			UnitID:        &req.UnitID,
 			Memo:          memo,
 		}
-		effects, glErr := s.engine.RecordTransaction(ctx, ftx)
+		effects, glErr := engine.RecordTransaction(ctx, ftx)
 		if glErr != nil {
 			return nil, fmt.Errorf("fin: RecordPayment GL entry: %w", glErr)
 		}
@@ -976,7 +1075,11 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 	}
 
 	// Post GL journal entry via accounting engine.
-	if gl != nil && s.engine != nil {
+	if gl != nil && s.factory != nil {
+		engine, engineErr := s.factory.ForOrg(ctx, orgID)
+		if engineErr != nil {
+			return nil, fmt.Errorf("fin: CreateFundTransfer engine: %w", engineErr)
+		}
 		fromFund, _ := funds.FindFundByID(ctx, req.FromFundID)
 		toFund, _ := funds.FindFundByID(ctx, req.ToFundID)
 		if fromFund != nil && toFund != nil {
@@ -994,7 +1097,7 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 					"to_fund_name":   toFund.Name,
 				},
 			}
-			effects, glErr := s.engine.RecordTransaction(ctx, ftx)
+			effects, glErr := engine.RecordTransaction(ctx, ftx)
 			if glErr != nil {
 				return nil, fmt.Errorf("fin: CreateFundTransfer GL entry: %w", glErr)
 			}
