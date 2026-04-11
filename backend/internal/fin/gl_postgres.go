@@ -224,7 +224,7 @@ func (r *PostgresGLRepository) PostJournalEntry(ctx context.Context, entry *GLJo
 			INSERT INTO gl_journal_lines (
 				journal_entry_id, account_id, debit_cents, credit_cents, memo
 			) VALUES ($1, $2, $3, $4, $5)
-			RETURNING id, journal_entry_id, account_id, debit_cents, credit_cents, memo`,
+			RETURNING id, journal_entry_id, account_id, debit_cents, credit_cents, memo, reconciled`,
 			result.ID, line.AccountID, line.DebitCents, line.CreditCents, line.Memo,
 		)
 		l, err := scanGLJournalLine(lineRow)
@@ -259,7 +259,7 @@ func (r *PostgresGLRepository) FindJournalEntryByID(ctx context.Context, id uuid
 	}
 
 	const linesQ = `
-		SELECT id, journal_entry_id, account_id, debit_cents, credit_cents, memo
+		SELECT id, journal_entry_id, account_id, debit_cents, credit_cents, memo, reconciled
 		FROM gl_journal_lines
 		WHERE journal_entry_id = $1
 		ORDER BY id`
@@ -321,7 +321,7 @@ func (r *PostgresGLRepository) FindJournalEntriesBySource(ctx context.Context, s
 	}
 
 	const linesQ = `
-		SELECT id, journal_entry_id, account_id, debit_cents, credit_cents, memo
+		SELECT id, journal_entry_id, account_id, debit_cents, credit_cents, memo, reconciled
 		FROM gl_journal_lines
 		WHERE journal_entry_id = $1
 		ORDER BY id`
@@ -542,6 +542,7 @@ func scanGLJournalLine(row pgx.Row) (*GLJournalLine, error) {
 		&l.DebitCents,
 		&l.CreditCents,
 		&l.Memo,
+		&l.Reconciled,
 	)
 	if err != nil {
 		return nil, err
@@ -561,6 +562,7 @@ func collectGLJournalLines(rows pgx.Rows, op string) ([]GLJournalLine, error) {
 			&l.DebitCents,
 			&l.CreditCents,
 			&l.Memo,
+			&l.Reconciled,
 		); err != nil {
 			return nil, fmt.Errorf("fin: %s scan: %w", op, err)
 		}
