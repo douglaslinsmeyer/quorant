@@ -313,6 +313,7 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 		ScheduleID:   req.ScheduleID,
 		IsRecurring:  req.ScheduleID != nil,
 		Status:       AssessmentStatusPosted,
+		LateFeeCents: req.LateFeeCents,
 	}
 
 	// Optional: look up late fee policy to set late_fee_cents if not provided.
@@ -324,6 +325,21 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 			}
 			if jsonErr := json.Unmarshal(result.Config, &cfg); jsonErr == nil && cfg.LateFeeCents > 0 {
 				a.LateFeeCents = &cfg.LateFeeCents
+			}
+		}
+	}
+
+	// Compliance: cap late fee at jurisdiction limit if available.
+	if s.compliance != nil && a.LateFeeCents != nil {
+		result, err := s.compliance.CheckCompliance(ctx, orgID, "fine_limits")
+		if err == nil && result != nil {
+			for _, rule := range result.Rules {
+				if rule.Key == "max_late_fee_cents" {
+					var cap int64
+					if jsonErr := json.Unmarshal(rule.Value, &cap); jsonErr == nil && cap > 0 && *a.LateFeeCents > cap {
+						a.LateFeeCents = &cap
+					}
+				}
 			}
 		}
 	}

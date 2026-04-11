@@ -2,6 +2,7 @@ package fin_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -857,6 +858,41 @@ func (m *mockCollectionRepo) GetCollectionStatusForUnit(_ context.Context, unitI
 }
 
 func (m *mockCollectionRepo) WithTx(_ pgx.Tx) fin.CollectionRepository { return m }
+
+// mockComplianceResolver is a stub ComplianceResolver for unit tests.
+type mockComplianceResolver struct {
+	rules map[string][]ai.RuleValue // category -> rules
+}
+
+func (m *mockComplianceResolver) GetJurisdictionRule(_ context.Context, _, category, key string) (*ai.RuleValue, error) {
+	for _, r := range m.rules[category] {
+		if r.Key == key {
+			return &r, nil
+		}
+	}
+	return nil, nil
+}
+
+func (m *mockComplianceResolver) ListJurisdictionRules(_ context.Context, _, category string) ([]ai.RuleValue, error) {
+	return m.rules[category], nil
+}
+
+func (m *mockComplianceResolver) EvaluateCompliance(_ context.Context, _ uuid.UUID) (*ai.ComplianceReport, error) {
+	return nil, nil
+}
+
+func (m *mockComplianceResolver) CheckCompliance(_ context.Context, _ uuid.UUID, category string) (*ai.ComplianceResult, error) {
+	rules := m.rules[category]
+	if len(rules) == 0 {
+		return nil, nil
+	}
+	return &ai.ComplianceResult{
+		Category:  category,
+		Status:    "checked",
+		Rules:     rules,
+		CheckedAt: time.Now(),
+	}, nil
+}
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
@@ -2520,4 +2556,45 @@ func TestRecordPayment_IdempotencyKey_DeduplicatesPayment(t *testing.T) {
 
 	assert.Equal(t, first.ID, second.ID, "second call should return the original payment")
 	assert.Len(t, paymentRepo.payments, 1, "only one payment should exist")
+}
+
+// TestCreateAssessment_ComplianceCapsLateFee verifies that when a ComplianceResolver
+// returns a max_late_fee_cents limit, the late fee on the assessment is capped at
+// that value even when the caller provides a higher fee.
+func TestCreateAssessment_ComplianceCapsLateFee(t *testing.T) {
+	assessments := &mockAssessmentRepo{}
+	payments := &mockPaymentRepo{}
+	budgets := &mockBudgetRepo{}
+	funds := &mockFundRepo{}
+	collections := &mockCollectionRepo{}
+	factory := wildcardTestFactory()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	// Use a compliance resolver that returns a fine_limits cap of $25.
+	compliance := &mockComplianceResolver{
+		rules: map[string][]ai.RuleValue{
+			"fine_limits": {
+				{Key: "max_late_fee_cents", ValueType: "integer", Value: json.RawMessage(`2500`)},
+			},
+		},
+	}
+
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, factory, ai.NewNoopPolicyResolver(), compliance, nil, logger, nil)
+	ctx := context.Background()
+	orgID := uuid.New()
+	dueDate := time.Now().Add(30 * 24 * time.Hour)
+	highFee := int64(10000) // $100 late fee
+
+	req := fin.CreateAssessmentRequest{
+		UnitID:       uuid.New(),
+		Description:  "Q1 dues",
+		AmountCents:  50000,
+		DueDate:      dueDate,
+		LateFeeCents: &highFee,
+	}
+
+	result, err := svc.CreateAssessment(ctx, orgID, req)
+	require.NoError(t, err)
+	require.NotNil(t, result.LateFeeCents)
+	assert.Equal(t, int64(2500), *result.LateFeeCents, "late fee should be capped at compliance limit")
 }
