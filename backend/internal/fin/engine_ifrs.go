@@ -115,6 +115,18 @@ func (e *IfrsEngine) ValidateTransaction(ctx context.Context, tx FinancialTransa
 		return err
 	}
 
+	// Fee and interest cap enforcement.
+	switch tx.Type {
+	case TxTypeLateFee:
+		if err := validateFeeCap(ctx, e.registry, tx); err != nil {
+			return err
+		}
+	case TxTypeInterestAccrual:
+		if err := validateInterestCap(ctx, e.registry, tx); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
