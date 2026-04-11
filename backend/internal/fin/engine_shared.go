@@ -193,6 +193,63 @@ type interestCapRuling struct {
 	MaxCents *int64 `json:"max_cents"`
 }
 
+// OverpaymentAction defines how the org wants to handle overpayments.
+type OverpaymentAction string
+
+const (
+	OverpaymentActionAccept OverpaymentAction = "accept"
+	OverpaymentActionReject OverpaymentAction = "reject"
+	OverpaymentActionCap    OverpaymentAction = "cap"
+)
+
+// overpaymentRuling holds the decoded overpayment_policy ruling.
+type overpaymentRuling struct {
+	Action            OverpaymentAction `json:"action"`
+	MaxOverpayPercent *float64          `json:"max_overpay_percent,omitempty"`
+}
+
+// validateOverpayment checks whether a payment's overpayment is permitted by
+// the org's overpayment policy. When the registry is nil or no policy is
+// configured, overpayments are accepted (GAAP default: prepaid assessment).
+func validateOverpayment(ctx context.Context, registry *policy.Registry, tx FinancialTransaction) error {
+	if registry == nil {
+		return nil
+	}
+
+	overpaymentCents, ok := metadataInt64(tx.Metadata, "overpayment_cents")
+	if !ok || overpaymentCents <= 0 {
+		return nil // no overpayment, nothing to validate
+	}
+
+	resolution, err := registry.Resolve(ctx, tx.OrgID, nil, "overpayment_policy")
+	if err != nil || resolution == nil || resolution.Ruling == nil {
+		return nil // no policy configured — accept (GAAP default)
+	}
+
+	var ruling overpaymentRuling
+	if err := json.Unmarshal(resolution.Ruling, &ruling); err != nil {
+		return nil
+	}
+
+	balanceCents, _ := metadataInt64(tx.Metadata, "unit_balance_cents")
+
+	switch ruling.Action {
+	case OverpaymentActionReject:
+		return fmt.Errorf("validate: payment overpayment of %d cents exceeds outstanding balance of %d cents", overpaymentCents, balanceCents)
+	case OverpaymentActionCap:
+		if ruling.MaxOverpayPercent != nil && balanceCents > 0 {
+			maxOverpay := int64(float64(balanceCents) * *ruling.MaxOverpayPercent)
+			if overpaymentCents > maxOverpay {
+				return fmt.Errorf("validate: payment overpayment of %d cents exceeds cap of %.0f%% (max %d cents) on balance of %d cents",
+					overpaymentCents, *ruling.MaxOverpayPercent*100, maxOverpay, balanceCents)
+			}
+		}
+		return nil
+	default:
+		return nil // accept
+	}
+}
+
 // validateFeeCap checks whether a late fee exceeds the jurisdiction-scoped cap.
 // When the registry is nil or no cap policy is configured, all fees are allowed.
 func validateFeeCap(ctx context.Context, registry *policy.Registry, tx FinancialTransaction) error {

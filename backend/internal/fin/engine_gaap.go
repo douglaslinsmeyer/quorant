@@ -614,6 +614,9 @@ func (e *GaapEngine) ValidateTransaction(ctx context.Context, tx FinancialTransa
 		if tx.UnitID == nil {
 			return fmt.Errorf("validate: payment requires unit_id")
 		}
+		if err := validateOverpayment(ctx, e.registry, tx); err != nil {
+			return err
+		}
 	}
 
 	// Period boundary check.

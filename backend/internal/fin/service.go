@@ -634,6 +634,12 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 		}
 	}
 
+	// Look up the unit's current balance for overpayment policy evaluation.
+	unitBalance, balErr := assessments.GetUnitBalance(ctx, req.UnitID)
+	if balErr != nil {
+		return nil, fmt.Errorf("fin: RecordPayment get unit balance: %w", balErr)
+	}
+
 	ftx := FinancialTransaction{
 		Type:          TxTypePayment,
 		OrgID:         orgID,
@@ -642,11 +648,11 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 		SourceID:      created.ID,
 		UnitID:        &req.UnitID,
 		Memo:          memo,
+		Metadata: map[string]any{
+			"unit_balance_cents": unitBalance,
+		},
 	}
 	if overpaymentCents > 0 {
-		if ftx.Metadata == nil {
-			ftx.Metadata = make(map[string]any)
-		}
 		ftx.Metadata["overpayment_cents"] = overpaymentCents
 	}
 	if vErr := engine.ValidateTransaction(ctx, ftx); vErr != nil {
