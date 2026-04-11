@@ -3,7 +3,6 @@ package fin
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/quorant/quorant/internal/platform/policy"
 )
@@ -601,12 +600,7 @@ func (e *GaapEngine) ValidateTransaction(_ context.Context, tx FinancialTransact
 
 // PaymentTerms is implemented in engine_terms.go.
 // PayableRecognitionDate is implemented in engine_terms.go.
-
-// RevenueRecognitionDate determines when revenue should be recognized.
-// Not yet implemented; returns ErrNotImplemented.
-func (e *GaapEngine) RevenueRecognitionDate(_ context.Context, _ FinancialTransaction) (time.Time, error) {
-	return time.Time{}, ErrNotImplemented
-}
+// RevenueRecognitionDate is implemented in engine_revenue.go.
 
 // gaapChartOfAccounts defines the standard GAAP chart of accounts for HOA fund accounting.
 // 5 headers + 51 detail accounts = 56 total.
