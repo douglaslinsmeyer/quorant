@@ -59,7 +59,7 @@ func TestGaapEngine_VoidReversal_Assessment(t *testing.T) {
 	assert.Equal(t, int64(-25000), effects.FundTransactions[0].AmountCents)
 	assert.Contains(t, effects.FundTransactions[0].Description, "Reversal")
 
-	// Ledger entry: adjustment with negated amount.
+	// Ledger entry: adjustment with negated amount (charge was positive, so reversal is negative).
 	require.Len(t, effects.LedgerEntries, 1)
 	assert.Equal(t, unitID, effects.LedgerEntries[0].UnitID)
 	assert.Equal(t, LedgerEntryTypeAdjustment, effects.LedgerEntries[0].Type)
@@ -123,11 +123,13 @@ func TestGaapEngine_VoidReversal_Payment(t *testing.T) {
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
 	assert.Equal(t, int64(-15000), effects.FundTransactions[0].AmountCents)
 
-	// Ledger entry: adjustment with negated amount.
+	// Ledger entry: adjustment that reverses the stored payment value.
+	// Payment entries are stored as -amount by executeEffects, so reversal
+	// produces +amount to undo the balance effect.
 	require.Len(t, effects.LedgerEntries, 1)
 	assert.Equal(t, unitID, effects.LedgerEntries[0].UnitID)
 	assert.Equal(t, LedgerEntryTypeAdjustment, effects.LedgerEntries[0].Type)
-	assert.Equal(t, int64(-15000), effects.LedgerEntries[0].AmountCents)
+	assert.Equal(t, int64(15000), effects.LedgerEntries[0].AmountCents)
 
 	// Verify GL lines are balanced.
 	var totalDebits, totalCredits int64

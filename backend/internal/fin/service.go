@@ -414,8 +414,8 @@ func (s *FinService) DeleteAssessment(ctx context.Context, id uuid.UUID) error {
 	return s.VoidAssessment(ctx, id, uuid.Nil)
 }
 
-// VoidAssessment reverses the charge ledger entry for the assessment, reverses
-// any associated GL journal entries, and marks the assessment as void.
+// VoidAssessment reverses the financial effects of an assessment through the
+// accounting engine and marks the assessment as void.
 func (s *FinService) VoidAssessment(ctx context.Context, id uuid.UUID, voidedBy uuid.UUID) error {
 	assessment, err := s.GetAssessment(ctx, id)
 	if err != nil {
@@ -437,28 +437,31 @@ func (s *FinService) VoidAssessment(ctx context.Context, id uuid.UUID, voidedBy 
 		}
 	}
 
-	// Find the unreversed charge entry and reverse it.
-	for _, e := range entries {
-		if e.EntryType == LedgerEntryTypeCharge && e.ReversedByEntryID == nil {
-			if _, err := s.ReverseLedgerEntry(ctx, e.ID, voidedBy); err != nil {
-				return err
-			}
-			break
-		}
+	// Delegate reversal to the accounting engine.
+	engine, engineErr := s.factory.ForOrg(ctx, assessment.OrgID)
+	if engineErr != nil {
+		return fmt.Errorf("fin: VoidAssessment engine: %w", engineErr)
 	}
 
-	// Reverse associated GL journal entries.
-	if s.gl != nil {
-		glEntries, glErr := s.gl.FindJournalEntriesBySource(ctx, GLSourceTypeAssessment, id)
-		if glErr == nil {
-			for _, ge := range glEntries {
-				if ge.ReversedBy == nil && !ge.IsReversal {
-					if _, rErr := s.gl.ReverseJournalEntry(ctx, ge.ID, voidedBy); rErr != nil {
-						s.logger.Error("GL: failed to reverse assessment journal entry", "journal_entry_id", ge.ID, "error", rErr)
-					}
-				}
-			}
-		}
+	ftx := FinancialTransaction{
+		Type:          TxTypeVoidReversal,
+		OrgID:         assessment.OrgID,
+		AmountCents:   assessment.AmountCents,
+		EffectiveDate: time.Now(),
+		SourceID:      assessment.ID,
+		UnitID:        &assessment.UnitID,
+		Memo:          fmt.Sprintf("Void assessment: %s", assessment.Description),
+		Metadata: map[string]any{
+			"original_type": string(TxTypeAssessment),
+		},
+	}
+
+	effects, recErr := engine.RecordTransaction(ctx, ftx)
+	if recErr != nil {
+		return fmt.Errorf("fin: VoidAssessment record: %w", recErr)
+	}
+	if err := s.executeEffects(ctx, nil, assessment.OrgID, GLSourceTypeAssessment, assessment.ID, &assessment.UnitID, ftx.EffectiveDate, ftx.Memo, effects); err != nil {
+		return fmt.Errorf("fin: VoidAssessment effects: %w", err)
 	}
 
 	// Mark the assessment as void.
@@ -699,8 +702,8 @@ func (s *FinService) RemovePaymentMethod(ctx context.Context, id uuid.UUID) erro
 	return s.payments.SoftDeletePaymentMethod(ctx, id)
 }
 
-// VoidPayment reverses the payment ledger entry, reverses any associated GL
-// journal entries, and marks the payment as void.
+// VoidPayment reverses the financial effects of a payment through the
+// accounting engine and marks the payment as void.
 func (s *FinService) VoidPayment(ctx context.Context, id uuid.UUID, voidedBy uuid.UUID) error {
 	payment, err := s.GetPayment(ctx, id)
 	if err != nil {
@@ -714,29 +717,36 @@ func (s *FinService) VoidPayment(ctx context.Context, id uuid.UUID, voidedBy uui
 		)
 	}
 
-	// Find and reverse the payment ledger entry.
-	ledgerEntry, err := s.assessments.FindLedgerEntryByPaymentRef(ctx, id)
-	if err != nil {
-		return err
-	}
-	if ledgerEntry != nil && ledgerEntry.ReversedByEntryID == nil {
-		if _, err := s.ReverseLedgerEntry(ctx, ledgerEntry.ID, voidedBy); err != nil {
-			return err
-		}
+	// Delegate reversal to the accounting engine.
+	engine, engineErr := s.factory.ForOrg(ctx, payment.OrgID)
+	if engineErr != nil {
+		return fmt.Errorf("fin: VoidPayment engine: %w", engineErr)
 	}
 
-	// Reverse associated GL journal entries.
-	if s.gl != nil {
-		glEntries, glErr := s.gl.FindJournalEntriesBySource(ctx, GLSourceTypePayment, id)
-		if glErr == nil {
-			for _, ge := range glEntries {
-				if ge.ReversedBy == nil && !ge.IsReversal {
-					if _, rErr := s.gl.ReverseJournalEntry(ctx, ge.ID, voidedBy); rErr != nil {
-						s.logger.Error("GL: failed to reverse payment journal entry", "journal_entry_id", ge.ID, "error", rErr)
-					}
-				}
-			}
-		}
+	memo := "Void payment"
+	if payment.Description != nil {
+		memo = fmt.Sprintf("Void payment: %s", *payment.Description)
+	}
+
+	ftx := FinancialTransaction{
+		Type:          TxTypeVoidReversal,
+		OrgID:         payment.OrgID,
+		AmountCents:   payment.AmountCents,
+		EffectiveDate: time.Now(),
+		SourceID:      payment.ID,
+		UnitID:        &payment.UnitID,
+		Memo:          memo,
+		Metadata: map[string]any{
+			"original_type": string(TxTypePayment),
+		},
+	}
+
+	effects, recErr := engine.RecordTransaction(ctx, ftx)
+	if recErr != nil {
+		return fmt.Errorf("fin: VoidPayment record: %w", recErr)
+	}
+	if err := s.executeEffects(ctx, nil, payment.OrgID, GLSourceTypePayment, payment.ID, &payment.UnitID, ftx.EffectiveDate, ftx.Memo, effects); err != nil {
+		return fmt.Errorf("fin: VoidPayment effects: %w", err)
 	}
 
 	// Mark the payment as void.

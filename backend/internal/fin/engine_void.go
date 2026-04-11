@@ -57,12 +57,23 @@ func (e *GaapEngine) voidReversalEffects(ctx context.Context, tx FinancialTransa
 		})
 	}
 
-	// Convert ledger entries to adjustment type with negated amounts.
+	// Convert ledger entries to adjustment type with amounts that reverse the
+	// stored value. Payment-type entries are negated by executeEffects (stored
+	// as -amount), so we produce +amount. Other types are stored as +amount,
+	// so we produce -amount. Since the output uses LedgerEntryTypeAdjustment
+	// (which executeEffects does not negate), we compute the final stored
+	// value here.
 	for _, led := range originalEffects.LedgerEntries {
+		reversalAmount := -led.AmountCents
+		if led.Type == LedgerEntryTypePayment {
+			// Payment entries are stored as -amount by executeEffects.
+			// To reverse, store +amount.
+			reversalAmount = led.AmountCents
+		}
 		effects.LedgerEntries = append(effects.LedgerEntries, LedgerEntryDirective{
 			UnitID:      led.UnitID,
 			Type:        LedgerEntryTypeAdjustment,
-			AmountCents: -led.AmountCents,
+			AmountCents: reversalAmount,
 			Description: "Reversal: " + led.Description,
 			SourceID:    led.SourceID,
 		})
