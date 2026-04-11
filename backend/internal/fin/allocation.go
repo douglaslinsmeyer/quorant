@@ -33,6 +33,20 @@ type AllocationResult struct {
 	AllocatedCents int64
 }
 
+// ApplyStrategy converts an ApplicationStrategy into an AllocationRuling and
+// delegates to Allocate. This bridges the engine's strategy resolution with
+// the allocation algorithm.
+func ApplyStrategy(strategy *ApplicationStrategy, charges []OutstandingCharge, paymentCents int64) ([]AllocationResult, int64) {
+	ruling := AllocationRuling{
+		AcceptPartial:  true,
+		CreditHandling: "credit_on_account",
+	}
+	if strategy.Method == ApplicationMethodPriorityFIFO {
+		ruling.PriorityOrder = strategy.PriorityOrder
+	}
+	return Allocate(charges, paymentCents, ruling)
+}
+
 // Allocate distributes paymentCents across charges per the ruling.
 // Returns allocation results and any remaining credit (overpayment).
 func Allocate(charges []OutstandingCharge, paymentCents int64, ruling AllocationRuling) ([]AllocationResult, int64) {
