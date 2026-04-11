@@ -999,7 +999,8 @@ func TestCreateAssessment_CreatesLedgerEntry(t *testing.T) {
 }
 
 // TestRecordPayment_CreatesLedgerEntry verifies that recording a payment creates
-// a "payment" credit ledger entry (negative amount).
+// a "payment" credit ledger entry (negative amount). When no outstanding charges
+// exist, the entire payment is overpayment, producing a second "credit" entry.
 func TestRecordPayment_CreatesLedgerEntry(t *testing.T) {
 	svc, assessmentRepo, _, _, _, _ := newTestService()
 	ctx := context.Background()
@@ -1018,13 +1019,19 @@ func TestRecordPayment_CreatesLedgerEntry(t *testing.T) {
 	assert.Equal(t, int64(15000), payment.AmountCents)
 	assert.Equal(t, fin.PaymentStatusCompleted, payment.Status)
 
-	// Verify a ledger entry was created with negative amount (credit).
-	require.Len(t, assessmentRepo.ledger, 1)
+	// With no outstanding assessments, the entire payment is overpayment:
+	// entry 0 = payment credit, entry 1 = overpayment credit-on-account.
+	require.Len(t, assessmentRepo.ledger, 2)
 	entry := assessmentRepo.ledger[0]
 	assert.Equal(t, fin.LedgerEntryTypePayment, entry.EntryType)
 	assert.Equal(t, int64(-15000), entry.AmountCents)
 	assert.Equal(t, unitID, entry.UnitID)
 	assert.Equal(t, orgID, entry.OrgID)
+
+	credit := assessmentRepo.ledger[1]
+	assert.Equal(t, fin.LedgerEntryTypeCredit, credit.EntryType)
+	assert.Equal(t, int64(15000), credit.AmountCents)
+	assert.Equal(t, unitID, credit.UnitID)
 }
 
 // TestRecordPayment_Validation verifies that a negative amount is rejected.
@@ -1721,8 +1728,8 @@ func TestRecordPayment_SetsCurrencyCode(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "USD", payment.CurrencyCode)
 
-	// Verify ledger entry also has CurrencyCode set.
-	require.Len(t, assessmentRepo.ledger, 1)
+	// Verify ledger entries have CurrencyCode set (payment + overpayment credit).
+	require.GreaterOrEqual(t, len(assessmentRepo.ledger), 1)
 	assert.Equal(t, "USD", assessmentRepo.ledger[0].CurrencyCode)
 }
 

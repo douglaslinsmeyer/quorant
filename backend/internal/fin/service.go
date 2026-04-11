@@ -575,6 +575,55 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 	if req.Description != nil {
 		memo = *req.Description
 	}
+
+	// Resolve the payment application strategy via the engine's policy pipeline.
+	strategy, stratErr := engine.PaymentApplicationStrategy(ctx, PaymentContext{
+		OrgID:       orgID,
+		PaymentID:   created.ID,
+		PayerID:     userID,
+		AmountCents: created.AmountCents,
+	})
+	if stratErr != nil {
+		return nil, fmt.Errorf("fin: RecordPayment strategy: %w", stratErr)
+	}
+
+	// Gather outstanding assessments for the unit and allocate the payment.
+	assessments := s.assessments
+	if uow != nil {
+		assessments = s.assessments.WithTx(uow.Tx())
+	}
+	unitAssessments, listErr := assessments.ListAssessmentsByUnit(ctx, req.UnitID)
+	if listErr != nil {
+		return nil, fmt.Errorf("fin: RecordPayment list assessments: %w", listErr)
+	}
+	var charges []OutstandingCharge
+	for _, a := range unitAssessments {
+		if a.Status != AssessmentStatusPosted {
+			continue
+		}
+		charges = append(charges, OutstandingCharge{
+			ID:          a.ID,
+			ChargeType:  ChargeTypeRegularAssessment,
+			AmountCents: a.AmountCents,
+			DueDate:     a.DueDate,
+		})
+	}
+
+	allocResults, overpaymentCents := ApplyStrategy(strategy, charges, created.AmountCents)
+
+	// Persist each allocation line.
+	for _, ar := range allocResults {
+		alloc := &PaymentAllocation{
+			PaymentID:      created.ID,
+			ChargeType:     string(ar.ChargeType),
+			ChargeID:       ar.ChargeID,
+			AllocatedCents: ar.AllocatedCents,
+		}
+		if _, err := payments.CreatePaymentAllocation(ctx, alloc); err != nil {
+			return nil, fmt.Errorf("fin: RecordPayment allocation: %w", err)
+		}
+	}
+
 	ftx := FinancialTransaction{
 		Type:          TxTypePayment,
 		OrgID:         orgID,
@@ -583,6 +632,12 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 		SourceID:      created.ID,
 		UnitID:        &req.UnitID,
 		Memo:          memo,
+	}
+	if overpaymentCents > 0 {
+		if ftx.Metadata == nil {
+			ftx.Metadata = make(map[string]any)
+		}
+		ftx.Metadata["overpayment_cents"] = overpaymentCents
 	}
 	if vErr := engine.ValidateTransaction(ctx, ftx); vErr != nil {
 		return nil, fmt.Errorf("fin: RecordPayment validate: %w", vErr)
