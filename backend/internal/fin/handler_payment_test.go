@@ -43,7 +43,7 @@ func setupPaymentTestServer(t *testing.T) *paymentTestServer {
 		mockFundRepo,
 		mockCollectionRepo,
 		nil,
-		nil,
+		wildcardTestFactory(),
 		ai.NewNoopPolicyResolver(),
 		ai.NewNoopComplianceResolver(),
 		nil,

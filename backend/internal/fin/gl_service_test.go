@@ -458,10 +458,14 @@ func TestGLService_SeedDefaultAccounts(t *testing.T) {
 	svc, repo := newTestGLService()
 	ctx := context.Background()
 	orgID := uuid.New()
-	operatingFundID := uuid.New()
-	reserveFundID := uuid.New()
+	fundMap := map[string]uuid.UUID{
+		"operating": uuid.New(),
+		"reserve":   uuid.New(),
+		"capital":   uuid.New(),
+		"special":   uuid.New(),
+	}
 
-	err := svc.SeedDefaultAccounts(ctx, orgID, operatingFundID, reserveFundID, fin.NewGaapEngine())
+	err := svc.SeedDefaultAccounts(ctx, orgID, fundMap, fin.NewGaapEngine(nil, nil, fin.EngineConfig{}))
 	require.NoError(t, err)
 
 	// Count accounts belonging to this org.
@@ -471,7 +475,7 @@ func TestGLService_SeedDefaultAccounts(t *testing.T) {
 			count++
 		}
 	}
-	assert.Equal(t, 26, count)
+	assert.Equal(t, 56, count)
 
 	// Verify headers are marked correctly.
 	headers := 0
@@ -487,6 +491,28 @@ func TestGLService_SeedDefaultAccounts(t *testing.T) {
 		if a.OrgID == orgID && !a.IsHeader {
 			assert.NotNil(t, a.ParentID, "child account %d %s should have a parent_id", a.AccountNumber, a.Name)
 		}
+	}
+
+	// Verify fund-scoped accounts are linked to the correct fund IDs.
+	fundLinkedAccounts := 0
+	for _, a := range repo.accounts {
+		if a.OrgID == orgID && a.FundID != nil {
+			fundLinkedAccounts++
+		}
+	}
+	// 4 cash + 4 fund balance + 4 revenue + 1 reserve expense = 13 fund-scoped accounts
+	assert.Equal(t, 13, fundLinkedAccounts, "expected 13 fund-scoped accounts")
+
+	// Verify each fund type has at least one linked account.
+	for key, fundID := range fundMap {
+		found := false
+		for _, a := range repo.accounts {
+			if a.OrgID == orgID && a.FundID != nil && *a.FundID == fundID {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "expected at least one account linked to fund %s", key)
 	}
 }
 

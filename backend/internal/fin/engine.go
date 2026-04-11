@@ -2,84 +2,33 @@ package fin
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-// AccountingStandard identifies which accounting standard an engine implements.
-type AccountingStandard string
-
-const (
-	AccountingStandardGAAP AccountingStandard = "gaap"
-	AccountingStandardIFRS AccountingStandard = "ifrs"
+// Sentinel errors returned by engine methods.
+var (
+	ErrNotImplemented     = errors.New("accounting engine: method not implemented in this phase")
+	ErrCashBasisNoPayable = errors.New("accounting engine: cash basis does not recognize payables")
+	ErrClosedPeriod       = errors.New("accounting engine: cannot post to closed period")
+	ErrSoftClosedPeriod   = errors.New("accounting engine: only adjusting entries allowed in soft-closed period")
 )
-
-// IsValid returns true if the AccountingStandard is a recognized value.
-func (s AccountingStandard) IsValid() bool {
-	switch s {
-	case AccountingStandardGAAP, AccountingStandardIFRS:
-		return true
-	}
-	return false
-}
-
-// TransactionType classifies a financial transaction for the engine.
-type TransactionType string
-
-const (
-	TxTypeAssessment   TransactionType = "assessment"
-	TxTypePayment      TransactionType = "payment"
-	TxTypeFundTransfer TransactionType = "fund_transfer"
-)
-
-// IsValid returns true if the TransactionType is a recognized value.
-func (t TransactionType) IsValid() bool {
-	switch t {
-	case TxTypeAssessment, TxTypePayment, TxTypeFundTransfer:
-		return true
-	}
-	return false
-}
-
-// FinancialTransaction is the standard envelope passed to the engine.
-// The engine inspects Type to decide which accounting rules apply.
-type FinancialTransaction struct {
-	Type          TransactionType
-	OrgID         uuid.UUID
-	AmountCents   int64
-	EffectiveDate time.Time
-	SourceID      uuid.UUID
-	UnitID        *uuid.UUID
-	FundID        *uuid.UUID
-	Memo          string
-	Metadata      map[string]any
-}
-
-// GLAccountSeed defines a single account to create when seeding an org's chart of accounts.
-type GLAccountSeed struct {
-	Number    int
-	Name      string
-	Type      GLAccountType
-	IsHeader  bool
-	IsSystem  bool
-	FundKey   string // "operating", "reserve", or "" for no fund
-	ParentNum int    // 0 means no parent
-}
 
 // AccountingEngine defines the contract for accounting standard drivers.
-// Phase 1 covers JournalLines and ChartOfAccounts. Future phases will add
-// ValidateTransaction, PaymentApplicationStrategy, PayableRecognitionDate,
-// RevenueRecognitionDate, and PaymentTerms.
 type AccountingEngine interface {
-	// Standard returns the accounting standard this engine implements.
 	Standard() AccountingStandard
-
-	// JournalLines resolves GL account mappings and returns the journal lines
-	// to post for the given transaction. The GLService is passed so the engine
-	// can look up accounts by org+number within the current transaction.
-	JournalLines(ctx context.Context, gl *GLService, tx FinancialTransaction) ([]GLJournalLine, error)
-
-	// ChartOfAccounts returns the default chart of accounts for this standard.
 	ChartOfAccounts() []GLAccountSeed
+	RecordTransaction(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error)
+	ValidateTransaction(ctx context.Context, tx FinancialTransaction) error
+	PaymentApplicationStrategy(ctx context.Context, pc PaymentContext) (*ApplicationStrategy, error)
+	PaymentTerms(ctx context.Context, pc PayableContext) (*PaymentTermsResult, error)
+	PayableRecognitionDate(ctx context.Context, ec ExpenseContext) (time.Time, error)
+	RevenueRecognitionDate(ctx context.Context, tx FinancialTransaction) (time.Time, error)
+}
+
+// AccountResolver provides account lookups for the engine.
+type AccountResolver interface {
+	FindAccountByOrgAndNumber(ctx context.Context, orgID uuid.UUID, number int) (*GLAccount, error)
 }
