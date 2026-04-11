@@ -1200,16 +1200,7 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 		funds = s.funds.WithTx(uow.Tx())
 	}
 
-	created, err := funds.CreateTransfer(ctx, t)
-	if err != nil {
-		return nil, err
-	}
-
-	// Delegate GL journal, fund transactions to the engine.
-	engine, engineErr := s.factory.ForOrg(ctx, orgID)
-	if engineErr != nil {
-		return nil, fmt.Errorf("fin: CreateFundTransfer engine: %w", engineErr)
-	}
+	// Look up source and destination funds for validation.
 	fromFund, err := funds.FindFundByID(ctx, req.FromFundID)
 	if err != nil {
 		return nil, fmt.Errorf("fin: CreateFundTransfer lookup source fund: %w", err)
@@ -1219,7 +1210,27 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 		return nil, fmt.Errorf("fin: CreateFundTransfer lookup dest fund: %w", err)
 	}
 	if fromFund == nil || toFund == nil {
-		return nil, fmt.Errorf("fin: CreateFundTransfer: source or destination fund not found")
+		return nil, api.NewNotFoundError("fin.fund.not_found")
+	}
+
+	// Balance sufficiency check.
+	if fromFund.BalanceCents < req.AmountCents {
+		return nil, api.NewValidationError(
+			"fin.fund_transfer.insufficient_balance", "amount_cents",
+			api.P("available", fromFund.BalanceCents),
+			api.P("requested", req.AmountCents),
+		)
+	}
+
+	created, err := funds.CreateTransfer(ctx, t)
+	if err != nil {
+		return nil, err
+	}
+
+	// Delegate GL journal, fund transactions to the engine.
+	engine, engineErr := s.factory.ForOrg(ctx, orgID)
+	if engineErr != nil {
+		return nil, fmt.Errorf("fin: CreateFundTransfer engine: %w", engineErr)
 	}
 	ftx := FinancialTransaction{
 		Type:          TxTypeFundTransfer,

@@ -1779,6 +1779,12 @@ func TestCreateFundTransfer_SetsCurrencyCode(t *testing.T) {
 	// Create two funds to transfer between.
 	from, err := svc.CreateFund(ctx, orgID, fin.CreateFundRequest{Name: "From Fund", FundType: "operating"})
 	require.NoError(t, err)
+	// Give the source fund sufficient balance.
+	for i := range fundRepo.funds {
+		if fundRepo.funds[i].ID == from.ID {
+			fundRepo.funds[i].BalanceCents = 10000
+		}
+	}
 	to, err := svc.CreateFund(ctx, orgID, fin.CreateFundRequest{Name: "To Fund", FundType: "reserve"})
 	require.NoError(t, err)
 

@@ -104,6 +104,11 @@ func (e *IfrsEngine) ValidateTransaction(ctx context.Context, tx FinancialTransa
 		if len(tx.FundAllocations) < 2 {
 			return fmt.Errorf("validate: %s requires at least 2 fund_allocations (source and destination)", tx.Type)
 		}
+		if tx.Type == TxTypeFundTransfer {
+			if err := validateReserveWithdrawal(ctx, e.registry, tx); err != nil {
+				return err
+			}
+		}
 	case TxTypePayment:
 		if tx.UnitID == nil {
 			return fmt.Errorf("validate: payment requires unit_id")

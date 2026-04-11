@@ -232,6 +232,7 @@ func TestCreateFundTransfer_Success(t *testing.T) {
 	ts := setupFundTestServer(t)
 	orgID := uuid.New()
 	fromFund := seedFund(t, ts.mockFundRepo, orgID)
+	fromFund.BalanceCents = 50000 // sufficient balance
 	toFund := seedFund(t, ts.mockFundRepo, orgID)
 
 	body := map[string]any{
@@ -253,6 +254,23 @@ func TestCreateFundTransfer_Success(t *testing.T) {
 	assert.Equal(t, toFund.ID, envelope.Data.ToFundID)
 	assert.Equal(t, int64(10000), envelope.Data.AmountCents)
 	assert.NotEqual(t, uuid.Nil, envelope.Data.ID)
+}
+
+func TestCreateFundTransfer_InsufficientBalance(t *testing.T) {
+	ts := setupFundTestServer(t)
+	orgID := uuid.New()
+	fromFund := seedFund(t, ts.mockFundRepo, orgID)
+	fromFund.BalanceCents = 5000 // only 5000 available
+	toFund := seedFund(t, ts.mockFundRepo, orgID)
+
+	body := map[string]any{
+		"from_fund_id": fromFund.ID,
+		"to_fund_id":   toFund.ID,
+		"amount_cents": 10000, // trying to transfer 10000
+	}
+	resp := doFinRequest(t, ts.server.URL, http.MethodPost,
+		fmt.Sprintf("/organizations/%s/fund-transfers", orgID), body)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
 func TestCreateFundTransfer_InvalidBody(t *testing.T) {

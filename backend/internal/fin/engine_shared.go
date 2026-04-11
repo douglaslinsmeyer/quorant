@@ -250,6 +250,47 @@ func validateOverpayment(ctx context.Context, registry *policy.Registry, tx Fina
 	}
 }
 
+// reserveWithdrawalRuling holds the decoded reserve_withdrawal_policy ruling.
+type reserveWithdrawalRuling struct {
+	RequiresApproval bool `json:"requires_approval"`
+}
+
+// validateReserveWithdrawal checks whether a fund transfer from a reserve fund
+// requires board approval. When the registry is nil or no policy is configured,
+// reserve withdrawals are allowed without approval.
+func validateReserveWithdrawal(ctx context.Context, registry *policy.Registry, tx FinancialTransaction) error {
+	if registry == nil {
+		return nil
+	}
+
+	// Only applies to transfers FROM reserve funds.
+	fromType, _ := tx.Metadata["from_fund_type"].(string)
+	if fromType != string(FundTypeReserve) {
+		return nil
+	}
+
+	resolution, err := registry.Resolve(ctx, tx.OrgID, nil, "reserve_withdrawal_policy")
+	if err != nil || resolution == nil || resolution.Ruling == nil {
+		return nil // no policy configured — allow
+	}
+
+	var ruling reserveWithdrawalRuling
+	if err := json.Unmarshal(resolution.Ruling, &ruling); err != nil {
+		return nil
+	}
+
+	if !ruling.RequiresApproval {
+		return nil
+	}
+
+	// Check if approval was provided.
+	if approvedBy, ok := tx.Metadata["approved_by"].(string); ok && approvedBy != "" {
+		return nil
+	}
+
+	return fmt.Errorf("validate: reserve fund withdrawal requires board approval")
+}
+
 // validateFeeCap checks whether a late fee exceeds the jurisdiction-scoped cap.
 // When the registry is nil or no cap policy is configured, all fees are allowed.
 func validateFeeCap(ctx context.Context, registry *policy.Registry, tx FinancialTransaction) error {
