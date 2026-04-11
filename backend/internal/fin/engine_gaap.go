@@ -54,6 +54,12 @@ func (e *GaapEngine) RecordTransaction(ctx context.Context, tx FinancialTransact
 		return e.lateFeeEffects(ctx, tx)
 	case TxTypeInterestAccrual:
 		return e.interestAccrualEffects(ctx, tx)
+	case TxTypeBadDebtProvision:
+		return e.badDebtProvisionEffects(ctx, tx)
+	case TxTypeBadDebtWriteOff:
+		return e.badDebtWriteOffEffects(ctx, tx)
+	case TxTypeBadDebtRecovery:
+		return e.badDebtRecoveryEffects(ctx, tx)
 	default:
 		return nil, fmt.Errorf("record transaction: unsupported type %q", tx.Type)
 	}
