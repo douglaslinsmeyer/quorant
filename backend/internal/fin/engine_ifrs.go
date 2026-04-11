@@ -15,14 +15,20 @@ type IfrsEngine struct {
 	resolver AccountResolver
 	registry *policy.Registry
 	config   EngineConfig
+	periods  AccountingPeriodRepository
 }
 
 // NewIfrsEngine returns a new IFRS accounting engine.
-func NewIfrsEngine(resolver AccountResolver, registry *policy.Registry, config EngineConfig) *IfrsEngine {
+func NewIfrsEngine(resolver AccountResolver, registry *policy.Registry, config EngineConfig, periods ...AccountingPeriodRepository) *IfrsEngine {
+	var p AccountingPeriodRepository
+	if len(periods) > 0 {
+		p = periods[0]
+	}
 	return &IfrsEngine{
 		resolver: resolver,
 		registry: registry,
 		config:   config,
+		periods:  p,
 	}
 }
 
@@ -82,7 +88,7 @@ func (e *IfrsEngine) RecordTransaction(ctx context.Context, tx FinancialTransact
 
 // ValidateTransaction validates a financial transaction against IFRS rules.
 // Modified accrual basis is rejected outright under IFRS.
-func (e *IfrsEngine) ValidateTransaction(_ context.Context, tx FinancialTransaction) error {
+func (e *IfrsEngine) ValidateTransaction(ctx context.Context, tx FinancialTransaction) error {
 	if e.config.RecognitionBasis == RecognitionBasisModifiedAccrual {
 		return fmt.Errorf("validate transaction: IFRS does not support modified_accrual basis")
 	}
@@ -103,6 +109,12 @@ func (e *IfrsEngine) ValidateTransaction(_ context.Context, tx FinancialTransact
 			return fmt.Errorf("validate: payment requires unit_id")
 		}
 	}
+
+	// Period boundary check.
+	if err := validatePeriodBoundary(ctx, e.periods, tx); err != nil {
+		return err
+	}
+
 	return nil
 }
 

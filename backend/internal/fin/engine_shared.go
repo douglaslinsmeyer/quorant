@@ -155,3 +155,29 @@ func rulingToStrategy(ruling *AllocationRuling) *ApplicationStrategy {
 func resolveRevenueRecognitionDate(_ RecognitionBasis, tx FinancialTransaction) (time.Time, error) {
 	return tx.EffectiveDate, nil
 }
+
+// validatePeriodBoundary checks whether the transaction's EffectiveDate falls
+// in an open (or soft-closed for adjusting entries) accounting period. When
+// periods is nil, all transactions are allowed (backward compatible).
+func validatePeriodBoundary(ctx context.Context, periods AccountingPeriodRepository, tx FinancialTransaction) error {
+	if periods == nil {
+		return nil
+	}
+
+	period, err := periods.GetPeriodForDate(ctx, tx.OrgID, tx.EffectiveDate)
+	if err != nil {
+		// Period not found — allow (periods may not be set up yet).
+		return nil
+	}
+
+	switch period.Status {
+	case PeriodStatusClosed:
+		return ErrClosedPeriod
+	case PeriodStatusSoftClosed:
+		if tx.Type != TxTypeAdjustingEntry {
+			return ErrSoftClosedPeriod
+		}
+	}
+
+	return nil
+}

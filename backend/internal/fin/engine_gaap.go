@@ -12,14 +12,20 @@ type GaapEngine struct {
 	resolver AccountResolver
 	registry *policy.Registry
 	config   EngineConfig
+	periods  AccountingPeriodRepository
 }
 
 // NewGaapEngine returns a new GAAP accounting engine.
-func NewGaapEngine(resolver AccountResolver, registry *policy.Registry, config EngineConfig) *GaapEngine {
+func NewGaapEngine(resolver AccountResolver, registry *policy.Registry, config EngineConfig, periods ...AccountingPeriodRepository) *GaapEngine {
+	var p AccountingPeriodRepository
+	if len(periods) > 0 {
+		p = periods[0]
+	}
 	return &GaapEngine{
 		resolver: resolver,
 		registry: registry,
 		config:   config,
+		periods:  p,
 	}
 }
 
@@ -588,7 +594,7 @@ func metadataInt(m map[string]any, key string) (int, bool) {
 }
 
 // ValidateTransaction validates a financial transaction against GAAP rules.
-func (e *GaapEngine) ValidateTransaction(_ context.Context, tx FinancialTransaction) error {
+func (e *GaapEngine) ValidateTransaction(ctx context.Context, tx FinancialTransaction) error {
 	if e.config.RecognitionBasis == RecognitionBasisModifiedAccrual {
 		return fmt.Errorf("validate transaction: modified_accrual basis not yet implemented (Phase 1 supports cash and accrual)")
 	}
@@ -609,6 +615,12 @@ func (e *GaapEngine) ValidateTransaction(_ context.Context, tx FinancialTransact
 			return fmt.Errorf("validate: payment requires unit_id")
 		}
 	}
+
+	// Period boundary check.
+	if err := validatePeriodBoundary(ctx, e.periods, tx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
