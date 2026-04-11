@@ -357,3 +357,188 @@ func TestIfrsEngine_RecordTransaction_BadDebtProvision(t *testing.T) {
 	assert.Equal(t, resolver.accounts[1105].ID, effects.JournalLines[1].AccountID)
 	assert.Equal(t, int64(5000), effects.JournalLines[1].CreditCents)
 }
+
+// ── ValidateTransaction tests ───────────────────────────────────────
+
+func TestIfrsEngine_ValidateTransaction_RejectsModifiedAccrual(t *testing.T) {
+	engine := NewIfrsEngine(nil, nil, EngineConfig{
+		RecognitionBasis: RecognitionBasisModifiedAccrual,
+		FiscalYearStart:  1,
+	})
+
+	tx := FinancialTransaction{
+		Type: TxTypeAssessment, OrgID: uuid.New(), AmountCents: 10000,
+		SourceID: uuid.New(), UnitID: ptr(uuid.New()),
+	}
+	err := engine.ValidateTransaction(context.Background(), tx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "modified_accrual")
+	assert.Contains(t, err.Error(), "IFRS")
+}
+
+func TestIfrsEngine_ValidateTransaction_Valid(t *testing.T) {
+	engine := newTestIfrsEngine()
+
+	tx := FinancialTransaction{
+		Type: TxTypeAssessment, OrgID: uuid.New(), AmountCents: 10000,
+		EffectiveDate: time.Now(), SourceID: uuid.New(), UnitID: ptr(uuid.New()),
+		FundAllocations: []FundAllocation{{FundID: uuid.New(), FundKey: "operating", AmountCents: 10000}},
+	}
+	assert.NoError(t, engine.ValidateTransaction(context.Background(), tx))
+}
+
+func TestIfrsEngine_ValidateTransaction_NegativeAmount(t *testing.T) {
+	engine := newTestIfrsEngine()
+
+	tx := FinancialTransaction{
+		Type: TxTypeAssessment, OrgID: uuid.New(), AmountCents: -100,
+		SourceID: uuid.New(), UnitID: ptr(uuid.New()),
+	}
+	err := engine.ValidateTransaction(context.Background(), tx)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "positive")
+}
+
+func TestIfrsEngine_ValidateTransaction_AssessmentRequiresUnit(t *testing.T) {
+	engine := newTestIfrsEngine()
+
+	tx := FinancialTransaction{
+		Type: TxTypeAssessment, OrgID: uuid.New(), AmountCents: 10000,
+		SourceID: uuid.New(),
+	}
+	err := engine.ValidateTransaction(context.Background(), tx)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unit_id")
+}
+
+// ── PaymentTerms tests ─────────────────────────────────────────────
+
+func TestIfrsEngine_PaymentTerms_Net30(t *testing.T) {
+	engine := newTestIfrsEngine()
+	invoiceDate := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+
+	result, err := engine.PaymentTerms(context.Background(), PayableContext{
+		PayableID:   uuid.New(),
+		InvoiceDate: invoiceDate,
+		VendorTerms: "Net 30",
+		AmountCents: 50000,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, invoiceDate.AddDate(0, 0, 30), result.DueDate)
+	assert.Nil(t, result.DiscountDate)
+	assert.Nil(t, result.DiscountPercent)
+}
+
+func TestIfrsEngine_PaymentTerms_DiscountTerms(t *testing.T) {
+	engine := newTestIfrsEngine()
+	invoiceDate := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+
+	result, err := engine.PaymentTerms(context.Background(), PayableContext{
+		PayableID:   uuid.New(),
+		InvoiceDate: invoiceDate,
+		VendorTerms: "2/10 Net 30",
+		AmountCents: 50000,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, invoiceDate.AddDate(0, 0, 30), result.DueDate)
+	require.NotNil(t, result.DiscountDate)
+	assert.Equal(t, invoiceDate.AddDate(0, 0, 10), *result.DiscountDate)
+	require.NotNil(t, result.DiscountPercent)
+	assert.Equal(t, float64(2), *result.DiscountPercent)
+}
+
+func TestIfrsEngine_PaymentTerms_Default(t *testing.T) {
+	engine := newTestIfrsEngine()
+	invoiceDate := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+
+	result, err := engine.PaymentTerms(context.Background(), PayableContext{
+		PayableID:   uuid.New(),
+		InvoiceDate: invoiceDate,
+		VendorTerms: "", // empty defaults to Net 30
+		AmountCents: 50000,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, invoiceDate.AddDate(0, 0, 30), result.DueDate)
+}
+
+// ── PayableRecognitionDate tests ────────────────────────────────────
+
+func TestIfrsEngine_PayableRecognitionDate_Accrual_ServiceDate(t *testing.T) {
+	engine := newTestIfrsEngine()
+	serviceDate := time.Date(2026, 3, 15, 0, 0, 0, 0, time.UTC)
+
+	date, err := engine.PayableRecognitionDate(context.Background(), ExpenseContext{
+		InvoiceDate: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+		ServiceDate: &serviceDate,
+		AmountCents: 50000,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, serviceDate, date)
+}
+
+func TestIfrsEngine_PayableRecognitionDate_Accrual_FallbackToInvoice(t *testing.T) {
+	engine := newTestIfrsEngine()
+	invoiceDate := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+
+	date, err := engine.PayableRecognitionDate(context.Background(), ExpenseContext{
+		InvoiceDate: invoiceDate,
+		AmountCents: 50000,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, invoiceDate, date)
+}
+
+func TestIfrsEngine_PayableRecognitionDate_CashBasis(t *testing.T) {
+	engine := NewIfrsEngine(nil, nil, EngineConfig{
+		RecognitionBasis: RecognitionBasisCash,
+		FiscalYearStart:  1,
+	})
+
+	_, err := engine.PayableRecognitionDate(context.Background(), ExpenseContext{
+		InvoiceDate: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+		AmountCents: 50000,
+	})
+	assert.ErrorIs(t, err, ErrCashBasisNoPayable)
+}
+
+// ── RevenueRecognitionDate tests ────────────────────────────────────
+
+func TestIfrsEngine_RevenueRecognitionDate(t *testing.T) {
+	engine := newTestIfrsEngine()
+	effectiveDate := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+
+	date, err := engine.RevenueRecognitionDate(context.Background(), FinancialTransaction{
+		Type:          TxTypeAssessment,
+		EffectiveDate: effectiveDate,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, effectiveDate, date)
+}
+
+// ── PaymentApplicationStrategy tests ────────────────────────────────
+
+func TestIfrsEngine_PaymentApplicationStrategy_DefaultOldestFirst(t *testing.T) {
+	engine := newTestIfrsEngine()
+
+	strategy, err := engine.PaymentApplicationStrategy(context.Background(), PaymentContext{
+		OrgID:     uuid.New(),
+		PaymentID: uuid.New(),
+		PayerID:   uuid.New(),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, ApplicationMethodOldestFirst, strategy.Method)
+}
+
+func TestIfrsEngine_PaymentApplicationStrategy_Designated(t *testing.T) {
+	engine := newTestIfrsEngine()
+	invoiceID := uuid.New()
+
+	strategy, err := engine.PaymentApplicationStrategy(context.Background(), PaymentContext{
+		OrgID:             uuid.New(),
+		PaymentID:         uuid.New(),
+		PayerID:           uuid.New(),
+		DesignatedInvoice: &invoiceID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, ApplicationMethodDesignated, strategy.Method)
+}
