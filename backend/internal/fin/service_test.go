@@ -850,14 +850,59 @@ func (m *mockCollectionRepo) WithTx(_ pgx.Tx) fin.CollectionRepository { return 
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
+// wildcardAccountResolver returns a deterministic GLAccount for any org+number
+// combination so that engine tests work without a real GL service.
+type wildcardAccountResolver struct{}
+
+func (w *wildcardAccountResolver) FindAccountByOrgAndNumber(_ context.Context, _ uuid.UUID, number int) (*fin.GLAccount, error) {
+	id := uuid.NewSHA1(uuid.Nil, []byte(fmt.Sprintf("account-%d", number)))
+	return &fin.GLAccount{ID: id, AccountNumber: number}, nil
+}
+
+// wildcardTestFactory creates an EngineFactory that accepts any orgID (uses a
+// wildcard config repo).
+func wildcardTestFactory() *fin.EngineFactory {
+	repo := &wildcardConfigRepo{}
+	builders := map[fin.AccountingStandard]fin.EngineBuilder{
+		fin.AccountingStandardGAAP: func(config fin.EngineConfig) fin.AccountingEngine {
+			return fin.NewGaapEngine(&wildcardAccountResolver{}, nil, config)
+		},
+	}
+	return fin.NewEngineFactory(builders, repo)
+}
+
+// wildcardConfigRepo returns an accrual GAAP config for any org.
+type wildcardConfigRepo struct{}
+
+func (r *wildcardConfigRepo) CreateConfig(_ context.Context, cfg *fin.OrgAccountingConfig) (*fin.OrgAccountingConfig, error) {
+	cfg.ID = uuid.New()
+	cfg.CreatedAt = time.Now()
+	return cfg, nil
+}
+
+func (r *wildcardConfigRepo) GetEffectiveConfig(_ context.Context, _ uuid.UUID, _ time.Time) (*fin.OrgAccountingConfig, error) {
+	return &fin.OrgAccountingConfig{
+		ID:               uuid.New(),
+		Standard:         fin.AccountingStandardGAAP,
+		RecognitionBasis: fin.RecognitionBasisAccrual,
+		FiscalYearStart:  time.January,
+		EffectiveDate:    time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+	}, nil
+}
+
+func (r *wildcardConfigRepo) ListConfigsByOrg(_ context.Context, _ uuid.UUID) ([]fin.OrgAccountingConfig, error) {
+	return nil, nil
+}
+
 func newTestService() (*fin.FinService, *mockAssessmentRepo, *mockPaymentRepo, *mockBudgetRepo, *mockFundRepo, *mockCollectionRepo) {
 	assessments := &mockAssessmentRepo{}
 	payments := &mockPaymentRepo{}
 	budgets := &mockBudgetRepo{}
 	funds := &mockFundRepo{}
 	collections := &mockCollectionRepo{}
+	factory := wildcardTestFactory()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, nil, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, factory, ai.NewNoopPolicyResolver(), ai.NewNoopComplianceResolver(), nil, logger, nil)
 	return svc, assessments, payments, budgets, funds, collections
 }
 

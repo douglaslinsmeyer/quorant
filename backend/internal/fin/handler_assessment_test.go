@@ -43,7 +43,7 @@ func setupAssessmentTestServer(t *testing.T) *assessmentTestServer {
 		mockFundRepo,
 		mockCollectionRepo,
 		nil,
-		nil,
+		wildcardTestFactory(),
 		ai.NewNoopPolicyResolver(),
 		ai.NewNoopComplianceResolver(),
 		nil,

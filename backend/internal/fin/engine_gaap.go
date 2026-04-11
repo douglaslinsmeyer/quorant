@@ -39,6 +39,9 @@ func (e *GaapEngine) ChartOfAccounts() []GLAccountSeed {
 
 // RecordTransaction records a financial transaction and returns the resulting effects.
 func (e *GaapEngine) RecordTransaction(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error) {
+	if e.config.RecognitionBasis == RecognitionBasisModifiedAccrual {
+		return nil, fmt.Errorf("record transaction: modified_accrual basis not yet implemented (Phase 1 supports cash and accrual)")
+	}
 	switch tx.Type {
 	case TxTypeAssessment:
 		return e.assessmentEffects(ctx, tx)
@@ -55,24 +58,34 @@ func (e *GaapEngine) RecordTransaction(ctx context.Context, tx FinancialTransact
 	}
 }
 
-// fundIndexToRevenueAccount maps fund allocation index to revenue account number.
-var fundIndexToRevenueAccount = map[int]int{0: 4010, 1: 4020, 2: 4030, 3: 4040}
-
-func revenueAccountForFundIndex(idx int) int {
-	if num, ok := fundIndexToRevenueAccount[idx]; ok {
-		return num
-	}
-	return 4010
+// fundKeyToRevenueAccount maps fund key to revenue account number.
+var fundKeyToRevenueAccount = map[string]int{
+	"operating": 4010,
+	"reserve":   4020,
+	"capital":   4030,
+	"special":   4040,
 }
 
-// fundIndexToCashAccount maps fund allocation index to cash account number.
-var fundIndexToCashAccount = map[int]int{0: 1010, 1: 1020, 2: 1030, 3: 1040}
-
-func cashAccountForFundIndex(idx int) int {
-	if num, ok := fundIndexToCashAccount[idx]; ok {
+func revenueAccountForFundKey(key string) int {
+	if num, ok := fundKeyToRevenueAccount[key]; ok {
 		return num
 	}
-	return 1010
+	return 4010 // default to operating
+}
+
+// fundKeyToCashAccount maps fund key to cash account number.
+var fundKeyToCashAccount = map[string]int{
+	"operating": 1010,
+	"reserve":   1020,
+	"capital":   1030,
+	"special":   1040,
+}
+
+func cashAccountForFundKey(key string) int {
+	if num, ok := fundKeyToCashAccount[key]; ok {
+		return num
+	}
+	return 1010 // default to operating
 }
 
 func (e *GaapEngine) assessmentEffects(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error) {
@@ -114,8 +127,8 @@ func (e *GaapEngine) assessmentEffects(ctx context.Context, tx FinancialTransact
 			AccountID: revenueAccount.ID, CreditCents: tx.AmountCents,
 		})
 	} else {
-		for i, alloc := range tx.FundAllocations {
-			revenueNum := revenueAccountForFundIndex(i)
+		for _, alloc := range tx.FundAllocations {
+			revenueNum := revenueAccountForFundKey(alloc.FundKey)
 			revenueAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, revenueNum)
 			if err != nil {
 				return nil, fmt.Errorf("assessment: resolve revenue account %d: %w", revenueNum, err)
@@ -165,8 +178,8 @@ func (e *GaapEngine) paymentEffects(ctx context.Context, tx FinancialTransaction
 				GLJournalLine{AccountID: revenueAccount.ID, CreditCents: tx.AmountCents},
 			)
 		} else {
-			for i, alloc := range tx.FundAllocations {
-				cashNum := cashAccountForFundIndex(i)
+			for _, alloc := range tx.FundAllocations {
+				cashNum := cashAccountForFundKey(alloc.FundKey)
 				cashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, cashNum)
 				if err != nil {
 					return nil, fmt.Errorf("payment: resolve cash account %d: %w", cashNum, err)
@@ -175,7 +188,7 @@ func (e *GaapEngine) paymentEffects(ctx context.Context, tx FinancialTransaction
 					AccountID: cashAccount.ID, DebitCents: alloc.AmountCents,
 				})
 
-				revenueNum := revenueAccountForFundIndex(i)
+				revenueNum := revenueAccountForFundKey(alloc.FundKey)
 				revenueAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, revenueNum)
 				if err != nil {
 					return nil, fmt.Errorf("payment: resolve revenue account %d: %w", revenueNum, err)
@@ -210,8 +223,8 @@ func (e *GaapEngine) paymentEffects(ctx context.Context, tx FinancialTransaction
 			GLJournalLine{AccountID: arAccount.ID, CreditCents: tx.AmountCents},
 		)
 	} else {
-		for i, alloc := range tx.FundAllocations {
-			cashNum := cashAccountForFundIndex(i)
+		for _, alloc := range tx.FundAllocations {
+			cashNum := cashAccountForFundKey(alloc.FundKey)
 			cashAccount, err := e.resolver.FindAccountByOrgAndNumber(ctx, tx.OrgID, cashNum)
 			if err != nil {
 				return nil, fmt.Errorf("payment: resolve cash account %d: %w", cashNum, err)
@@ -253,12 +266,12 @@ func (e *GaapEngine) fundTransferEffects(ctx context.Context, tx FinancialTransa
 	effects := &FinancialEffects{}
 
 	// Resolve source and destination cash accounts.
-	// When FundAllocations are provided, use index-based mapping.
+	// When FundAllocations have FundKey set, use fund-key-based mapping.
 	// Otherwise, fall back to Metadata fund type strings set by the service layer.
 	var srcCashNum, dstCashNum int
-	if len(tx.FundAllocations) >= 2 {
-		srcCashNum = cashAccountForFundIndex(0)
-		dstCashNum = cashAccountForFundIndex(1)
+	if len(tx.FundAllocations) >= 2 && tx.FundAllocations[0].FundKey != "" {
+		srcCashNum = cashAccountForFundKey(tx.FundAllocations[0].FundKey)
+		dstCashNum = cashAccountForFundKey(tx.FundAllocations[1].FundKey)
 	} else {
 		srcType, _ := tx.Metadata["from_fund_type"].(string)
 		dstType, _ := tx.Metadata["to_fund_type"].(string)
@@ -406,6 +419,9 @@ func (e *GaapEngine) interestAccrualEffects(ctx context.Context, tx FinancialTra
 
 // ValidateTransaction validates a financial transaction against GAAP rules.
 func (e *GaapEngine) ValidateTransaction(_ context.Context, tx FinancialTransaction) error {
+	if e.config.RecognitionBasis == RecognitionBasisModifiedAccrual {
+		return fmt.Errorf("validate transaction: modified_accrual basis not yet implemented (Phase 1 supports cash and accrual)")
+	}
 	if tx.Type != TxTypeAdjustingEntry && tx.AmountCents <= 0 {
 		return fmt.Errorf("validate: amount_cents must be positive, got %d", tx.AmountCents)
 	}

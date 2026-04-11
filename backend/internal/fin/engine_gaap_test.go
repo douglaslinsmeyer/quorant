@@ -134,7 +134,7 @@ func TestGaapEngine_ValidateTransaction(t *testing.T) {
 		tx := FinancialTransaction{
 			Type: TxTypeAssessment, OrgID: uuid.New(), AmountCents: 10000,
 			EffectiveDate: time.Now(), SourceID: uuid.New(), UnitID: ptr(uuid.New()),
-			FundAllocations: []FundAllocation{{FundID: uuid.New(), AmountCents: 10000}},
+			FundAllocations: []FundAllocation{{FundID: uuid.New(), FundKey: "operating", AmountCents: 10000}},
 		}
 		assert.NoError(t, engine.ValidateTransaction(context.Background(), tx))
 	})
@@ -230,7 +230,7 @@ func TestGaapEngine_RecordTransaction_Assessment_Accrual(t *testing.T) {
 		Type: TxTypeAssessment, OrgID: uuid.New(), AmountCents: 25000,
 		EffectiveDate: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
 		SourceID: uuid.New(), UnitID: &unitID,
-		FundAllocations: []FundAllocation{{FundID: fundID, AmountCents: 25000}},
+		FundAllocations: []FundAllocation{{FundID: fundID, FundKey: "operating", AmountCents: 25000}},
 		Memo:            "Monthly assessment",
 	}
 
@@ -268,7 +268,7 @@ func TestGaapEngine_RecordTransaction_Assessment_CashBasis(t *testing.T) {
 		Type: TxTypeAssessment, OrgID: uuid.New(), AmountCents: 25000,
 		EffectiveDate: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
 		SourceID: uuid.New(), UnitID: &unitID,
-		FundAllocations: []FundAllocation{{FundID: uuid.New(), AmountCents: 25000}},
+		FundAllocations: []FundAllocation{{FundID: uuid.New(), FundKey: "operating", AmountCents: 25000}},
 	}
 
 	effects, err := engine.RecordTransaction(context.Background(), tx)
@@ -292,8 +292,8 @@ func TestGaapEngine_RecordTransaction_Assessment_SplitFund(t *testing.T) {
 		EffectiveDate: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
 		SourceID: uuid.New(), UnitID: &unitID,
 		FundAllocations: []FundAllocation{
-			{FundID: opFundID, AmountCents: 20000},
-			{FundID: resFundID, AmountCents: 5000},
+			{FundID: opFundID, FundKey: "operating", AmountCents: 20000},
+			{FundID: resFundID, FundKey: "reserve", AmountCents: 5000},
 		},
 	}
 
@@ -326,7 +326,7 @@ func TestGaapEngine_RecordTransaction_Payment_Accrual(t *testing.T) {
 		Type: TxTypePayment, OrgID: uuid.New(), AmountCents: 15000,
 		EffectiveDate: time.Date(2026, 4, 5, 0, 0, 0, 0, time.UTC),
 		SourceID: uuid.New(), UnitID: &unitID,
-		FundAllocations: []FundAllocation{{FundID: fundID, AmountCents: 15000}},
+		FundAllocations: []FundAllocation{{FundID: fundID, FundKey: "operating", AmountCents: 15000}},
 		Memo:            "Monthly payment",
 	}
 
@@ -366,7 +366,7 @@ func TestGaapEngine_RecordTransaction_Payment_CashBasis(t *testing.T) {
 		Type: TxTypePayment, OrgID: uuid.New(), AmountCents: 15000,
 		EffectiveDate: time.Date(2026, 4, 5, 0, 0, 0, 0, time.UTC),
 		SourceID: uuid.New(), UnitID: &unitID,
-		FundAllocations: []FundAllocation{{FundID: fundID, AmountCents: 15000}},
+		FundAllocations: []FundAllocation{{FundID: fundID, FundKey: "operating", AmountCents: 15000}},
 		Memo:            "Monthly payment",
 	}
 
@@ -405,8 +405,8 @@ func TestGaapEngine_RecordTransaction_FundTransfer(t *testing.T) {
 		EffectiveDate: time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC),
 		SourceID:      uuid.New(),
 		FundAllocations: []FundAllocation{
-			{FundID: srcFundID, AmountCents: 50000},
-			{FundID: dstFundID, AmountCents: 50000},
+			{FundID: srcFundID, FundKey: "operating", AmountCents: 50000},
+			{FundID: dstFundID, FundKey: "reserve", AmountCents: 50000},
 		},
 		Memo: "Transfer to reserve",
 	}
@@ -451,7 +451,7 @@ func TestGaapEngine_RecordTransaction_LateFee(t *testing.T) {
 		Type: TxTypeLateFee, OrgID: uuid.New(), AmountCents: 2500,
 		EffectiveDate: time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC),
 		SourceID: uuid.New(), UnitID: &unitID,
-		FundAllocations: []FundAllocation{{FundID: fundID, AmountCents: 2500}},
+		FundAllocations: []FundAllocation{{FundID: fundID, FundKey: "operating", AmountCents: 2500}},
 		Memo:            "Late fee",
 	}
 
@@ -490,7 +490,7 @@ func TestGaapEngine_RecordTransaction_LateFee_CashBasis(t *testing.T) {
 		Type: TxTypeLateFee, OrgID: uuid.New(), AmountCents: 2500,
 		EffectiveDate: time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC),
 		SourceID: uuid.New(), UnitID: &unitID,
-		FundAllocations: []FundAllocation{{FundID: uuid.New(), AmountCents: 2500}},
+		FundAllocations: []FundAllocation{{FundID: uuid.New(), FundKey: "operating", AmountCents: 2500}},
 	}
 
 	effects, err := engine.RecordTransaction(context.Background(), tx)
@@ -514,7 +514,7 @@ func TestGaapEngine_RecordTransaction_InterestAccrual(t *testing.T) {
 		Type: TxTypeInterestAccrual, OrgID: uuid.New(), AmountCents: 1200,
 		EffectiveDate: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC),
 		SourceID: uuid.New(), UnitID: &unitID,
-		FundAllocations: []FundAllocation{{FundID: fundID, AmountCents: 1200}},
+		FundAllocations: []FundAllocation{{FundID: fundID, FundKey: "operating", AmountCents: 1200}},
 		Memo:            "Interest accrual",
 	}
 
@@ -553,7 +553,7 @@ func TestGaapEngine_RecordTransaction_InterestAccrual_CashBasis(t *testing.T) {
 		Type: TxTypeInterestAccrual, OrgID: uuid.New(), AmountCents: 1200,
 		EffectiveDate: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC),
 		SourceID: uuid.New(), UnitID: &unitID,
-		FundAllocations: []FundAllocation{{FundID: uuid.New(), AmountCents: 1200}},
+		FundAllocations: []FundAllocation{{FundID: uuid.New(), FundKey: "operating", AmountCents: 1200}},
 	}
 
 	effects, err := engine.RecordTransaction(context.Background(), tx)

@@ -102,6 +102,7 @@ type FinancialTransaction struct {
 // FundAllocation describes how an amount is split across funds.
 type FundAllocation struct {
 	FundID      uuid.UUID
+	FundKey     string // "operating", "reserve", "capital", "special"
 	AmountCents int64
 }
 
