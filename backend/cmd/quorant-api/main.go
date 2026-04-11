@@ -279,7 +279,14 @@ func run() error {
 	glRepo := fin.NewPostgresGLRepository(pool)
 	glService := fin.NewGLService(glRepo, auditor, logger)
 	uowFactory := db.NewUnitOfWorkFactory(pool)
-	finService := fin.NewFinService(assessmentRepo, paymentRepo, budgetRepo, fundRepo, collectionRepo, glService, fin.NewGaapEngine(), policyResolver, complianceService, policyRegistry, logger, uowFactory)
+	orgConfigRepo := fin.NewPostgresOrgAccountingConfigRepository(pool)
+	engineBuilders := map[fin.AccountingStandard]fin.EngineBuilder{
+		fin.AccountingStandardGAAP: func(config fin.EngineConfig) fin.AccountingEngine {
+			return fin.NewGaapEngine(glService, policyRegistry, config)
+		},
+	}
+	engineFactory := fin.NewEngineFactory(engineBuilders, orgConfigRepo)
+	finService := fin.NewFinService(assessmentRepo, paymentRepo, budgetRepo, fundRepo, collectionRepo, glService, engineFactory, policyResolver, complianceService, policyRegistry, logger, uowFactory)
 	auditedFinService := fin.NewAuditedFinService(finService, auditor, outboxPublisher, logger)
 	assessmentHandler := fin.NewAssessmentHandler(auditedFinService, logger)
 	paymentHandler := fin.NewPaymentHandler(auditedFinService, logger)

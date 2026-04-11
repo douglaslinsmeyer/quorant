@@ -114,15 +114,27 @@ func (s *FinService) executeEffects(
 
 	// 2. Create fund transactions for each FundTransactionDirective.
 	for _, ftd := range effects.FundTransactions {
-		if _, err := funds.CreateTransaction(ctx, &FundTransaction{
+		amount := ftd.AmountCents
+		// Transfer-out fund transactions are debits: negate the amount.
+		if ftd.Type == FundTxTypeTransferOut {
+			amount = -amount
+		}
+		txn := &FundTransaction{
 			FundID:          ftd.FundID,
 			OrgID:           orgID,
 			CurrencyCode:    "USD",
 			TransactionType: ftd.Type,
-			AmountCents:     ftd.AmountCents,
+			AmountCents:     amount,
 			Description:     &ftd.Description,
 			EffectiveDate:   effectiveDate,
-		}); err != nil {
+		}
+		// Link transfer transactions to their source fund transfer.
+		if sourceType == GLSourceTypeTransfer {
+			refType := FundTxRefTypeTransfer
+			txn.ReferenceType = &refType
+			txn.ReferenceID = &sourceID
+		}
+		if _, err := funds.CreateTransaction(ctx, txn); err != nil {
 			return fmt.Errorf("fin: executeEffects fund transaction: %w", err)
 		}
 	}
@@ -130,18 +142,30 @@ func (s *FinService) executeEffects(
 	// 3. Create ledger entries for each LedgerEntryDirective.
 	for _, led := range effects.LedgerEntries {
 		desc := led.Description
+		amount := led.AmountCents
+		// Payment-type ledger entries are credits: negate the amount so the
+		// unit balance decreases.
+		if led.Type == LedgerEntryTypePayment {
+			amount = -amount
+		}
 		entry := &LedgerEntry{
 			OrgID:         orgID,
 			CurrencyCode:  "USD",
 			UnitID:        led.UnitID,
 			EntryType:     led.Type,
-			AmountCents:   led.AmountCents,
+			AmountCents:   amount,
 			Description:   &desc,
 			EffectiveDate: effectiveDate,
 		}
 		// Link assessment charges to the source assessment.
 		if led.Type == LedgerEntryTypeCharge && led.SourceID != uuid.Nil {
 			entry.AssessmentID = &led.SourceID
+		}
+		// Link payment ledger entries back to the payment.
+		if led.Type == LedgerEntryTypePayment && led.SourceID != uuid.Nil {
+			refType := LedgerRefTypePayment
+			entry.ReferenceType = &refType
+			entry.ReferenceID = &led.SourceID
 		}
 		if _, err := assessments.CreateLedgerEntry(ctx, entry); err != nil {
 			return fmt.Errorf("fin: executeEffects ledger entry: %w", err)
@@ -294,7 +318,6 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 	// When nil (unit tests), operations run against the repos directly.
 	var uow *db.UnitOfWork
 	assessments := s.assessments
-	gl := s.gl
 
 	if s.uowFactory != nil {
 		var err error
@@ -304,9 +327,6 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 		}
 		defer uow.Rollback(ctx) //nolint:errcheck
 		assessments = s.assessments.WithTx(uow.Tx())
-		if s.gl != nil {
-			gl = s.gl.WithTx(uow.Tx())
-		}
 	}
 
 	created, err := assessments.CreateAssessment(ctx, a)
@@ -314,24 +334,8 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 		return nil, err
 	}
 
-	// Create a matching charge ledger entry.
-	desc := created.Description
-	entry := &LedgerEntry{
-		OrgID:         orgID,
-		CurrencyCode:  "USD",
-		UnitID:        req.UnitID,
-		AssessmentID:  &created.ID,
-		EntryType:     LedgerEntryTypeCharge,
-		AmountCents:   created.AmountCents,
-		Description:   &desc,
-		EffectiveDate: created.DueDate,
-	}
-	if _, err := assessments.CreateLedgerEntry(ctx, entry); err != nil {
-		return nil, fmt.Errorf("fin: CreateAssessment ledger entry: %w", err)
-	}
-
-	// Post GL journal entry via accounting engine.
-	if gl != nil && s.factory != nil {
+	// Delegate ledger entry, GL journal, and fund transactions to the engine.
+	if s.factory != nil {
 		engine, engineErr := s.factory.ForOrg(ctx, orgID)
 		if engineErr != nil {
 			return nil, fmt.Errorf("fin: CreateAssessment engine: %w", engineErr)
@@ -345,13 +349,31 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 			UnitID:        &req.UnitID,
 			Memo:          fmt.Sprintf("Assessment: %s", created.Description),
 		}
-		effects, glErr := engine.RecordTransaction(ctx, ftx)
-		if glErr != nil {
-			return nil, fmt.Errorf("fin: CreateAssessment GL entry: %w", glErr)
+		if vErr := engine.ValidateTransaction(ctx, ftx); vErr != nil {
+			return nil, fmt.Errorf("fin: CreateAssessment validate: %w", vErr)
 		}
-		sourceType := GLSourceTypeAssessment
-		if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, created.DueDate, ftx.Memo, &sourceType, &created.ID, &req.UnitID, effects.JournalLines); glErr != nil {
-			return nil, fmt.Errorf("fin: CreateAssessment GL entry: %w", glErr)
+		effects, recErr := engine.RecordTransaction(ctx, ftx)
+		if recErr != nil {
+			return nil, fmt.Errorf("fin: CreateAssessment record: %w", recErr)
+		}
+		if err := s.executeEffects(ctx, uow, orgID, GLSourceTypeAssessment, created.ID, &req.UnitID, created.DueDate, ftx.Memo, effects); err != nil {
+			return nil, fmt.Errorf("fin: CreateAssessment effects: %w", err)
+		}
+	} else {
+		// No engine configured — create ledger entry directly (backward compat for tests without factory).
+		desc := created.Description
+		entry := &LedgerEntry{
+			OrgID:         orgID,
+			CurrencyCode:  "USD",
+			UnitID:        req.UnitID,
+			AssessmentID:  &created.ID,
+			EntryType:     LedgerEntryTypeCharge,
+			AmountCents:   created.AmountCents,
+			Description:   &desc,
+			EffectiveDate: created.DueDate,
+		}
+		if _, err := assessments.CreateLedgerEntry(ctx, entry); err != nil {
+			return nil, fmt.Errorf("fin: CreateAssessment ledger entry: %w", err)
 		}
 	}
 
@@ -541,8 +563,6 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 
 	var uow *db.UnitOfWork
 	payments := s.payments
-	assessments := s.assessments
-	gl := s.gl
 
 	if s.uowFactory != nil {
 		var err error
@@ -552,10 +572,6 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 		}
 		defer uow.Rollback(ctx) //nolint:errcheck
 		payments = s.payments.WithTx(uow.Tx())
-		assessments = s.assessments.WithTx(uow.Tx())
-		if s.gl != nil {
-			gl = s.gl.WithTx(uow.Tx())
-		}
 	}
 
 	created, err := payments.CreatePayment(ctx, p)
@@ -563,25 +579,8 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 		return nil, err
 	}
 
-	// Create a credit ledger entry (negative amount reduces the balance).
-	refType := LedgerRefTypePayment
-	entry := &LedgerEntry{
-		OrgID:         orgID,
-		CurrencyCode:  "USD",
-		UnitID:        req.UnitID,
-		EntryType:     LedgerEntryTypePayment,
-		AmountCents:   -created.AmountCents,
-		Description:   req.Description,
-		ReferenceType: &refType,
-		ReferenceID:   &created.ID,
-		EffectiveDate: now,
-	}
-	if _, err := assessments.CreateLedgerEntry(ctx, entry); err != nil {
-		return nil, fmt.Errorf("fin: RecordPayment ledger entry: %w", err)
-	}
-
-	// Post GL journal entry via accounting engine.
-	if gl != nil && s.factory != nil {
+	// Delegate ledger entry, GL journal, and fund transactions to the engine.
+	if s.factory != nil {
 		engine, engineErr := s.factory.ForOrg(ctx, orgID)
 		if engineErr != nil {
 			return nil, fmt.Errorf("fin: RecordPayment engine: %w", engineErr)
@@ -599,13 +598,36 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 			UnitID:        &req.UnitID,
 			Memo:          memo,
 		}
-		effects, glErr := engine.RecordTransaction(ctx, ftx)
-		if glErr != nil {
-			return nil, fmt.Errorf("fin: RecordPayment GL entry: %w", glErr)
+		if vErr := engine.ValidateTransaction(ctx, ftx); vErr != nil {
+			return nil, fmt.Errorf("fin: RecordPayment validate: %w", vErr)
 		}
-		sourceType := GLSourceTypePayment
-		if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, userID, now, ftx.Memo, &sourceType, &created.ID, &req.UnitID, effects.JournalLines); glErr != nil {
-			return nil, fmt.Errorf("fin: RecordPayment GL entry: %w", glErr)
+		effects, recErr := engine.RecordTransaction(ctx, ftx)
+		if recErr != nil {
+			return nil, fmt.Errorf("fin: RecordPayment record: %w", recErr)
+		}
+		if err := s.executeEffects(ctx, uow, orgID, GLSourceTypePayment, created.ID, &req.UnitID, now, ftx.Memo, effects); err != nil {
+			return nil, fmt.Errorf("fin: RecordPayment effects: %w", err)
+		}
+	} else {
+		// No engine configured — create ledger entry directly (backward compat for tests without factory).
+		assessments := s.assessments
+		if uow != nil {
+			assessments = s.assessments.WithTx(uow.Tx())
+		}
+		refType := LedgerRefTypePayment
+		entry := &LedgerEntry{
+			OrgID:         orgID,
+			CurrencyCode:  "USD",
+			UnitID:        req.UnitID,
+			EntryType:     LedgerEntryTypePayment,
+			AmountCents:   -created.AmountCents,
+			Description:   req.Description,
+			ReferenceType: &refType,
+			ReferenceID:   &created.ID,
+			EffectiveDate: now,
+		}
+		if _, err := assessments.CreateLedgerEntry(ctx, entry); err != nil {
+			return nil, fmt.Errorf("fin: RecordPayment ledger entry: %w", err)
 		}
 	}
 
@@ -1021,7 +1043,6 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 
 	var uow *db.UnitOfWork
 	funds := s.funds
-	gl := s.gl
 
 	if s.uowFactory != nil {
 		var err error
@@ -1031,9 +1052,6 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 		}
 		defer uow.Rollback(ctx) //nolint:errcheck
 		funds = s.funds.WithTx(uow.Tx())
-		if s.gl != nil {
-			gl = s.gl.WithTx(uow.Tx())
-		}
 	}
 
 	created, err := funds.CreateTransfer(ctx, t)
@@ -1041,70 +1059,75 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 		return nil, err
 	}
 
-	// Debit the source fund.
-	refType := FundTxRefTypeTransfer
-	debitDesc := "Transfer out"
-	if _, err := s.funds.CreateTransaction(ctx, &FundTransaction{
-		FundID:          req.FromFundID,
-		OrgID:           orgID,
-		CurrencyCode:    "USD",
-		TransactionType: FundTxTypeTransferOut,
-		AmountCents:     -req.AmountCents,
-		Description:     &debitDesc,
-		ReferenceType:   &refType,
-		ReferenceID:     &created.ID,
-		EffectiveDate:   now,
-	}); err != nil {
-		return nil, fmt.Errorf("fin: CreateFundTransfer debit source fund: %w", err)
-	}
-
-	// Credit the destination fund.
-	creditDesc := "Transfer in"
-	if _, err := s.funds.CreateTransaction(ctx, &FundTransaction{
-		FundID:          req.ToFundID,
-		OrgID:           orgID,
-		CurrencyCode:    "USD",
-		TransactionType: FundTxTypeTransferIn,
-		AmountCents:     req.AmountCents,
-		Description:     &creditDesc,
-		ReferenceType:   &refType,
-		ReferenceID:     &created.ID,
-		EffectiveDate:   now,
-	}); err != nil {
-		return nil, fmt.Errorf("fin: CreateFundTransfer credit destination fund: %w", err)
-	}
-
-	// Post GL journal entry via accounting engine.
-	if gl != nil && s.factory != nil {
+	// Delegate GL journal, fund transactions to the engine.
+	if s.factory != nil {
 		engine, engineErr := s.factory.ForOrg(ctx, orgID)
 		if engineErr != nil {
 			return nil, fmt.Errorf("fin: CreateFundTransfer engine: %w", engineErr)
 		}
 		fromFund, _ := funds.FindFundByID(ctx, req.FromFundID)
 		toFund, _ := funds.FindFundByID(ctx, req.ToFundID)
-		if fromFund != nil && toFund != nil {
-			ftx := FinancialTransaction{
-				Type:          TxTypeFundTransfer,
-				OrgID:         orgID,
-				AmountCents:   req.AmountCents,
-				EffectiveDate: now,
-				SourceID:      created.ID,
-				Memo:          fmt.Sprintf("Transfer: %s to %s", fromFund.Name, toFund.Name),
-				Metadata: map[string]any{
-					"from_fund_type": string(fromFund.FundType),
-					"to_fund_type":   string(toFund.FundType),
-					"from_fund_name": fromFund.Name,
-					"to_fund_name":   toFund.Name,
-				},
-			}
-			effects, glErr := engine.RecordTransaction(ctx, ftx)
-			if glErr != nil {
-				return nil, fmt.Errorf("fin: CreateFundTransfer GL entry: %w", glErr)
-			}
-			sourceType := GLSourceTypeTransfer
-			if _, glErr := gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, now, ftx.Memo, &sourceType, &created.ID, nil, effects.JournalLines); glErr != nil {
-				return nil, fmt.Errorf("fin: CreateFundTransfer GL entry: %w", glErr)
-			}
+		if fromFund == nil || toFund == nil {
+			return nil, fmt.Errorf("fin: CreateFundTransfer: source or destination fund not found")
+		}
+		ftx := FinancialTransaction{
+			Type:          TxTypeFundTransfer,
+			OrgID:         orgID,
+			AmountCents:   req.AmountCents,
+			EffectiveDate: now,
+			SourceID:      created.ID,
+			Memo:          fmt.Sprintf("Transfer: %s to %s", fromFund.Name, toFund.Name),
+			FundAllocations: []FundAllocation{
+				{FundID: req.FromFundID, AmountCents: req.AmountCents},
+				{FundID: req.ToFundID, AmountCents: req.AmountCents},
+			},
+			Metadata: map[string]any{
+				"from_fund_type": string(fromFund.FundType),
+				"to_fund_type":   string(toFund.FundType),
+				"from_fund_name": fromFund.Name,
+				"to_fund_name":   toFund.Name,
+			},
+		}
+		if vErr := engine.ValidateTransaction(ctx, ftx); vErr != nil {
+			return nil, fmt.Errorf("fin: CreateFundTransfer validate: %w", vErr)
+		}
+		effects, recErr := engine.RecordTransaction(ctx, ftx)
+		if recErr != nil {
+			return nil, fmt.Errorf("fin: CreateFundTransfer record: %w", recErr)
+		}
+		if err := s.executeEffects(ctx, uow, orgID, GLSourceTypeTransfer, created.ID, nil, now, ftx.Memo, effects); err != nil {
+			return nil, fmt.Errorf("fin: CreateFundTransfer effects: %w", err)
+		}
+	} else {
+		// No engine configured — create fund transactions directly (backward compat for tests without factory).
+		refType := FundTxRefTypeTransfer
+		debitDesc := "Transfer out"
+		if _, err := funds.CreateTransaction(ctx, &FundTransaction{
+			FundID:          req.FromFundID,
+			OrgID:           orgID,
+			CurrencyCode:    "USD",
+			TransactionType: FundTxTypeTransferOut,
+			AmountCents:     -req.AmountCents,
+			Description:     &debitDesc,
+			ReferenceType:   &refType,
+			ReferenceID:     &created.ID,
+			EffectiveDate:   now,
+		}); err != nil {
+			return nil, fmt.Errorf("fin: CreateFundTransfer debit source fund: %w", err)
+		}
+		creditDesc := "Transfer in"
+		if _, err := funds.CreateTransaction(ctx, &FundTransaction{
+			FundID:          req.ToFundID,
+			OrgID:           orgID,
+			CurrencyCode:    "USD",
+			TransactionType: FundTxTypeTransferIn,
+			AmountCents:     req.AmountCents,
+			Description:     &creditDesc,
+			ReferenceType:   &refType,
+			ReferenceID:     &created.ID,
+			EffectiveDate:   now,
+		}); err != nil {
+			return nil, fmt.Errorf("fin: CreateFundTransfer credit destination fund: %w", err)
 		}
 	}
 
