@@ -267,10 +267,14 @@ func (s *GLService) GetAccountBalances(ctx context.Context, orgID uuid.UUID, fro
 }
 
 // SeedDefaultAccounts creates the default chart of accounts for a new org.
-func (s *GLService) SeedDefaultAccounts(ctx context.Context, orgID uuid.UUID, operatingFundID uuid.UUID, reserveFundID uuid.UUID, engine AccountingEngine) error {
-	fundMap := map[string]*uuid.UUID{
-		"operating": &operatingFundID,
-		"reserve":   &reserveFundID,
+// fundMap maps fund-key strings ("operating", "reserve", "capital", "special")
+// to the UUID of each fund. Accounts whose FundKey matches a key in the map
+// are linked to the corresponding fund.
+func (s *GLService) SeedDefaultAccounts(ctx context.Context, orgID uuid.UUID, fundMap map[string]uuid.UUID, engine AccountingEngine) error {
+	ptrMap := make(map[string]*uuid.UUID, len(fundMap))
+	for k, v := range fundMap {
+		v := v // capture loop variable
+		ptrMap[k] = &v
 	}
 
 	seeds := engine.ChartOfAccounts()
@@ -284,7 +288,7 @@ func (s *GLService) SeedDefaultAccounts(ctx context.Context, orgID uuid.UUID, op
 			AccountType:   GLAccountType(seed.Type),
 			IsHeader:      seed.IsHeader,
 			IsSystem:      seed.IsSystem,
-			FundID:        fundMap[seed.FundKey],
+			FundID:        ptrMap[seed.FundKey],
 		}
 		if seed.ParentNum != 0 {
 			parentID := numToID[seed.ParentNum]
