@@ -1458,6 +1458,44 @@ func (s *FinService) AddCollectionAction(ctx context.Context, caseID uuid.UUID, 
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
+
+	// Compliance: enforce notice-before-lien requirement per jurisdiction rules.
+	if s.compliance != nil && CollectionActionType(req.ActionType) == CollectionActionTypeLienFiled {
+		caseRecord, caseErr := s.collections.FindCaseByID(ctx, caseID)
+		if caseErr != nil {
+			return nil, fmt.Errorf("fin: AddCollectionAction case lookup: %w", caseErr)
+		}
+		if caseRecord != nil {
+			result, compErr := s.compliance.CheckCompliance(ctx, caseRecord.OrgID, "fine_limits")
+			if compErr == nil && result != nil {
+				for _, rule := range result.Rules {
+					if rule.Key == "require_notice_before_lien" {
+						var required bool
+						if jsonErr := json.Unmarshal(rule.Value, &required); jsonErr == nil && required {
+							actions, listErr := s.collections.ListActionsByCase(ctx, caseID)
+							if listErr != nil {
+								return nil, fmt.Errorf("fin: AddCollectionAction list actions: %w", listErr)
+							}
+							hasNotice := false
+							for _, act := range actions {
+								if act.ActionType == CollectionActionTypeNoticeSent {
+									hasNotice = true
+									break
+								}
+							}
+							if !hasNotice {
+								return nil, api.NewValidationError(
+									"fin.collection.notice_required_before_lien", "action_type",
+									api.P("rule", "fine_limits.require_notice_before_lien"),
+								)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	a := &CollectionAction{
 		CaseID:       caseID,
 		ActionType:   CollectionActionType(req.ActionType),

@@ -2644,3 +2644,41 @@ func TestCreateFundTransfer_ComplianceBlocksReserveWithdrawal(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "reserve_minimum")
 }
+
+func TestAddCollectionAction_ComplianceBlocksLienWithoutNotice(t *testing.T) {
+	assessments := &mockAssessmentRepo{}
+	payments := &mockPaymentRepo{}
+	budgets := &mockBudgetRepo{}
+	funds := &mockFundRepo{}
+	collections := &mockCollectionRepo{}
+	factory := wildcardTestFactory()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	compliance := &mockComplianceResolver{
+		rules: map[string][]ai.RuleValue{
+			"fine_limits": {
+				{Key: "require_notice_before_lien", ValueType: "boolean", Value: json.RawMessage(`true`)},
+			},
+		},
+	}
+
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, factory, ai.NewNoopPolicyResolver(), compliance, nil, logger, nil)
+	ctx := context.Background()
+
+	// Create a collection case with no prior actions.
+	caseID := uuid.New()
+	collections.cases = []fin.CollectionCase{
+		{ID: caseID, OrgID: uuid.New(), UnitID: uuid.New(), Status: fin.CollectionCaseStatusLate},
+	}
+
+	// Attempt to file a lien without a prior notice.
+	notes := "Filing lien"
+	req := fin.CreateCollectionActionRequest{
+		ActionType: string(fin.CollectionActionTypeLienFiled),
+		Notes:      &notes,
+	}
+
+	_, err := svc.AddCollectionAction(ctx, caseID, req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "notice_required")
+}
