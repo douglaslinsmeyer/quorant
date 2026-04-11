@@ -565,3 +565,72 @@ func TestGaapEngine_RecordTransaction_InterestAccrual_CashBasis(t *testing.T) {
 	require.Len(t, effects.LedgerEntries, 1)
 	assert.Equal(t, LedgerEntryTypeCharge, effects.LedgerEntries[0].Type)
 }
+
+// ── Overpayment CreditDirective tests ───────────────────────────────
+
+func TestGaapEngine_RecordTransaction_Payment_OverpaymentCredit(t *testing.T) {
+	engine, _ := newTestGaapEngineWithResolver(RecognitionBasisAccrual)
+	unitID := uuid.New()
+	fundID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypePayment, OrgID: uuid.New(), AmountCents: 25000,
+		EffectiveDate: time.Date(2026, 4, 5, 0, 0, 0, 0, time.UTC),
+		SourceID: uuid.New(), UnitID: &unitID,
+		FundAllocations: []FundAllocation{{FundID: fundID, FundKey: "operating", AmountCents: 25000}},
+		Memo:            "Payment with overpayment",
+		Metadata:        map[string]any{"overpayment_cents": int64(10000)},
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// Credits: 1 directive for the overpayment.
+	require.Len(t, effects.Credits, 1)
+	assert.Equal(t, unitID, effects.Credits[0].UnitID)
+	assert.Equal(t, int64(10000), effects.Credits[0].AmountCents)
+	assert.Equal(t, CreditTypeOnAccount, effects.Credits[0].Type)
+}
+
+func TestGaapEngine_RecordTransaction_Payment_NoOverpayment(t *testing.T) {
+	engine, _ := newTestGaapEngineWithResolver(RecognitionBasisAccrual)
+	unitID := uuid.New()
+	fundID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypePayment, OrgID: uuid.New(), AmountCents: 15000,
+		EffectiveDate: time.Date(2026, 4, 5, 0, 0, 0, 0, time.UTC),
+		SourceID: uuid.New(), UnitID: &unitID,
+		FundAllocations: []FundAllocation{{FundID: fundID, FundKey: "operating", AmountCents: 15000}},
+		Memo:            "Exact payment",
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// No credits when there's no overpayment metadata.
+	assert.Empty(t, effects.Credits)
+}
+
+func TestGaapEngine_RecordTransaction_Payment_OverpaymentZero(t *testing.T) {
+	engine, _ := newTestGaapEngineWithResolver(RecognitionBasisAccrual)
+	unitID := uuid.New()
+	fundID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypePayment, OrgID: uuid.New(), AmountCents: 15000,
+		EffectiveDate: time.Date(2026, 4, 5, 0, 0, 0, 0, time.UTC),
+		SourceID: uuid.New(), UnitID: &unitID,
+		FundAllocations: []FundAllocation{{FundID: fundID, FundKey: "operating", AmountCents: 15000}},
+		Metadata:        map[string]any{"overpayment_cents": int64(0)},
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// Zero overpayment should not produce a credit directive.
+	assert.Empty(t, effects.Credits)
+}

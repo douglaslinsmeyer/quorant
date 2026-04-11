@@ -244,7 +244,33 @@ func (e *GaapEngine) paymentEffects(ctx context.Context, tx FinancialTransaction
 		})
 	}
 
+	// Overpayment: produce a credit directive for the surplus.
+	if overpayment, ok := metadataInt64(tx.Metadata, "overpayment_cents"); ok && overpayment > 0 && tx.UnitID != nil {
+		effects.Credits = append(effects.Credits, CreditDirective{
+			UnitID:      *tx.UnitID,
+			AmountCents: overpayment,
+			Type:        CreditTypeOnAccount,
+		})
+	}
+
 	return effects, nil
+}
+
+// metadataInt64 extracts an int64 from a metadata map, handling both int64
+// (programmatic callers) and float64 (JSON-unmarshaled values).
+func metadataInt64(m map[string]any, key string) (int64, bool) {
+	v, ok := m[key]
+	if !ok {
+		return 0, false
+	}
+	switch n := v.(type) {
+	case int64:
+		return n, true
+	case float64:
+		return int64(n), true
+	default:
+		return 0, false
+	}
 }
 
 // fundTypeToCashAccount maps fund type strings to their cash account numbers.
