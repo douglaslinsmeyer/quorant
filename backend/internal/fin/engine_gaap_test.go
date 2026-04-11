@@ -593,7 +593,7 @@ func TestGaapEngine_RecordTransaction_Payment_OverpaymentCredit(t *testing.T) {
 	require.Len(t, effects.Credits, 1)
 	assert.Equal(t, unitID, effects.Credits[0].UnitID)
 	assert.Equal(t, int64(10000), effects.Credits[0].AmountCents)
-	assert.Equal(t, CreditTypeOnAccount, effects.Credits[0].Type)
+	assert.Equal(t, CreditTypePrepayment, effects.Credits[0].Type)
 }
 
 func TestGaapEngine_RecordTransaction_Payment_NoOverpayment(t *testing.T) {

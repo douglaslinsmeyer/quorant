@@ -247,11 +247,17 @@ func (e *GaapEngine) paymentEffects(ctx context.Context, tx FinancialTransaction
 	}
 
 	// Overpayment: produce a credit directive for the surplus.
+	// Accrual basis treats overpayments as deferred revenue (prepayment);
+	// cash basis treats them as a simple credit on account.
 	if overpayment, ok := metadataInt64(tx.Metadata, "overpayment_cents"); ok && overpayment > 0 && tx.UnitID != nil {
+		creditType := CreditTypeOnAccount
+		if e.config.RecognitionBasis == RecognitionBasisAccrual {
+			creditType = CreditTypePrepayment
+		}
 		effects.Credits = append(effects.Credits, CreditDirective{
 			UnitID:      *tx.UnitID,
 			AmountCents: overpayment,
-			Type:        CreditTypeOnAccount,
+			Type:        creditType,
 		})
 	}
 
