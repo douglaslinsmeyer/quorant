@@ -468,11 +468,7 @@ func (e *GaapEngine) ValidateTransaction(_ context.Context, tx FinancialTransact
 	return nil
 }
 
-// PaymentTerms computes payment terms for a payable.
-// Not yet implemented; returns ErrNotImplemented.
-func (e *GaapEngine) PaymentTerms(_ context.Context, _ PayableContext) (*PaymentTermsResult, error) {
-	return nil, ErrNotImplemented
-}
+// PaymentTerms is implemented in engine_terms.go.
 
 // PayableRecognitionDate determines when an expense should be recognized as a payable.
 // Not yet implemented; returns ErrNotImplemented.
