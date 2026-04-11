@@ -353,7 +353,7 @@ func TestGaapEngine_RecordTransaction_Payment_Accrual(t *testing.T) {
 	// Fund: payment directive.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "payment", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTransactionType("payment"), effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(15000), effects.FundTransactions[0].AmountCents)
 
 	// Ledger: payment entry on unit.
@@ -391,7 +391,7 @@ func TestGaapEngine_RecordTransaction_Payment_CashBasis(t *testing.T) {
 	// Fund: revenue directive (not payment — revenue recognized at receipt).
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "revenue", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTxTypeRevenue, effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(15000), effects.FundTransactions[0].AmountCents)
 
 	// Ledger: payment entry on unit.
@@ -550,7 +550,7 @@ func TestGaapEngine_RecordTransaction_Depreciation_WithFundAllocation(t *testing
 	// Fund: depreciation directive for the fund.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "depreciation", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTransactionType("depreciation"), effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(8000), effects.FundTransactions[0].AmountCents)
 
 	assert.Empty(t, effects.LedgerEntries)
@@ -587,7 +587,7 @@ func TestGaapEngine_RecordTransaction_LateFee(t *testing.T) {
 	// Fund: late_fee directive.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "late_fee", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTransactionType("late_fee"), effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(2500), effects.FundTransactions[0].AmountCents)
 
 	// Ledger: late fee entry on unit.
@@ -650,7 +650,7 @@ func TestGaapEngine_RecordTransaction_InterestAccrual(t *testing.T) {
 	// Fund: interest directive.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "interest", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTransactionType("interest"), effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(1200), effects.FundTransactions[0].AmountCents)
 
 	// Ledger: charge entry on unit.
@@ -782,7 +782,7 @@ func TestGaapEngine_RecordTransaction_Expense_Accrual_Approved(t *testing.T) {
 	// Fund: expense directive.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "expense", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTxTypeExpense, effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(50000), effects.FundTransactions[0].AmountCents)
 
 	// No ledger entries — expenses don't affect unit balances.
@@ -818,7 +818,7 @@ func TestGaapEngine_RecordTransaction_Expense_Accrual_Paid(t *testing.T) {
 	// Fund: expense directive.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "expense", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTxTypeExpense, effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(50000), effects.FundTransactions[0].AmountCents)
 
 	// No ledger entries.
@@ -854,7 +854,7 @@ func TestGaapEngine_RecordTransaction_Expense_Cash_Paid(t *testing.T) {
 	// Fund: expense directive.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "expense", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTxTypeExpense, effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(50000), effects.FundTransactions[0].AmountCents)
 
 	// No ledger entries.

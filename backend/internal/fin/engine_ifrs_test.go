@@ -188,7 +188,7 @@ func TestIfrsEngine_RecordTransaction_Payment_Accrual(t *testing.T) {
 	// Fund: payment directive.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "payment", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTransactionType("payment"), effects.FundTransactions[0].Type)
 
 	// Ledger: payment entry on unit.
 	require.Len(t, effects.LedgerEntries, 1)
@@ -260,7 +260,7 @@ func TestIfrsEngine_RecordTransaction_Payment_CashBasis(t *testing.T) {
 
 	// Fund: revenue directive.
 	require.Len(t, effects.FundTransactions, 1)
-	assert.Equal(t, "revenue", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTxTypeRevenue, effects.FundTransactions[0].Type)
 }
 
 func TestIfrsEngine_RecordTransaction_FundTransfer(t *testing.T) {
@@ -398,7 +398,7 @@ func TestIfrsEngine_RecordTransaction_Depreciation_WithFundAllocation(t *testing
 	// Fund: depreciation directive for the fund.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "depreciation", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTransactionType("depreciation"), effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(8000), effects.FundTransactions[0].AmountCents)
 
 	assert.Empty(t, effects.LedgerEntries)

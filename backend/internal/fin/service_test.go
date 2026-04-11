@@ -1231,7 +1231,7 @@ func TestApproveExpense_PostsGLEffects(t *testing.T) {
 	// The fund directive should have created a fund transaction.
 	require.Len(t, fundRepo.transactions, 1)
 	assert.Equal(t, fund.ID, fundRepo.transactions[0].FundID)
-	assert.Equal(t, "expense", fundRepo.transactions[0].TransactionType)
+	assert.Equal(t, fin.FundTxTypeExpense, fundRepo.transactions[0].TransactionType)
 	assert.Equal(t, created.TotalCents, fundRepo.transactions[0].AmountCents)
 }
 
@@ -1277,7 +1277,7 @@ func TestPayExpense_PostsGLEffects(t *testing.T) {
 	require.Greater(t, len(fundRepo.transactions), approveCount)
 	payTx := fundRepo.transactions[len(fundRepo.transactions)-1]
 	assert.Equal(t, fund.ID, payTx.FundID)
-	assert.Equal(t, "expense", payTx.TransactionType)
+	assert.Equal(t, fin.FundTxTypeExpense, payTx.TransactionType)
 	assert.Equal(t, created.TotalCents, payTx.AmountCents)
 }
 
