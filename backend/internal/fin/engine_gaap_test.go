@@ -214,6 +214,9 @@ func newTestGaapEngineWithResolver(basis RecognitionBasis) (*GaapEngine, *stubAc
 		4040: {ID: uuid.MustParse("00000000-0000-0000-0000-000000004040"), AccountNumber: 4040},
 		4100: {ID: uuid.MustParse("00000000-0000-0000-0000-000000004100"), AccountNumber: 4100},
 		4200: {ID: uuid.MustParse("00000000-0000-0000-0000-000000004200"), AccountNumber: 4200},
+		2100: {ID: uuid.MustParse("00000000-0000-0000-0000-000000002100"), AccountNumber: 2100},
+		5010: {ID: uuid.MustParse("00000000-0000-0000-0000-000000005010"), AccountNumber: 5010},
+		5040: {ID: uuid.MustParse("00000000-0000-0000-0000-000000005040"), AccountNumber: 5040},
 		3100: {ID: uuid.MustParse("00000000-0000-0000-0000-000000003100"), AccountNumber: 3100},
 		3110: {ID: uuid.MustParse("00000000-0000-0000-0000-000000003110"), AccountNumber: 3110},
 	}}
@@ -633,4 +636,162 @@ func TestGaapEngine_RecordTransaction_Payment_OverpaymentZero(t *testing.T) {
 
 	// Zero overpayment should not produce a credit directive.
 	assert.Empty(t, effects.Credits)
+}
+
+// ── Expense tests ───────────────────────────────────────────────────
+
+func TestGaapEngine_RecordTransaction_Expense_Accrual_Approved(t *testing.T) {
+	engine, resolver := newTestGaapEngineWithResolver(RecognitionBasisAccrual)
+	fundID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypeExpense, OrgID: uuid.New(), AmountCents: 50000,
+		EffectiveDate: time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC),
+		SourceID:      uuid.New(),
+		FundAllocations: []FundAllocation{{FundID: fundID, FundKey: "operating", AmountCents: 50000}},
+		Memo:     "Landscaping expense",
+		Metadata: map[string]any{"status": "approved", "expense_account": 5040},
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// GL: DR 5040 (Landscaping) / CR 2100 (AP).
+	require.Len(t, effects.JournalLines, 2)
+	assert.Equal(t, resolver.accounts[5040].ID, effects.JournalLines[0].AccountID)
+	assert.Equal(t, int64(50000), effects.JournalLines[0].DebitCents)
+	assert.Equal(t, int64(0), effects.JournalLines[0].CreditCents)
+	assert.Equal(t, resolver.accounts[2100].ID, effects.JournalLines[1].AccountID)
+	assert.Equal(t, int64(0), effects.JournalLines[1].DebitCents)
+	assert.Equal(t, int64(50000), effects.JournalLines[1].CreditCents)
+
+	// Fund: expense directive.
+	require.Len(t, effects.FundTransactions, 1)
+	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
+	assert.Equal(t, "expense", effects.FundTransactions[0].Type)
+	assert.Equal(t, int64(50000), effects.FundTransactions[0].AmountCents)
+
+	// No ledger entries — expenses don't affect unit balances.
+	assert.Empty(t, effects.LedgerEntries)
+}
+
+func TestGaapEngine_RecordTransaction_Expense_Accrual_Paid(t *testing.T) {
+	engine, resolver := newTestGaapEngineWithResolver(RecognitionBasisAccrual)
+	fundID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypeExpense, OrgID: uuid.New(), AmountCents: 50000,
+		EffectiveDate: time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC),
+		SourceID:      uuid.New(),
+		FundAllocations: []FundAllocation{{FundID: fundID, FundKey: "operating", AmountCents: 50000}},
+		Memo:     "Landscaping payment",
+		Metadata: map[string]any{"status": "paid", "expense_account": 5040},
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// GL: DR 2100 (AP) / CR 1010 (Cash-Operating).
+	require.Len(t, effects.JournalLines, 2)
+	assert.Equal(t, resolver.accounts[2100].ID, effects.JournalLines[0].AccountID)
+	assert.Equal(t, int64(50000), effects.JournalLines[0].DebitCents)
+	assert.Equal(t, int64(0), effects.JournalLines[0].CreditCents)
+	assert.Equal(t, resolver.accounts[1010].ID, effects.JournalLines[1].AccountID)
+	assert.Equal(t, int64(0), effects.JournalLines[1].DebitCents)
+	assert.Equal(t, int64(50000), effects.JournalLines[1].CreditCents)
+
+	// Fund: expense directive.
+	require.Len(t, effects.FundTransactions, 1)
+	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
+	assert.Equal(t, "expense", effects.FundTransactions[0].Type)
+	assert.Equal(t, int64(50000), effects.FundTransactions[0].AmountCents)
+
+	// No ledger entries.
+	assert.Empty(t, effects.LedgerEntries)
+}
+
+func TestGaapEngine_RecordTransaction_Expense_Cash_Paid(t *testing.T) {
+	engine, resolver := newTestGaapEngineWithResolver(RecognitionBasisCash)
+	fundID := uuid.New()
+
+	tx := FinancialTransaction{
+		Type: TxTypeExpense, OrgID: uuid.New(), AmountCents: 50000,
+		EffectiveDate: time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC),
+		SourceID:      uuid.New(),
+		FundAllocations: []FundAllocation{{FundID: fundID, FundKey: "operating", AmountCents: 50000}},
+		Memo:     "Landscaping payment",
+		Metadata: map[string]any{"status": "paid", "expense_account": 5040},
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// Cash + paid: DR 5040 (Landscaping) / CR 1010 (Cash-Operating).
+	require.Len(t, effects.JournalLines, 2)
+	assert.Equal(t, resolver.accounts[5040].ID, effects.JournalLines[0].AccountID)
+	assert.Equal(t, int64(50000), effects.JournalLines[0].DebitCents)
+	assert.Equal(t, int64(0), effects.JournalLines[0].CreditCents)
+	assert.Equal(t, resolver.accounts[1010].ID, effects.JournalLines[1].AccountID)
+	assert.Equal(t, int64(0), effects.JournalLines[1].DebitCents)
+	assert.Equal(t, int64(50000), effects.JournalLines[1].CreditCents)
+
+	// Fund: expense directive.
+	require.Len(t, effects.FundTransactions, 1)
+	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
+	assert.Equal(t, "expense", effects.FundTransactions[0].Type)
+	assert.Equal(t, int64(50000), effects.FundTransactions[0].AmountCents)
+
+	// No ledger entries.
+	assert.Empty(t, effects.LedgerEntries)
+}
+
+func TestGaapEngine_RecordTransaction_Expense_Cash_Approved(t *testing.T) {
+	engine, _ := newTestGaapEngineWithResolver(RecognitionBasisCash)
+
+	tx := FinancialTransaction{
+		Type: TxTypeExpense, OrgID: uuid.New(), AmountCents: 50000,
+		EffectiveDate: time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC),
+		SourceID:      uuid.New(),
+		FundAllocations: []FundAllocation{{FundID: uuid.New(), FundKey: "operating", AmountCents: 50000}},
+		Memo:     "Landscaping expense",
+		Metadata: map[string]any{"status": "approved", "expense_account": 5040},
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// Cash basis + approved: no GL, no fund transactions, no ledger entries.
+	assert.Empty(t, effects.JournalLines)
+	assert.Empty(t, effects.FundTransactions)
+	assert.Empty(t, effects.LedgerEntries)
+}
+
+func TestGaapEngine_RecordTransaction_Expense_DefaultAccount(t *testing.T) {
+	engine, resolver := newTestGaapEngineWithResolver(RecognitionBasisAccrual)
+	fundID := uuid.New()
+
+	// No expense_account in metadata — should default to 5010.
+	tx := FinancialTransaction{
+		Type: TxTypeExpense, OrgID: uuid.New(), AmountCents: 30000,
+		EffectiveDate: time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC),
+		SourceID:      uuid.New(),
+		FundAllocations: []FundAllocation{{FundID: fundID, FundKey: "operating", AmountCents: 30000}},
+		Memo:     "Management fee",
+		Metadata: map[string]any{"status": "approved"},
+	}
+
+	effects, err := engine.RecordTransaction(context.Background(), tx)
+	require.NoError(t, err)
+	require.NotNil(t, effects)
+
+	// GL: DR 5010 (default) / CR 2100 (AP).
+	require.Len(t, effects.JournalLines, 2)
+	assert.Equal(t, resolver.accounts[5010].ID, effects.JournalLines[0].AccountID)
+	assert.Equal(t, int64(30000), effects.JournalLines[0].DebitCents)
+	assert.Equal(t, resolver.accounts[2100].ID, effects.JournalLines[1].AccountID)
+	assert.Equal(t, int64(30000), effects.JournalLines[1].CreditCents)
 }
