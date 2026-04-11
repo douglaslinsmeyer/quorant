@@ -469,12 +469,7 @@ func (e *GaapEngine) ValidateTransaction(_ context.Context, tx FinancialTransact
 }
 
 // PaymentTerms is implemented in engine_terms.go.
-
-// PayableRecognitionDate determines when an expense should be recognized as a payable.
-// Not yet implemented; returns ErrNotImplemented.
-func (e *GaapEngine) PayableRecognitionDate(_ context.Context, _ ExpenseContext) (time.Time, error) {
-	return time.Time{}, ErrNotImplemented
-}
+// PayableRecognitionDate is implemented in engine_terms.go.
 
 // RevenueRecognitionDate determines when revenue should be recognized.
 // Not yet implemented; returns ErrNotImplemented.

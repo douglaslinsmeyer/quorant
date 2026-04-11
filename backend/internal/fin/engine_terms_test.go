@@ -108,3 +108,47 @@ func TestPaymentTerms_CaseInsensitive(t *testing.T) {
 		})
 	}
 }
+
+// ── PayableRecognitionDate tests ────────────────────────────────────
+
+func TestPayableRecognitionDate_AccrualWithServiceDate(t *testing.T) {
+	engine := newTestGaapEngine() // accrual basis
+	invoiceDate := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	serviceDate := time.Date(2026, 3, 15, 0, 0, 0, 0, time.UTC)
+
+	result, err := engine.PayableRecognitionDate(context.Background(), ExpenseContext{
+		InvoiceDate: invoiceDate,
+		ServiceDate: &serviceDate,
+		AmountCents: 50000,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, serviceDate, result)
+}
+
+func TestPayableRecognitionDate_AccrualWithoutServiceDate(t *testing.T) {
+	engine := newTestGaapEngine() // accrual basis
+	invoiceDate := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+
+	result, err := engine.PayableRecognitionDate(context.Background(), ExpenseContext{
+		InvoiceDate: invoiceDate,
+		AmountCents: 50000,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, invoiceDate, result)
+}
+
+func TestPayableRecognitionDate_CashBasis(t *testing.T) {
+	engine := NewGaapEngine(nil, nil, EngineConfig{
+		RecognitionBasis: RecognitionBasisCash,
+		FiscalYearStart:  1,
+	})
+
+	_, err := engine.PayableRecognitionDate(context.Background(), ExpenseContext{
+		InvoiceDate: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+		AmountCents: 50000,
+	})
+
+	require.ErrorIs(t, err, ErrCashBasisNoPayable)
+}

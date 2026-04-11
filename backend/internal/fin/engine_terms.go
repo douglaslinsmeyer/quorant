@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 // Regex patterns for parsing vendor payment terms.
@@ -59,4 +60,21 @@ func (e *GaapEngine) PaymentTerms(_ context.Context, pc PayableContext) (*Paymen
 	return &PaymentTermsResult{
 		DueDate: dueDate,
 	}, nil
+}
+
+// PayableRecognitionDate determines when an expense should be recognized as a
+// payable based on the recognition basis:
+//   - Cash basis: payables are not recognized; returns ErrCashBasisNoPayable.
+//   - Accrual basis with ServiceDate: recognized on ServiceDate.
+//   - Accrual basis without ServiceDate: recognized on InvoiceDate.
+func (e *GaapEngine) PayableRecognitionDate(_ context.Context, ec ExpenseContext) (time.Time, error) {
+	if e.config.RecognitionBasis == RecognitionBasisCash {
+		return time.Time{}, ErrCashBasisNoPayable
+	}
+
+	// Accrual: prefer service date, fall back to invoice date.
+	if ec.ServiceDate != nil {
+		return *ec.ServiceDate, nil
+	}
+	return ec.InvoiceDate, nil
 }
