@@ -905,7 +905,8 @@ func (s *FinService) ListExpenses(ctx context.Context, orgID uuid.UUID) ([]Expen
 	return s.budgets.ListExpensesByOrg(ctx, orgID)
 }
 
-// ApproveExpense transitions an expense to "approved" status.
+// ApproveExpense transitions an expense to "approved" status and posts GL
+// entries via the accounting engine (accrual: DR expense / CR AP).
 func (s *FinService) ApproveExpense(ctx context.Context, id uuid.UUID, approvedBy uuid.UUID) (*Expense, error) {
 	e, err := s.GetExpense(ctx, id)
 	if err != nil {
@@ -918,10 +919,36 @@ func (s *FinService) ApproveExpense(ctx context.Context, id uuid.UUID, approvedB
 	e.Status = ExpenseStatusApproved
 	e.ApprovedBy = &approvedBy
 	e.ApprovedAt = &now
-	return s.budgets.UpdateExpense(ctx, e)
+
+	updated, err := s.budgets.UpdateExpense(ctx, e)
+	if err != nil {
+		return nil, err
+	}
+
+	// Post GL entries via accounting engine.
+	if s.factory != nil {
+		engine, engineErr := s.factory.ForOrg(ctx, updated.OrgID)
+		if engineErr != nil {
+			return nil, fmt.Errorf("fin: ApproveExpense engine: %w", engineErr)
+		}
+		ftx := s.buildExpenseTransaction(ctx, updated, "approved")
+		if vErr := engine.ValidateTransaction(ctx, ftx); vErr != nil {
+			return nil, fmt.Errorf("fin: ApproveExpense validate: %w", vErr)
+		}
+		effects, recErr := engine.RecordTransaction(ctx, ftx)
+		if recErr != nil {
+			return nil, fmt.Errorf("fin: ApproveExpense record: %w", recErr)
+		}
+		if err := s.executeEffects(ctx, nil, updated.OrgID, GLSourceTypeExpense, updated.ID, nil, now, ftx.Memo, effects); err != nil {
+			return nil, fmt.Errorf("fin: ApproveExpense effects: %w", err)
+		}
+	}
+
+	return updated, nil
 }
 
-// PayExpense transitions an expense to "paid" status and sets the paid_date.
+// PayExpense transitions an expense to "paid" status, sets paid_date, and posts
+// GL entries via the accounting engine (accrual: DR AP / CR Cash; cash: DR expense / CR Cash).
 func (s *FinService) PayExpense(ctx context.Context, id uuid.UUID) (*Expense, error) {
 	e, err := s.GetExpense(ctx, id)
 	if err != nil {
@@ -933,7 +960,71 @@ func (s *FinService) PayExpense(ctx context.Context, id uuid.UUID) (*Expense, er
 	now := time.Now()
 	e.Status = ExpenseStatusPaid
 	e.PaidDate = &now
-	return s.budgets.UpdateExpense(ctx, e)
+
+	updated, err := s.budgets.UpdateExpense(ctx, e)
+	if err != nil {
+		return nil, err
+	}
+
+	// Post GL entries via accounting engine.
+	if s.factory != nil {
+		engine, engineErr := s.factory.ForOrg(ctx, updated.OrgID)
+		if engineErr != nil {
+			return nil, fmt.Errorf("fin: PayExpense engine: %w", engineErr)
+		}
+		ftx := s.buildExpenseTransaction(ctx, updated, "paid")
+		if vErr := engine.ValidateTransaction(ctx, ftx); vErr != nil {
+			return nil, fmt.Errorf("fin: PayExpense validate: %w", vErr)
+		}
+		effects, recErr := engine.RecordTransaction(ctx, ftx)
+		if recErr != nil {
+			return nil, fmt.Errorf("fin: PayExpense record: %w", recErr)
+		}
+		if err := s.executeEffects(ctx, nil, updated.OrgID, GLSourceTypeExpense, updated.ID, nil, now, ftx.Memo, effects); err != nil {
+			return nil, fmt.Errorf("fin: PayExpense effects: %w", err)
+		}
+	}
+
+	return updated, nil
+}
+
+// buildExpenseTransaction constructs a FinancialTransaction for an expense
+// at the given status. It resolves the fund allocation from the expense's
+// FundType by looking up the matching fund for the org.
+func (s *FinService) buildExpenseTransaction(ctx context.Context, expense *Expense, status string) FinancialTransaction {
+	now := time.Now()
+
+	ftx := FinancialTransaction{
+		Type:          TxTypeExpense,
+		OrgID:         expense.OrgID,
+		AmountCents:   expense.TotalCents,
+		EffectiveDate: now,
+		SourceID:      expense.ID,
+		Memo:          fmt.Sprintf("Expense %s: %s", status, expense.Description),
+		Metadata: map[string]any{
+			"status":          status,
+			"expense_account": 5010, // default
+		},
+	}
+
+	// Resolve fund allocation from expense FundType.
+	if expense.FundType != nil {
+		funds, err := s.funds.ListFundsByOrg(ctx, expense.OrgID)
+		if err == nil {
+			for _, f := range funds {
+				if f.FundType == *expense.FundType {
+					ftx.FundAllocations = []FundAllocation{{
+						FundID:      f.ID,
+						FundKey:     string(f.FundType),
+						AmountCents: expense.TotalCents,
+					}}
+					break
+				}
+			}
+		}
+	}
+
+	return ftx
 }
 
 // ── Funds ─────────────────────────────────────────────────────────────────────

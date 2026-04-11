@@ -173,13 +173,14 @@ const (
 	GLSourceTypeAssessment GLSourceType = "assessment"
 	GLSourceTypePayment    GLSourceType = "payment"
 	GLSourceTypeTransfer   GLSourceType = "transfer"
+	GLSourceTypeExpense    GLSourceType = "expense"
 	GLSourceTypeManual     GLSourceType = "manual"
 )
 
 // IsValid returns true if the GLSourceType value is one of the defined constants.
 func (s GLSourceType) IsValid() bool {
 	switch s {
-	case GLSourceTypeAssessment, GLSourceTypePayment, GLSourceTypeTransfer, GLSourceTypeManual:
+	case GLSourceTypeAssessment, GLSourceTypePayment, GLSourceTypeTransfer, GLSourceTypeExpense, GLSourceTypeManual:
 		return true
 	}
 	return false
