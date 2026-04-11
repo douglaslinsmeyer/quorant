@@ -139,7 +139,7 @@ func run() error {
 
 	// Scheduler
 	sched := scheduler.New(logger)
-	sched.Register(scheduler.NewAssessmentGeneratorJob(pool, logger), 1*time.Hour)
+	sched.Register(scheduler.NewAssessmentGeneratorJob(pool, nil, logger), 1*time.Hour) // TODO: wire AssessmentGenerator from fin service
 	sched.Register(scheduler.NewLateFeeJob(pool, logger), 24*time.Hour)
 	sched.Register(scheduler.NewCollectionEscalationJob(pool, logger), 24*time.Hour)
 	sched.Register(scheduler.NewARBAutoApprovalJob(pool, logger), 1*time.Hour)

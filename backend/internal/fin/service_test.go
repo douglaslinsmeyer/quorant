@@ -1369,6 +1369,89 @@ func TestPayExpense_UpdatesBudgetActuals(t *testing.T) {
 	assert.Equal(t, int64(50000), updated.ActualCents)
 }
 
+// ── GenerateScheduledAssessments tests ───────────────────────────────
+
+type stubUnitLister struct {
+	units []uuid.UUID
+}
+
+func (s *stubUnitLister) ListUnitIDsByOrg(_ context.Context, _ uuid.UUID) ([]uuid.UUID, error) {
+	return s.units, nil
+}
+
+func TestGenerateScheduledAssessments_CreatesForAllUnits(t *testing.T) {
+	svc, assessmentRepo, _, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	unitIDs := []uuid.UUID{uuid.New(), uuid.New(), uuid.New()}
+	lister := &stubUnitLister{units: unitIDs}
+
+	sched := fin.AssessmentSchedule{
+		ID:              uuid.New(),
+		OrgID:           orgID,
+		Name:            "Monthly HOA",
+		Frequency:       fin.AssessmentFreqMonthly,
+		AmountStrategy:  fin.AmountStrategyFlat,
+		BaseAmountCents: 25000,
+		DayOfMonth:      intPtr(1),
+		GraceDays:       intPtr(15),
+		StartsAt:        time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		IsActive:        true,
+		CreatedBy:       uuid.New(),
+	}
+
+	count, err := svc.GenerateScheduledAssessments(ctx, sched, lister)
+	require.NoError(t, err)
+	assert.Equal(t, 3, count)
+	assert.Len(t, assessmentRepo.assessments, 3)
+	for _, a := range assessmentRepo.assessments {
+		assert.Equal(t, int64(25000), a.AmountCents)
+		assert.Equal(t, &sched.ID, a.ScheduleID)
+	}
+}
+
+func TestGenerateScheduledAssessments_SkipsDuplicates(t *testing.T) {
+	svc, assessmentRepo, _, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	unitIDs := []uuid.UUID{uuid.New(), uuid.New()}
+	lister := &stubUnitLister{units: unitIDs}
+
+	schedID := uuid.New()
+	sched := fin.AssessmentSchedule{
+		ID:              schedID,
+		OrgID:           orgID,
+		Name:            "Monthly HOA",
+		Frequency:       fin.AssessmentFreqMonthly,
+		AmountStrategy:  fin.AmountStrategyFlat,
+		BaseAmountCents: 25000,
+		DayOfMonth:      intPtr(1),
+		GraceDays:       intPtr(15),
+		StartsAt:        time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		IsActive:        true,
+		CreatedBy:       uuid.New(),
+	}
+
+	// Pre-seed an assessment for the first unit for this schedule's current period.
+	assessmentRepo.assessments = append(assessmentRepo.assessments, fin.Assessment{
+		ID:          uuid.New(),
+		OrgID:       orgID,
+		UnitID:      unitIDs[0],
+		ScheduleID:  &schedID,
+		AmountCents: 25000,
+		DueDate:     time.Date(time.Now().Year(), time.Now().Month(), 1, 0, 0, 0, 0, time.UTC),
+		Status:      fin.AssessmentStatusPosted,
+	})
+
+	count, err := svc.GenerateScheduledAssessments(ctx, sched, lister)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count) // only second unit gets a new assessment
+}
+
+func intPtr(v int) *int { return &v }
+
 // TestApproveExpense_WithoutFundType verifies that ApproveExpense works even
 // when the expense has no FundType set (no fund allocation, GL only).
 func TestApproveExpense_WithoutFundType(t *testing.T) {

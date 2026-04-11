@@ -310,6 +310,8 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 		AmountCents:  req.AmountCents,
 		DueDate:      req.DueDate,
 		GraceDays:    req.GraceDays,
+		ScheduleID:   req.ScheduleID,
+		IsRecurring:  req.ScheduleID != nil,
 		Status:       AssessmentStatusPosted,
 	}
 

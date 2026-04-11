@@ -7,88 +7,55 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// AssessmentGenerator abstracts the fin module's assessment generation for
+// the scheduler. Implemented by fin.FinService.
+type AssessmentGenerator interface {
+	ListActiveSchedules(ctx context.Context) ([]ActiveSchedule, error)
+	GenerateForSchedule(ctx context.Context, scheduleID string) (int, error)
+}
+
+// ActiveSchedule is a minimal schedule view returned by the generator interface.
+type ActiveSchedule struct {
+	ID   string
+	Name string
+}
+
 // AssessmentGeneratorJob generates assessments for active schedules.
-// It checks each active assessment_schedule and creates assessments for units
-// in the org that do not already have an assessment for the current period.
-// Runs every hour.
+// It delegates all business logic to the fin module via the AssessmentGenerator
+// interface. Runs every hour.
 type AssessmentGeneratorJob struct {
+	gen    AssessmentGenerator
 	pool   *pgxpool.Pool
 	logger *slog.Logger
 }
 
 // NewAssessmentGeneratorJob creates a new AssessmentGeneratorJob.
-func NewAssessmentGeneratorJob(pool *pgxpool.Pool, logger *slog.Logger) *AssessmentGeneratorJob {
-	return &AssessmentGeneratorJob{pool: pool, logger: logger}
+// The pool parameter is retained for backward compatibility with other jobs
+// but all assessment logic is delegated to the generator.
+func NewAssessmentGeneratorJob(pool *pgxpool.Pool, gen AssessmentGenerator, logger *slog.Logger) *AssessmentGeneratorJob {
+	return &AssessmentGeneratorJob{pool: pool, gen: gen, logger: logger}
 }
 
 func (j *AssessmentGeneratorJob) Name() string { return "assessment_generator" }
 
 func (j *AssessmentGeneratorJob) Run(ctx context.Context) error {
-	rows, err := j.pool.Query(ctx, `
-		SELECT id, org_id, name, frequency, base_amount_cents, day_of_month, grace_days
-		FROM assessment_schedules
-		WHERE is_active = TRUE AND deleted_at IS NULL
-		AND (ends_at IS NULL OR ends_at > now())
-	`)
+	if j.gen == nil {
+		j.logger.Warn("assessment generator not configured, skipping")
+		return nil
+	}
+	schedules, err := j.gen.ListActiveSchedules(ctx)
 	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	type schedule struct {
-		id              string
-		orgID           string
-		name            string
-		frequency       string
-		baseAmountCents int64
-		dayOfMonth      int
-		graceDays       int
-	}
-
-	var schedules []schedule
-	for rows.Next() {
-		var s schedule
-		if err := rows.Scan(&s.id, &s.orgID, &s.name, &s.frequency, &s.baseAmountCents, &s.dayOfMonth, &s.graceDays); err != nil {
-			return err
-		}
-		schedules = append(schedules, s)
-	}
-	if err := rows.Err(); err != nil {
 		return err
 	}
 
 	generated := 0
 	for _, s := range schedules {
-		// Insert assessments for all units in the org that don't already have one
-		// for this schedule in the current billing period.
-		result, err := j.pool.Exec(ctx, `
-			INSERT INTO assessments (org_id, unit_id, schedule_id, amount_cents, due_date, grace_days, status, created_at, updated_at)
-			SELECT
-				u.org_id,
-				u.id,
-				$1::uuid,
-				$2,
-				date_trunc('month', now()) + make_interval(days => $3 - 1),
-				$4,
-				'pending',
-				now(),
-				now()
-			FROM units u
-			WHERE u.org_id = $5::uuid
-			AND u.deleted_at IS NULL
-			AND NOT EXISTS (
-				SELECT 1 FROM assessments a
-				WHERE a.unit_id = u.id
-				AND a.schedule_id = $1::uuid
-				AND date_trunc('month', a.due_date) = date_trunc('month', now())
-				AND a.deleted_at IS NULL
-			)
-		`, s.id, s.baseAmountCents, s.dayOfMonth, s.graceDays, s.orgID)
+		count, err := j.gen.GenerateForSchedule(ctx, s.ID)
 		if err != nil {
-			j.logger.Error("failed to generate assessments", "schedule_id", s.id, "error", err)
+			j.logger.Error("failed to generate assessments", "schedule_id", s.ID, "schedule_name", s.Name, "error", err)
 			continue
 		}
-		generated += int(result.RowsAffected())
+		generated += count
 	}
 
 	if generated > 0 {
