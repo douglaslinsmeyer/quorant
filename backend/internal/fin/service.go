@@ -107,7 +107,7 @@ func (s *FinService) executeEffects(
 	// 1. Post GL journal entry (if JournalLines non-empty).
 	if gl != nil && len(effects.JournalLines) > 0 {
 		st := sourceType
-		if _, err := gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, effectiveDate, memo, &st, &sourceID, unitID, effects.JournalLines); err != nil {
+		if _, err := gl.PostSystemJournalEntry(ctx, orgID, uuid.Nil, effectiveDate, memo, &st, &sourceID, unitID, effects.JournalLines, effects.IsReversal); err != nil {
 			return fmt.Errorf("fin: executeEffects GL entry: %w", err)
 		}
 	}

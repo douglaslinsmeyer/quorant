@@ -62,6 +62,8 @@ func (e *GaapEngine) RecordTransaction(ctx context.Context, tx FinancialTransact
 		return e.badDebtRecoveryEffects(ctx, tx)
 	case TxTypeYearEndClose:
 		return e.yearEndCloseEffects(ctx, tx)
+	case TxTypeVoidReversal:
+		return e.voidReversalEffects(ctx, tx)
 	default:
 		return nil, fmt.Errorf("record transaction: unsupported type %q", tx.Type)
 	}
