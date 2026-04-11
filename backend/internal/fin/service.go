@@ -1142,14 +1142,20 @@ func (s *FinService) ListFunds(ctx context.Context, orgID uuid.UUID) ([]Fund, er
 }
 
 // UpdateFund persists changes to an existing fund and returns the updated row.
+// Only Name, FundType, TargetBalanceCents, and CustodianType are updatable.
+// Fields like BalanceCents, CurrencyCode, and IsDefault are system-managed.
 func (s *FinService) UpdateFund(ctx context.Context, id uuid.UUID, f *Fund) (*Fund, error) {
 	existing, err := s.GetFund(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	f.ID = existing.ID
-	f.OrgID = existing.OrgID
-	return s.funds.UpdateFund(ctx, f)
+
+	existing.Name = f.Name
+	existing.FundType = f.FundType
+	existing.TargetBalanceCents = f.TargetBalanceCents
+	existing.CustodianType = f.CustodianType
+
+	return s.funds.UpdateFund(ctx, existing)
 }
 
 // GetFundTransactions returns all transactions for the given fund.

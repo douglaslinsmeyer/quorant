@@ -322,6 +322,75 @@ func TestUpdateFund_Success(t *testing.T) {
 	assert.Equal(t, fin.FundTypeReserve, envelope.Data.FundType)
 }
 
+func TestUpdateFund_IgnoresBalanceCents(t *testing.T) {
+	ts := setupFundTestServer(t)
+	orgID := uuid.New()
+	fund := seedFund(t, ts.mockFundRepo, orgID)
+	fund.BalanceCents = 50000 // seed with a known balance
+
+	body := map[string]any{
+		"name":          "Same Fund",
+		"fund_type":     "operating",
+		"balance_cents": 9999999, // attempt to overwrite balance
+	}
+	resp := doFinRequest(t, ts.server.URL, http.MethodPatch,
+		fmt.Sprintf("/organizations/%s/funds/%s", orgID, fund.ID), body)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var envelope struct {
+		Data *fin.Fund `json:"data"`
+	}
+	decodeFinBody(t, resp, &envelope)
+	require.NotNil(t, envelope.Data)
+	assert.Equal(t, int64(50000), envelope.Data.BalanceCents, "balance_cents must not be changed via PATCH")
+}
+
+func TestUpdateFund_IgnoresIsDefault(t *testing.T) {
+	ts := setupFundTestServer(t)
+	orgID := uuid.New()
+	fund := seedFund(t, ts.mockFundRepo, orgID)
+	fund.IsDefault = false // seed as non-default
+
+	body := map[string]any{
+		"name":       "Same Fund",
+		"fund_type":  "operating",
+		"is_default": true, // attempt to promote to default
+	}
+	resp := doFinRequest(t, ts.server.URL, http.MethodPatch,
+		fmt.Sprintf("/organizations/%s/funds/%s", orgID, fund.ID), body)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var envelope struct {
+		Data *fin.Fund `json:"data"`
+	}
+	decodeFinBody(t, resp, &envelope)
+	require.NotNil(t, envelope.Data)
+	assert.False(t, envelope.Data.IsDefault, "is_default must not be changed via PATCH")
+}
+
+func TestUpdateFund_IgnoresCurrencyCode(t *testing.T) {
+	ts := setupFundTestServer(t)
+	orgID := uuid.New()
+	fund := seedFund(t, ts.mockFundRepo, orgID)
+	fund.CurrencyCode = "USD" // seed with known currency
+
+	body := map[string]any{
+		"name":          "Same Fund",
+		"fund_type":     "operating",
+		"currency_code": "EUR", // attempt to change currency
+	}
+	resp := doFinRequest(t, ts.server.URL, http.MethodPatch,
+		fmt.Sprintf("/organizations/%s/funds/%s", orgID, fund.ID), body)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var envelope struct {
+		Data *fin.Fund `json:"data"`
+	}
+	decodeFinBody(t, resp, &envelope)
+	require.NotNil(t, envelope.Data)
+	assert.Equal(t, "USD", envelope.Data.CurrencyCode, "currency_code must not be changed via PATCH")
+}
+
 func TestUpdateFund_NotFound(t *testing.T) {
 	ts := setupFundTestServer(t)
 	orgID := uuid.New()
