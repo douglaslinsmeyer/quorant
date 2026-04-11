@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/quorant/quorant/internal/platform/policy"
 )
 
@@ -248,6 +249,44 @@ func validateOverpayment(ctx context.Context, registry *policy.Registry, tx Fina
 	default:
 		return nil // accept
 	}
+}
+
+// fundSplitEntry describes one leg of an assessment fund allocation split.
+type fundSplitEntry struct {
+	FundType string  `json:"fund_type"`
+	Percent  float64 `json:"percent"`
+}
+
+// assessmentFundSplitRuling holds the decoded assessment_fund_allocation ruling.
+type assessmentFundSplitRuling struct {
+	Allocations []fundSplitEntry `json:"allocations"`
+}
+
+// resolveAssessmentFundSplit determines how an assessment's revenue should be
+// split across funds. When the registry is nil or no policy is configured,
+// 100% is allocated to operating (current default).
+func resolveAssessmentFundSplit(ctx context.Context, registry *policy.Registry, orgID uuid.UUID) ([]fundSplitEntry, error) {
+	defaultSplit := []fundSplitEntry{{FundType: "operating", Percent: 1.0}}
+
+	if registry == nil {
+		return defaultSplit, nil
+	}
+
+	resolution, err := registry.Resolve(ctx, orgID, nil, "assessment_fund_allocation")
+	if err != nil || resolution == nil || resolution.Ruling == nil {
+		return defaultSplit, nil
+	}
+
+	var ruling assessmentFundSplitRuling
+	if err := json.Unmarshal(resolution.Ruling, &ruling); err != nil {
+		return defaultSplit, nil
+	}
+
+	if len(ruling.Allocations) == 0 {
+		return defaultSplit, nil
+	}
+
+	return ruling.Allocations, nil
 }
 
 // reserveWithdrawalRuling holds the decoded reserve_withdrawal_policy ruling.

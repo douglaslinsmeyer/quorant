@@ -23,6 +23,7 @@ type AccountingEngine interface {
 	RecordTransaction(ctx context.Context, tx FinancialTransaction) (*FinancialEffects, error)
 	ValidateTransaction(ctx context.Context, tx FinancialTransaction) error
 	PaymentApplicationStrategy(ctx context.Context, pc PaymentContext) (*ApplicationStrategy, error)
+	AssessmentFundSplit(ctx context.Context, orgID uuid.UUID) ([]fundSplitEntry, error)
 	PaymentTerms(ctx context.Context, pc PayableContext) (*PaymentTermsResult, error)
 	PayableRecognitionDate(ctx context.Context, ec ExpenseContext) (time.Time, error)
 	RevenueRecognitionDate(ctx context.Context, tx FinancialTransaction) (time.Time, error)

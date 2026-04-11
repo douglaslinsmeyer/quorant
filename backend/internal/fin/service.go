@@ -351,14 +351,42 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 	if engineErr != nil {
 		return nil, fmt.Errorf("fin: CreateAssessment engine: %w", engineErr)
 	}
+	// Resolve assessment fund split from org policy.
+	splitEntries, splitErr := engine.AssessmentFundSplit(ctx, orgID)
+	if splitErr != nil {
+		return nil, fmt.Errorf("fin: CreateAssessment fund split: %w", splitErr)
+	}
+
+	var fundAllocs []FundAllocation
+	if len(splitEntries) > 0 {
+		orgFunds, listErr := s.funds.ListFundsByOrg(ctx, orgID)
+		if listErr != nil {
+			return nil, fmt.Errorf("fin: CreateAssessment list funds: %w", listErr)
+		}
+		fundByType := make(map[string]*Fund)
+		for i := range orgFunds {
+			fundByType[string(orgFunds[i].FundType)] = &orgFunds[i]
+		}
+		for _, entry := range splitEntries {
+			if f, ok := fundByType[entry.FundType]; ok {
+				fundAllocs = append(fundAllocs, FundAllocation{
+					FundID:      f.ID,
+					FundKey:     entry.FundType,
+					AmountCents: int64(float64(created.AmountCents) * entry.Percent),
+				})
+			}
+		}
+	}
+
 	ftx := FinancialTransaction{
-		Type:          TxTypeAssessment,
-		OrgID:         orgID,
-		AmountCents:   created.AmountCents,
-		EffectiveDate: created.DueDate,
-		SourceID:      created.ID,
-		UnitID:        &req.UnitID,
-		Memo:          fmt.Sprintf("Assessment: %s", created.Description),
+		Type:            TxTypeAssessment,
+		OrgID:           orgID,
+		AmountCents:     created.AmountCents,
+		EffectiveDate:   created.DueDate,
+		SourceID:        created.ID,
+		UnitID:          &req.UnitID,
+		Memo:            fmt.Sprintf("Assessment: %s", created.Description),
+		FundAllocations: fundAllocs,
 	}
 	if vErr := engine.ValidateTransaction(ctx, ftx); vErr != nil {
 		return nil, fmt.Errorf("fin: CreateAssessment validate: %w", vErr)
