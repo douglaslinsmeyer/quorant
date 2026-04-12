@@ -66,6 +66,7 @@ func TestPaymentApplicationStrategy_RegistryWithPriorityOrder(t *testing.T) {
 		&stubAIPolicyResolver{ruling: rulingJSON, confidence: 0.95},
 		nil,
 		nil,
+		nil,
 	)
 	err = registry.Register("payment_allocation_rules", policy.OperationDescriptor{
 		Category:         "payment_allocation_rules",
@@ -109,6 +110,7 @@ func TestPaymentApplicationStrategy_DesignatedOverridesPolicy(t *testing.T) {
 		&stubPolicyRecordRepo{records: nil},
 		nil,
 		&stubAIPolicyResolver{ruling: rulingJSON, confidence: 0.95},
+		nil,
 		nil,
 		nil,
 	)

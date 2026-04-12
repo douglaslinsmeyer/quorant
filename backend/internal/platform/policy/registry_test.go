@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -107,7 +109,7 @@ func (s *stubResolutionRepo) WithTx(_ pgx.Tx) policy.ResolutionRepository {
 
 func TestRegistry_Register(t *testing.T) {
 	t.Run("registers a descriptor successfully", func(t *testing.T) {
-		reg := policy.NewRegistry(nil, nil, nil, nil, nil)
+		reg := policy.NewRegistry(nil, nil, nil, nil, nil, nil)
 
 		desc := policy.OperationDescriptor{
 			Category:    "fee_schedule",
@@ -126,7 +128,7 @@ func TestRegistry_Register(t *testing.T) {
 	})
 
 	t.Run("returns error on duplicate category registration", func(t *testing.T) {
-		reg := policy.NewRegistry(nil, nil, nil, nil, nil)
+		reg := policy.NewRegistry(nil, nil, nil, nil, nil, nil)
 
 		desc := policy.OperationDescriptor{
 			Category:    "fee_schedule",
@@ -142,7 +144,7 @@ func TestRegistry_Register(t *testing.T) {
 	})
 
 	t.Run("allows registering multiple distinct categories", func(t *testing.T) {
-		reg := policy.NewRegistry(nil, nil, nil, nil, nil)
+		reg := policy.NewRegistry(nil, nil, nil, nil, nil, nil)
 
 		err := reg.Register("fee_schedule", policy.OperationDescriptor{Category: "fee_schedule"})
 		require.NoError(t, err)
@@ -153,7 +155,7 @@ func TestRegistry_Register(t *testing.T) {
 }
 
 func TestRegistry_FindTriggers(t *testing.T) {
-	reg := policy.NewRegistry(nil, nil, nil, nil, nil)
+	reg := policy.NewRegistry(nil, nil, nil, nil, nil, nil)
 
 	// Register a descriptor with two policies
 	err := reg.Register("fee_schedule", policy.OperationDescriptor{
@@ -300,7 +302,7 @@ func TestRegistry_Resolve_AutoApproved(t *testing.T) {
 		},
 	}
 
-	reg := policy.NewRegistry(recordRepo, resolutionRepo, aiResolver, nil, testLogger())
+	reg := policy.NewRegistry(recordRepo, resolutionRepo, aiResolver, nil, nil, testLogger())
 	err := reg.Register("fee_schedule", newTestDescriptor(nil))
 	require.NoError(t, err)
 
@@ -341,7 +343,7 @@ func TestRegistry_Resolve_Held(t *testing.T) {
 		return nil
 	}
 
-	reg := policy.NewRegistry(recordRepo, resolutionRepo, aiResolver, nil, testLogger())
+	reg := policy.NewRegistry(recordRepo, resolutionRepo, aiResolver, nil, nil, testLogger())
 	err := reg.Register("fee_schedule", newTestDescriptor(onHold))
 	require.NoError(t, err)
 
@@ -376,7 +378,7 @@ func TestRegistry_Resolve_AIUnavailable(t *testing.T) {
 		return nil
 	}
 
-	reg := policy.NewRegistry(recordRepo, resolutionRepo, aiResolver, nil, testLogger())
+	reg := policy.NewRegistry(recordRepo, resolutionRepo, aiResolver, nil, nil, testLogger())
 	err := reg.Register("fee_schedule", newTestDescriptor(onHold))
 	require.NoError(t, err)
 
@@ -398,10 +400,200 @@ func TestRegistry_Resolve_UnregisteredCategory(t *testing.T) {
 	ctx := context.Background()
 	orgID := uuid.New()
 
-	reg := policy.NewRegistry(nil, nil, nil, nil, testLogger())
+	reg := policy.NewRegistry(nil, nil, nil, nil, nil, testLogger())
 
 	res, err := reg.Resolve(ctx, orgID, nil, "nonexistent_category")
 	require.Error(t, err)
 	assert.Nil(t, res)
 	assert.Contains(t, err.Error(), "nonexistent_category")
+}
+
+// --- countingPolicyResolver tracks AI call count ---
+
+type countingPolicyResolver struct {
+	result *ai.ResolutionResult
+	err    error
+	calls  atomic.Int64
+}
+
+func (c *countingPolicyResolver) GetPolicy(_ context.Context, _ uuid.UUID, _ string) (*ai.PolicyResult, error) {
+	return nil, nil
+}
+
+func (c *countingPolicyResolver) QueryPolicy(_ context.Context, _ uuid.UUID, _ string, _ ai.QueryContext) (*ai.ResolutionResult, error) {
+	c.calls.Add(1)
+	return c.result, c.err
+}
+
+// --- Cache integration tests ---
+
+func TestRegistry_Resolve_CacheHit(t *testing.T) {
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	records := newTestRecords()
+	recordRepo := &stubRecordRepo{records: records}
+	aiResolver := &countingPolicyResolver{
+		result: &ai.ResolutionResult{
+			Resolution: json.RawMessage(`{"late_fee": 50}`),
+			Reasoning:  "Based on org policy",
+			Confidence: 0.95,
+		},
+	}
+	cache := policy.NewResolutionCache(5 * time.Minute)
+
+	reg := policy.NewRegistry(recordRepo, nil, aiResolver, nil, cache, testLogger())
+	err := reg.Register("fee_schedule", newTestDescriptor(nil))
+	require.NoError(t, err)
+
+	// First call: cache miss, AI should be called.
+	res1, err := reg.Resolve(ctx, orgID, nil, "fee_schedule")
+	require.NoError(t, err)
+	require.NotNil(t, res1)
+	assert.Equal(t, int64(1), aiResolver.calls.Load())
+
+	// Second call: same org + same records = same hash → cache hit, AI not called.
+	res2, err := reg.Resolve(ctx, orgID, nil, "fee_schedule")
+	require.NoError(t, err)
+	require.NotNil(t, res2)
+	assert.Equal(t, int64(1), aiResolver.calls.Load(), "AI should not be called on cache hit")
+
+	// Cached resolution should have the same ruling and reasoning.
+	assert.Equal(t, res1.Status, res2.Status)
+	assert.Equal(t, res1.Reasoning, res2.Reasoning)
+	assert.Equal(t, res1.Confidence, res2.Confidence)
+}
+
+func TestRegistry_Resolve_CacheMiss_DifferentPolicies(t *testing.T) {
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	record1 := policy.PolicyRecord{
+		ID:       uuid.New(),
+		Scope:    "org",
+		Category: "fee_schedule",
+		Key:      "late_fee",
+		Value:    json.RawMessage(`{"amount": 50}`),
+		IsActive: true,
+	}
+	record2 := policy.PolicyRecord{
+		ID:       uuid.New(),
+		Scope:    "org",
+		Category: "fee_schedule",
+		Key:      "late_fee",
+		Value:    json.RawMessage(`{"amount": 75}`),
+		IsActive: true,
+	}
+
+	recordRepo := &stubRecordRepo{records: []policy.PolicyRecord{record1}}
+	aiResolver := &countingPolicyResolver{
+		result: &ai.ResolutionResult{
+			Resolution: json.RawMessage(`{"late_fee": 50}`),
+			Reasoning:  "Based on org policy",
+			Confidence: 0.95,
+		},
+	}
+	cache := policy.NewResolutionCache(5 * time.Minute)
+
+	reg := policy.NewRegistry(recordRepo, nil, aiResolver, nil, cache, testLogger())
+	err := reg.Register("fee_schedule", newTestDescriptor(nil))
+	require.NoError(t, err)
+
+	// First call with record1.
+	_, err = reg.Resolve(ctx, orgID, nil, "fee_schedule")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), aiResolver.calls.Load())
+
+	// Swap to a different record set (different ID → different hash → cache miss).
+	recordRepo.records = []policy.PolicyRecord{record2}
+
+	_, err = reg.Resolve(ctx, orgID, nil, "fee_schedule")
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), aiResolver.calls.Load(), "AI should be called for different policy set")
+}
+
+func TestRegistry_Resolve_CacheExpiry(t *testing.T) {
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	records := newTestRecords()
+	recordRepo := &stubRecordRepo{records: records}
+	aiResolver := &countingPolicyResolver{
+		result: &ai.ResolutionResult{
+			Resolution: json.RawMessage(`{"late_fee": 50}`),
+			Reasoning:  "Based on org policy",
+			Confidence: 0.95,
+		},
+	}
+	cache := policy.NewResolutionCache(1 * time.Millisecond)
+
+	reg := policy.NewRegistry(recordRepo, nil, aiResolver, nil, cache, testLogger())
+	err := reg.Register("fee_schedule", newTestDescriptor(nil))
+	require.NoError(t, err)
+
+	// First call populates cache.
+	_, err = reg.Resolve(ctx, orgID, nil, "fee_schedule")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), aiResolver.calls.Load())
+
+	// Wait for TTL to expire.
+	time.Sleep(5 * time.Millisecond)
+
+	// Second call: expired → AI called again.
+	_, err = reg.Resolve(ctx, orgID, nil, "fee_schedule")
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), aiResolver.calls.Load(), "AI should be called after cache expiry")
+}
+
+func TestRegistry_Resolve_HeldResolutionNotCached(t *testing.T) {
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	records := newTestRecords()
+	recordRepo := &stubRecordRepo{records: records}
+	aiResolver := &countingPolicyResolver{
+		err: fmt.Errorf("connection refused"),
+	}
+	cache := policy.NewResolutionCache(5 * time.Minute)
+
+	reg := policy.NewRegistry(recordRepo, nil, aiResolver, nil, cache, testLogger())
+	err := reg.Register("fee_schedule", newTestDescriptor(nil))
+	require.NoError(t, err)
+
+	// First call: AI fails, resolution is held.
+	res1, err := reg.Resolve(ctx, orgID, nil, "fee_schedule")
+	require.NoError(t, err)
+	assert.Equal(t, "held", res1.Status)
+	assert.Equal(t, int64(1), aiResolver.calls.Load())
+
+	// Second call: held result should NOT be cached, so AI is retried.
+	_, err = reg.Resolve(ctx, orgID, nil, "fee_schedule")
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), aiResolver.calls.Load(), "held resolutions should not be cached; AI should be retried")
+}
+
+func TestRegistry_Resolve_NilCacheSkipsCaching(t *testing.T) {
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	records := newTestRecords()
+	recordRepo := &stubRecordRepo{records: records}
+	aiResolver := &countingPolicyResolver{
+		result: &ai.ResolutionResult{
+			Resolution: json.RawMessage(`{"late_fee": 50}`),
+			Reasoning:  "Based on org policy",
+			Confidence: 0.95,
+		},
+	}
+
+	// No cache — should still work, AI called every time.
+	reg := policy.NewRegistry(recordRepo, nil, aiResolver, nil, nil, testLogger())
+	err := reg.Register("fee_schedule", newTestDescriptor(nil))
+	require.NoError(t, err)
+
+	_, err = reg.Resolve(ctx, orgID, nil, "fee_schedule")
+	require.NoError(t, err)
+	_, err = reg.Resolve(ctx, orgID, nil, "fee_schedule")
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), aiResolver.calls.Load(), "AI should be called each time without cache")
 }

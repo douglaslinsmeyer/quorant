@@ -2,9 +2,11 @@ package policy
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"sync"
 
@@ -26,6 +28,7 @@ type Registry struct {
 	resolutions ResolutionRepository
 	ai          ai.PolicyResolver
 	orgLookup   OrgJurisdictionLookup
+	cache       *ResolutionCache
 	logger      *slog.Logger
 }
 
@@ -36,6 +39,7 @@ func NewRegistry(
 	resolutions ResolutionRepository,
 	aiResolver ai.PolicyResolver,
 	orgLookup OrgJurisdictionLookup,
+	cache *ResolutionCache,
 	logger *slog.Logger,
 ) *Registry {
 	return &Registry{
@@ -44,6 +48,7 @@ func NewRegistry(
 		resolutions: resolutions,
 		ai:          aiResolver,
 		orgLookup:   orgLookup,
+		cache:       cache,
 		logger:      logger,
 	}
 }
@@ -125,10 +130,28 @@ func (r *Registry) matchesTrigger(spec PolicySpec, documentType string, concepts
 	return false
 }
 
+// policyHash computes a SHA-256 hex digest of sorted "ID:UpdatedAt" pairs.
+// Including UpdatedAt ensures that content mutations to existing records
+// (same ID, new Value) produce a cache miss. The sorted order makes the
+// hash stable regardless of gather order.
+func policyHash(records []PolicyRecord) string {
+	keys := make([]string, len(records))
+	for i, rec := range records {
+		keys[i] = fmt.Sprintf("%s:%d", rec.ID.String(), rec.UpdatedAt.UnixNano())
+	}
+	sort.Strings(keys)
+	h := sha256.Sum256([]byte(strings.Join(keys, ",")))
+	return fmt.Sprintf("%x", h)
+}
+
 // Resolve executes the two-tier policy resolution pipeline for the given
 // category. Tier 1 gathers applicable policy records from the database.
 // Tier 2 sends them to the AI resolver for precedence reasoning. The result
 // is persisted (when a resolutions repo is available) and returned.
+//
+// When a ResolutionCache is configured, Resolve checks for a cached resolution
+// after Tier 1 gather using a SHA-256 hash of the gathered policy record IDs.
+// A cache hit skips the Tier 2 AI call entirely.
 func (r *Registry) Resolve(ctx context.Context, orgID uuid.UUID, unitID *uuid.UUID, category string) (*Resolution, error) {
 	r.mu.RLock()
 	desc, exists := r.descriptors[category]
@@ -144,6 +167,16 @@ func (r *Registry) Resolve(ctx context.Context, orgID uuid.UUID, unitID *uuid.UU
 	records, err := r.records.GatherForResolution(ctx, category, jurisdiction, orgID, unitID)
 	if err != nil {
 		return nil, fmt.Errorf("policy: gather records for %q: %w", category, err)
+	}
+
+	// Compute policy hash for cache lookup and audit trail.
+	hash := policyHash(records)
+
+	// Check cache before Tier 2 AI call.
+	if r.cache != nil {
+		if cached, ok := r.cache.Get(orgID, unitID, category, hash); ok {
+			return cached, nil
+		}
 	}
 
 	// Build policy ID slice for audit trail.
@@ -237,6 +270,12 @@ func (r *Registry) Resolve(ctx context.Context, orgID uuid.UUID, unitID *uuid.UU
 				)
 			}
 		}
+	}
+
+	// Cache only approved resolutions. Held/ai_unavailable results represent
+	// transient failures or low-confidence outcomes that should be retried.
+	if r.cache != nil && status == "approved" {
+		r.cache.Set(orgID, unitID, category, hash, res)
 	}
 
 	// Invoke OnHold callback if held.

@@ -22,6 +22,7 @@ func newRegistryWithCap(t *testing.T, category string, rulingJSON json.RawMessag
 		&stubAIPolicyResolver{ruling: rulingJSON, confidence: 0.95},
 		nil,
 		nil,
+		nil,
 	)
 	err := registry.Register(category, policy.OperationDescriptor{
 		Category:         category,

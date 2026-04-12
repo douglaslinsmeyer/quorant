@@ -268,7 +268,8 @@ func run() error {
 	// Policy engine
 	policyRecordRepo := policy.NewPostgresPolicyRecordRepository(pool)
 	policyResolutionRepo := policy.NewPostgresResolutionRepository(pool)
-	policyRegistry := policy.NewRegistry(policyRecordRepo, policyResolutionRepo, policyResolver, nil, logger)
+	policyCache := policy.NewResolutionCache(5 * time.Minute)
+	policyRegistry := policy.NewRegistry(policyRecordRepo, policyResolutionRepo, policyResolver, nil, policyCache, logger)
 
 	// Fin module
 	assessmentRepo := fin.NewPostgresAssessmentRepository(pool)
