@@ -2558,6 +2558,27 @@ func TestRecordPayment_IdempotencyKey_DeduplicatesPayment(t *testing.T) {
 	assert.Len(t, paymentRepo.payments, 1, "only one payment should exist")
 }
 
+func TestRecordPayment_NilIdempotencyKey_AllowsDuplicates(t *testing.T) {
+	svc, _, paymentRepo, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	userID := uuid.New()
+
+	req := fin.CreatePaymentRequest{
+		UnitID:      uuid.New(),
+		AmountCents: 5000,
+	}
+
+	first, err := svc.RecordPayment(ctx, orgID, userID, req)
+	require.NoError(t, err)
+
+	second, err := svc.RecordPayment(ctx, orgID, userID, req)
+	require.NoError(t, err)
+
+	assert.NotEqual(t, first.ID, second.ID, "nil key should create separate payments")
+	assert.Len(t, paymentRepo.payments, 2)
+}
+
 // TestCreateAssessment_ComplianceCapsLateFee verifies that when a ComplianceResolver
 // returns a max_late_fee_cents limit, the late fee on the assessment is capped at
 // that value even when the caller provides a higher fee.
