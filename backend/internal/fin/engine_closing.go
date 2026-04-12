@@ -66,8 +66,8 @@ func (e *GaapEngine) yearEndCloseEffects(ctx context.Context, tx FinancialTransa
 			return nil, fmt.Errorf("year_end_close: resolve account %d: %w", acctNum, err)
 		}
 
-		switch acctType {
-		case "revenue":
+		switch GLAccountType(acctType) {
+		case GLAccountTypeRevenue:
 			// Revenue accounts carry credit balances. DR to close (zero them out).
 			effects.JournalLines = append(effects.JournalLines, GLJournalLine{
 				AccountID:  account.ID,
@@ -75,7 +75,7 @@ func (e *GaapEngine) yearEndCloseEffects(ctx context.Context, tx FinancialTransa
 			})
 			netCents += balanceCents
 
-		case "expense":
+		case GLAccountTypeExpense:
 			// Expense accounts carry debit balances. CR to close (zero them out).
 			effects.JournalLines = append(effects.JournalLines, GLJournalLine{
 				AccountID:   account.ID,
@@ -83,7 +83,7 @@ func (e *GaapEngine) yearEndCloseEffects(ctx context.Context, tx FinancialTransa
 			})
 			netCents -= balanceCents
 
-		case "equity":
+		case GLAccountTypeEquity:
 			// Interfund transfer accounts: 3100 (transfer out) has a debit balance,
 			// 3110 (transfer in) has a credit balance. Close both to zero.
 			if acctNum == 3100 {

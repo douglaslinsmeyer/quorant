@@ -20,7 +20,7 @@ type FinancialEffects struct {
 // FundTransactionDirective instructs FinService to create a fund transaction.
 type FundTransactionDirective struct {
 	FundID      uuid.UUID
-	Type        string // uses FundTxType* constants from enums.go
+	Type        FundTransactionType
 	AmountCents int64
 	Description string
 }

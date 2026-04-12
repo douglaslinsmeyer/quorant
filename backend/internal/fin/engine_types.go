@@ -194,7 +194,7 @@ type GLAccountSeed struct {
 	Number    int
 	ParentNum int
 	Name      string
-	Type      string
+	Type      GLAccountType
 	IsHeader  bool
 	IsSystem  bool
 	FundKey   string // "operating", "reserve", "capital", "special", or ""

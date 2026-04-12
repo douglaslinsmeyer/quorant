@@ -313,6 +313,7 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 		ScheduleID:   req.ScheduleID,
 		IsRecurring:  req.ScheduleID != nil,
 		Status:       AssessmentStatusPosted,
+		LateFeeCents: req.LateFeeCents,
 	}
 
 	// Optional: look up late fee policy to set late_fee_cents if not provided.
@@ -324,6 +325,21 @@ func (s *FinService) CreateAssessment(ctx context.Context, orgID uuid.UUID, req 
 			}
 			if jsonErr := json.Unmarshal(result.Config, &cfg); jsonErr == nil && cfg.LateFeeCents > 0 {
 				a.LateFeeCents = &cfg.LateFeeCents
+			}
+		}
+	}
+
+	// Compliance: cap late fee at jurisdiction limit if available.
+	if s.compliance != nil && a.LateFeeCents != nil {
+		result, err := s.compliance.CheckCompliance(ctx, orgID, "fine_limits")
+		if err == nil && result != nil {
+			for _, rule := range result.Rules {
+				if rule.Key == "max_late_fee_cents" {
+					var cap int64
+					if jsonErr := json.Unmarshal(rule.Value, &cap); jsonErr == nil && cap > 0 && *a.LateFeeCents > cap {
+						a.LateFeeCents = &cap
+					}
+				}
 			}
 		}
 	}
@@ -592,6 +608,17 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 		return nil, err
 	}
 
+	// Idempotency: if the caller supplied a key, check for an existing payment.
+	if req.IdempotencyKey != nil {
+		existing, findErr := s.payments.FindPaymentByIdempotencyKey(ctx, orgID, *req.IdempotencyKey)
+		if findErr != nil {
+			return nil, fmt.Errorf("fin: RecordPayment idempotency lookup: %w", findErr)
+		}
+		if existing != nil {
+			return existing, nil
+		}
+	}
+
 	now := time.Now()
 	p := &Payment{
 		OrgID:           orgID,
@@ -602,6 +629,7 @@ func (s *FinService) RecordPayment(ctx context.Context, orgID uuid.UUID, userID 
 		AmountCents:     req.AmountCents,
 		Status:          PaymentStatusCompleted,
 		Description:     req.Description,
+		IdempotencyKey:  req.IdempotencyKey,
 		PaidAt:          &now,
 	}
 
@@ -1325,6 +1353,29 @@ func (s *FinService) CreateFundTransfer(ctx context.Context, orgID uuid.UUID, re
 		)
 	}
 
+	// Compliance: enforce reserve fund withdrawal minimums if applicable.
+	if s.compliance != nil && fromFund.FundType == FundTypeReserve {
+		result, compErr := s.compliance.CheckCompliance(ctx, orgID, "reserve_study")
+		if compErr == nil && result != nil {
+			for _, rule := range result.Rules {
+				if rule.Key == "min_reserve_balance_cents" {
+					var minBalance int64
+					if jsonErr := json.Unmarshal(rule.Value, &minBalance); jsonErr == nil && minBalance > 0 {
+						balanceAfter := fromFund.BalanceCents - req.AmountCents
+						if balanceAfter < minBalance {
+							return nil, api.NewValidationError(
+								"fin.fund_transfer.compliance_reserve_minimum", "amount_cents",
+								api.P("min_balance", minBalance),
+								api.P("balance_after", balanceAfter),
+								api.P("rule", "reserve_study"),
+							)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	created, err := funds.CreateTransfer(ctx, t)
 	if err != nil {
 		return nil, err
@@ -1407,6 +1458,44 @@ func (s *FinService) AddCollectionAction(ctx context.Context, caseID uuid.UUID, 
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
+
+	// Compliance: enforce notice-before-lien requirement per jurisdiction rules.
+	if s.compliance != nil && CollectionActionType(req.ActionType) == CollectionActionTypeLienFiled {
+		caseRecord, caseErr := s.collections.FindCaseByID(ctx, caseID)
+		if caseErr != nil {
+			return nil, fmt.Errorf("fin: AddCollectionAction case lookup: %w", caseErr)
+		}
+		if caseRecord != nil {
+			result, compErr := s.compliance.CheckCompliance(ctx, caseRecord.OrgID, "fine_limits")
+			if compErr == nil && result != nil {
+				for _, rule := range result.Rules {
+					if rule.Key == "require_notice_before_lien" {
+						var required bool
+						if jsonErr := json.Unmarshal(rule.Value, &required); jsonErr == nil && required {
+							actions, listErr := s.collections.ListActionsByCase(ctx, caseID)
+							if listErr != nil {
+								return nil, fmt.Errorf("fin: AddCollectionAction list actions: %w", listErr)
+							}
+							hasNotice := false
+							for _, act := range actions {
+								if act.ActionType == CollectionActionTypeNoticeSent {
+									hasNotice = true
+									break
+								}
+							}
+							if !hasNotice {
+								return nil, api.NewValidationError(
+									"fin.collection.notice_required_before_lien", "action_type",
+									api.P("rule", "fine_limits.require_notice_before_lien"),
+								)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	a := &CollectionAction{
 		CaseID:       caseID,
 		ActionType:   CollectionActionType(req.ActionType),

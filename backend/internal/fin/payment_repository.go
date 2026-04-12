@@ -21,6 +21,10 @@ type PaymentRepository interface {
 	// no matching row exists.
 	FindPaymentByID(ctx context.Context, id uuid.UUID) (*Payment, error)
 
+	// FindPaymentByIdempotencyKey returns the payment matching the given
+	// org-scoped idempotency key, or nil, nil if no match exists.
+	FindPaymentByIdempotencyKey(ctx context.Context, orgID uuid.UUID, key string) (*Payment, error)
+
 	// ListPaymentsByOrg returns payments for the given org, supporting cursor-based
 	// pagination ordered by id DESC.
 	// afterID is the cursor from the previous page; hasMore is true when more items exist.

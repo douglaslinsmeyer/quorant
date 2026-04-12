@@ -320,3 +320,39 @@ func TestLedgerReferenceType_IsValid_Reversal(t *testing.T) {
 func TestPaymentStatus_IsValid_Void(t *testing.T) {
 	assert.True(t, PaymentStatusVoid.IsValid())
 }
+
+func TestFundTransactionType_IsValid(t *testing.T) {
+	tests := []struct {
+		val  FundTransactionType
+		want bool
+	}{
+		{FundTxTypeTransferOut, true},
+		{FundTxTypeTransferIn, true},
+		{FundTxTypeLoanOut, true},
+		{FundTxTypeLoanIn, true},
+		{FundTxTypeRevenue, true},
+		{FundTxTypeExpense, true},
+		{FundTxTypeAssessment, true},
+		{FundTxTypePayment, true},
+		{FundTxTypeLateFee, true},
+		{FundTxTypeInterest, true},
+		{FundTxTypeDepreciation, true},
+		{FundTransactionType("bogus"), false},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, tt.val.IsValid(), "FundTransactionType(%q).IsValid()", tt.val)
+	}
+}
+
+func TestFundTransactionRefType_IsValid(t *testing.T) {
+	tests := []struct {
+		val  FundTransactionRefType
+		want bool
+	}{
+		{FundTxRefTypeTransfer, true},
+		{FundTransactionRefType("bogus"), false},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, tt.val.IsValid(), "FundTransactionRefType(%q).IsValid()", tt.val)
+	}
+}

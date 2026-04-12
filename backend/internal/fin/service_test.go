@@ -2,6 +2,7 @@ package fin_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -286,6 +287,16 @@ func (m *mockPaymentRepo) CreatePayment(_ context.Context, p *fin.Payment) (*fin
 func (m *mockPaymentRepo) FindPaymentByID(_ context.Context, id uuid.UUID) (*fin.Payment, error) {
 	for i := range m.payments {
 		if m.payments[i].ID == id {
+			out := m.payments[i]
+			return &out, nil
+		}
+	}
+	return nil, nil
+}
+
+func (m *mockPaymentRepo) FindPaymentByIdempotencyKey(_ context.Context, orgID uuid.UUID, key string) (*fin.Payment, error) {
+	for i := range m.payments {
+		if m.payments[i].OrgID == orgID && m.payments[i].IdempotencyKey != nil && *m.payments[i].IdempotencyKey == key {
 			out := m.payments[i]
 			return &out, nil
 		}
@@ -848,6 +859,41 @@ func (m *mockCollectionRepo) GetCollectionStatusForUnit(_ context.Context, unitI
 
 func (m *mockCollectionRepo) WithTx(_ pgx.Tx) fin.CollectionRepository { return m }
 
+// mockComplianceResolver is a stub ComplianceResolver for unit tests.
+type mockComplianceResolver struct {
+	rules map[string][]ai.RuleValue // category -> rules
+}
+
+func (m *mockComplianceResolver) GetJurisdictionRule(_ context.Context, _, category, key string) (*ai.RuleValue, error) {
+	for _, r := range m.rules[category] {
+		if r.Key == key {
+			return &r, nil
+		}
+	}
+	return nil, nil
+}
+
+func (m *mockComplianceResolver) ListJurisdictionRules(_ context.Context, _, category string) ([]ai.RuleValue, error) {
+	return m.rules[category], nil
+}
+
+func (m *mockComplianceResolver) EvaluateCompliance(_ context.Context, _ uuid.UUID) (*ai.ComplianceReport, error) {
+	return nil, nil
+}
+
+func (m *mockComplianceResolver) CheckCompliance(_ context.Context, _ uuid.UUID, category string) (*ai.ComplianceResult, error) {
+	rules := m.rules[category]
+	if len(rules) == 0 {
+		return nil, nil
+	}
+	return &ai.ComplianceResult{
+		Category:  category,
+		Status:    "checked",
+		Rules:     rules,
+		CheckedAt: time.Now(),
+	}, nil
+}
+
 // ── Helper ────────────────────────────────────────────────────────────────────
 
 // wildcardAccountResolver returns a deterministic GLAccount for any org+number
@@ -1231,7 +1277,7 @@ func TestApproveExpense_PostsGLEffects(t *testing.T) {
 	// The fund directive should have created a fund transaction.
 	require.Len(t, fundRepo.transactions, 1)
 	assert.Equal(t, fund.ID, fundRepo.transactions[0].FundID)
-	assert.Equal(t, "expense", fundRepo.transactions[0].TransactionType)
+	assert.Equal(t, fin.FundTxTypeExpense, fundRepo.transactions[0].TransactionType)
 	assert.Equal(t, created.TotalCents, fundRepo.transactions[0].AmountCents)
 }
 
@@ -1277,7 +1323,7 @@ func TestPayExpense_PostsGLEffects(t *testing.T) {
 	require.Greater(t, len(fundRepo.transactions), approveCount)
 	payTx := fundRepo.transactions[len(fundRepo.transactions)-1]
 	assert.Equal(t, fund.ID, payTx.FundID)
-	assert.Equal(t, "expense", payTx.TransactionType)
+	assert.Equal(t, fin.FundTxTypeExpense, payTx.TransactionType)
 	assert.Equal(t, created.TotalCents, payTx.AmountCents)
 }
 
@@ -2489,6 +2535,29 @@ func TestVoidPayment_AlreadyVoid(t *testing.T) {
 	assert.Contains(t, valErr.MsgKey(), "invalid_void_status")
 }
 
+func TestRecordPayment_IdempotencyKey_DeduplicatesPayment(t *testing.T) {
+	svc, _, paymentRepo, _, _, _ := newTestService()
+	ctx := context.Background()
+	orgID := uuid.New()
+	userID := uuid.New()
+	key := "txn-abc-123"
+
+	req := fin.CreatePaymentRequest{
+		UnitID:         uuid.New(),
+		AmountCents:    10000,
+		IdempotencyKey: &key,
+	}
+
+	first, err := svc.RecordPayment(ctx, orgID, userID, req)
+	require.NoError(t, err)
+
+	second, err := svc.RecordPayment(ctx, orgID, userID, req)
+	require.NoError(t, err)
+
+	assert.Equal(t, first.ID, second.ID, "second call should return the original payment")
+	assert.Len(t, paymentRepo.payments, 1, "only one payment should exist")
+}
+
 func TestRecordPayment_NilIdempotencyKey_AllowsDuplicates(t *testing.T) {
 	svc, _, paymentRepo, _, _, _ := newTestService()
 	ctx := context.Background()
@@ -2508,4 +2577,129 @@ func TestRecordPayment_NilIdempotencyKey_AllowsDuplicates(t *testing.T) {
 
 	assert.NotEqual(t, first.ID, second.ID, "nil key should create separate payments")
 	assert.Len(t, paymentRepo.payments, 2)
+}
+
+// TestCreateAssessment_ComplianceCapsLateFee verifies that when a ComplianceResolver
+// returns a max_late_fee_cents limit, the late fee on the assessment is capped at
+// that value even when the caller provides a higher fee.
+func TestCreateAssessment_ComplianceCapsLateFee(t *testing.T) {
+	assessments := &mockAssessmentRepo{}
+	payments := &mockPaymentRepo{}
+	budgets := &mockBudgetRepo{}
+	funds := &mockFundRepo{}
+	collections := &mockCollectionRepo{}
+	factory := wildcardTestFactory()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	// Use a compliance resolver that returns a fine_limits cap of $25.
+	compliance := &mockComplianceResolver{
+		rules: map[string][]ai.RuleValue{
+			"fine_limits": {
+				{Key: "max_late_fee_cents", ValueType: "integer", Value: json.RawMessage(`2500`)},
+			},
+		},
+	}
+
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, factory, ai.NewNoopPolicyResolver(), compliance, nil, logger, nil)
+	ctx := context.Background()
+	orgID := uuid.New()
+	dueDate := time.Now().Add(30 * 24 * time.Hour)
+	highFee := int64(10000) // $100 late fee
+
+	req := fin.CreateAssessmentRequest{
+		UnitID:       uuid.New(),
+		Description:  "Q1 dues",
+		AmountCents:  50000,
+		DueDate:      dueDate,
+		LateFeeCents: &highFee,
+	}
+
+	result, err := svc.CreateAssessment(ctx, orgID, req)
+	require.NoError(t, err)
+	require.NotNil(t, result.LateFeeCents)
+	assert.Equal(t, int64(2500), *result.LateFeeCents, "late fee should be capped at compliance limit")
+}
+
+// TestCreateFundTransfer_ComplianceBlocksReserveWithdrawal verifies that when a
+// ComplianceResolver returns a min_reserve_balance_cents rule, a fund transfer
+// that would drop the reserve fund below that minimum is rejected.
+func TestCreateFundTransfer_ComplianceBlocksReserveWithdrawal(t *testing.T) {
+	assessments := &mockAssessmentRepo{}
+	payments := &mockPaymentRepo{}
+	budgets := &mockBudgetRepo{}
+	funds := &mockFundRepo{}
+	collections := &mockCollectionRepo{}
+	factory := wildcardTestFactory()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	compliance := &mockComplianceResolver{
+		rules: map[string][]ai.RuleValue{
+			"reserve_study": {
+				{Key: "min_reserve_balance_cents", ValueType: "integer", Value: json.RawMessage(`100000`)},
+			},
+		},
+	}
+
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, factory, ai.NewNoopPolicyResolver(), compliance, nil, logger, nil)
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	// Create a reserve fund with 150000 balance.
+	fromFundID := uuid.New()
+	toFundID := uuid.New()
+	funds.funds = []fin.Fund{
+		{ID: fromFundID, OrgID: orgID, Name: "Reserve", FundType: fin.FundTypeReserve, BalanceCents: 150000},
+		{ID: toFundID, OrgID: orgID, Name: "Operating", FundType: fin.FundTypeOperating, BalanceCents: 50000},
+	}
+
+	// Transfer 60000 from reserve — would leave 90000, below the 100000 minimum.
+	desc := "Emergency transfer"
+	req := fin.CreateFundTransferRequest{
+		FromFundID:  fromFundID,
+		ToFundID:    toFundID,
+		AmountCents: 60000,
+		Description: &desc,
+	}
+
+	_, err := svc.CreateFundTransfer(ctx, orgID, req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "reserve_minimum")
+}
+
+func TestAddCollectionAction_ComplianceBlocksLienWithoutNotice(t *testing.T) {
+	assessments := &mockAssessmentRepo{}
+	payments := &mockPaymentRepo{}
+	budgets := &mockBudgetRepo{}
+	funds := &mockFundRepo{}
+	collections := &mockCollectionRepo{}
+	factory := wildcardTestFactory()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	compliance := &mockComplianceResolver{
+		rules: map[string][]ai.RuleValue{
+			"fine_limits": {
+				{Key: "require_notice_before_lien", ValueType: "boolean", Value: json.RawMessage(`true`)},
+			},
+		},
+	}
+
+	svc := fin.NewFinService(assessments, payments, budgets, funds, collections, nil, factory, ai.NewNoopPolicyResolver(), compliance, nil, logger, nil)
+	ctx := context.Background()
+
+	// Create a collection case with no prior actions.
+	caseID := uuid.New()
+	collections.cases = []fin.CollectionCase{
+		{ID: caseID, OrgID: uuid.New(), UnitID: uuid.New(), Status: fin.CollectionCaseStatusLate},
+	}
+
+	// Attempt to file a lien without a prior notice.
+	notes := "Filing lien"
+	req := fin.CreateCollectionActionRequest{
+		ActionType: string(fin.CollectionActionTypeLienFiled),
+		Notes:      &notes,
+	}
+
+	_, err := svc.AddCollectionAction(ctx, caseID, req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "notice_required")
 }

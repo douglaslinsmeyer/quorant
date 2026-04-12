@@ -37,13 +37,13 @@ func (r *PostgresPaymentRepository) CreatePayment(ctx context.Context, p *Paymen
 	const q = `
 		INSERT INTO payments (
 			org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
-			status, provider_ref, description, paid_at
+			status, provider_ref, description, idempotency_key, paid_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6,
-			$7, $8, $9, $10
+			$7, $8, $9, $10, $11
 		)
 		RETURNING id, org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
-		          status, provider_ref, description, paid_at,
+		          status, provider_ref, description, idempotency_key, paid_at,
 		          voided_by, voided_at, created_at, updated_at`
 
 	row := r.db.QueryRow(ctx, q,
@@ -56,6 +56,7 @@ func (r *PostgresPaymentRepository) CreatePayment(ctx context.Context, p *Paymen
 		p.Status,
 		p.ProviderRef,
 		p.Description,
+		p.IdempotencyKey,
 		p.PaidAt,
 	)
 
@@ -71,7 +72,7 @@ func (r *PostgresPaymentRepository) CreatePayment(ctx context.Context, p *Paymen
 func (r *PostgresPaymentRepository) FindPaymentByID(ctx context.Context, id uuid.UUID) (*Payment, error) {
 	const q = `
 		SELECT id, org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
-		       status, provider_ref, description, paid_at,
+		       status, provider_ref, description, idempotency_key, paid_at,
 		       voided_by, voided_at, created_at, updated_at
 		FROM payments
 		WHERE id = $1`
@@ -92,7 +93,7 @@ func (r *PostgresPaymentRepository) FindPaymentByID(ctx context.Context, id uuid
 func (r *PostgresPaymentRepository) ListPaymentsByOrg(ctx context.Context, orgID uuid.UUID, limit int, afterID *uuid.UUID) ([]Payment, bool, error) {
 	const q = `
 		SELECT id, org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
-		       status, provider_ref, description, paid_at,
+		       status, provider_ref, description, idempotency_key, paid_at,
 		       voided_by, voided_at, created_at, updated_at
 		FROM payments
 		WHERE org_id = $1
@@ -123,7 +124,7 @@ func (r *PostgresPaymentRepository) ListPaymentsByOrg(ctx context.Context, orgID
 func (r *PostgresPaymentRepository) ListPaymentsByUnit(ctx context.Context, unitID uuid.UUID) ([]Payment, error) {
 	const q = `
 		SELECT id, org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
-		       status, provider_ref, description, paid_at,
+		       status, provider_ref, description, idempotency_key, paid_at,
 		       voided_by, voided_at, created_at, updated_at
 		FROM payments
 		WHERE unit_id = $1
@@ -136,6 +137,27 @@ func (r *PostgresPaymentRepository) ListPaymentsByUnit(ctx context.Context, unit
 	defer rows.Close()
 
 	return collectPayments(rows, "ListPaymentsByUnit")
+}
+
+// FindPaymentByIdempotencyKey returns the payment matching the given
+// org-scoped idempotency key, or nil, nil if no match exists.
+func (r *PostgresPaymentRepository) FindPaymentByIdempotencyKey(ctx context.Context, orgID uuid.UUID, key string) (*Payment, error) {
+	const q = `
+		SELECT id, org_id, currency_code, unit_id, user_id, payment_method_id, amount_cents,
+		       status, provider_ref, description, idempotency_key, paid_at,
+		       voided_by, voided_at, created_at, updated_at
+		FROM payments
+		WHERE org_id = $1 AND idempotency_key = $2`
+
+	row := r.db.QueryRow(ctx, q, orgID, key)
+	result, err := scanPayment(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("fin: FindPaymentByIdempotencyKey: %w", err)
+	}
+	return result, nil
 }
 
 // UpdatePaymentStatus updates the status and optionally paid_at for the given
@@ -160,13 +182,13 @@ func (r *PostgresPaymentRepository) UpdatePaymentStatus(ctx context.Context, id 
 func (r *PostgresPaymentRepository) UpdatePaymentVoid(ctx context.Context, id uuid.UUID, voidedBy *uuid.UUID, voidedAt *time.Time) error {
 	const q = `
 		UPDATE payments
-		SET status     = 'void',
-		    voided_by  = $1,
-		    voided_at  = $2,
+		SET status     = $1,
+		    voided_by  = $2,
+		    voided_at  = $3,
 		    updated_at = now()
-		WHERE id = $3`
+		WHERE id = $4`
 
-	_, err := r.db.Exec(ctx, q, voidedBy, voidedAt, id)
+	_, err := r.db.Exec(ctx, q, PaymentStatusVoid, voidedBy, voidedAt, id)
 	if err != nil {
 		return fmt.Errorf("fin: UpdatePaymentVoid: %w", err)
 	}
@@ -312,6 +334,7 @@ func scanPayment(row pgx.Row) (*Payment, error) {
 		&p.Status,
 		&p.ProviderRef,
 		&p.Description,
+		&p.IdempotencyKey,
 		&p.PaidAt,
 		&p.VoidedBy,
 		&p.VoidedAt,
@@ -340,6 +363,7 @@ func collectPayments(rows pgx.Rows, op string) ([]Payment, error) {
 			&p.Status,
 			&p.ProviderRef,
 			&p.Description,
+			&p.IdempotencyKey,
 			&p.PaidAt,
 			&p.VoidedBy,
 			&p.VoidedAt,

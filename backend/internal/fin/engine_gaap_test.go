@@ -101,18 +101,18 @@ func TestGaapEngine_ChartOfAccounts_KeyAccounts(t *testing.T) {
 	}
 
 	// Verify key accounts exist with correct types.
-	assert.Equal(t, "asset", byNumber[1100].Type, "AR should be asset")
-	assert.Equal(t, "asset", byNumber[1105].Type, "Allowance should be asset (contra)")
-	assert.Equal(t, "liability", byNumber[2100].Type, "AP should be liability")
-	assert.Equal(t, "liability", byNumber[2200].Type, "Prepaid Assessments should be liability")
-	assert.Equal(t, "equity", byNumber[3100].Type, "Interfund Transfer Out should be equity")
-	assert.Equal(t, "equity", byNumber[3110].Type, "Interfund Transfer In should be equity")
-	assert.Equal(t, "asset", byNumber[1300].Type, "Due From Other Funds should be asset")
-	assert.Equal(t, "liability", byNumber[2500].Type, "Due To Other Funds should be liability")
-	assert.Equal(t, "asset", byNumber[1400].Type, "Fixed Assets should be asset")
-	assert.Equal(t, "expense", byNumber[5070].Type, "Bad Debt Expense")
-	assert.Equal(t, "expense", byNumber[5220].Type, "Depreciation Expense")
-	assert.Equal(t, "revenue", byNumber[4400].Type, "Insurance Proceeds should be revenue")
+	assert.Equal(t, GLAccountTypeAsset, byNumber[1100].Type, "AR should be asset")
+	assert.Equal(t, GLAccountTypeAsset, byNumber[1105].Type, "Allowance should be asset (contra)")
+	assert.Equal(t, GLAccountTypeLiability, byNumber[2100].Type, "AP should be liability")
+	assert.Equal(t, GLAccountTypeLiability, byNumber[2200].Type, "Prepaid Assessments should be liability")
+	assert.Equal(t, GLAccountTypeEquity, byNumber[3100].Type, "Interfund Transfer Out should be equity")
+	assert.Equal(t, GLAccountTypeEquity, byNumber[3110].Type, "Interfund Transfer In should be equity")
+	assert.Equal(t, GLAccountTypeAsset, byNumber[1300].Type, "Due From Other Funds should be asset")
+	assert.Equal(t, GLAccountTypeLiability, byNumber[2500].Type, "Due To Other Funds should be liability")
+	assert.Equal(t, GLAccountTypeAsset, byNumber[1400].Type, "Fixed Assets should be asset")
+	assert.Equal(t, GLAccountTypeExpense, byNumber[5070].Type, "Bad Debt Expense")
+	assert.Equal(t, GLAccountTypeExpense, byNumber[5220].Type, "Depreciation Expense")
+	assert.Equal(t, GLAccountTypeRevenue, byNumber[4400].Type, "Insurance Proceeds should be revenue")
 }
 
 func TestGaapEngine_ChartOfAccounts_NoDuplicateNumbers(t *testing.T) {
@@ -353,7 +353,7 @@ func TestGaapEngine_RecordTransaction_Payment_Accrual(t *testing.T) {
 	// Fund: payment directive.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "payment", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTxTypePayment, effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(15000), effects.FundTransactions[0].AmountCents)
 
 	// Ledger: payment entry on unit.
@@ -391,7 +391,7 @@ func TestGaapEngine_RecordTransaction_Payment_CashBasis(t *testing.T) {
 	// Fund: revenue directive (not payment — revenue recognized at receipt).
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "revenue", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTxTypeRevenue, effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(15000), effects.FundTransactions[0].AmountCents)
 
 	// Ledger: payment entry on unit.
@@ -550,7 +550,7 @@ func TestGaapEngine_RecordTransaction_Depreciation_WithFundAllocation(t *testing
 	// Fund: depreciation directive for the fund.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "depreciation", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTxTypeDepreciation, effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(8000), effects.FundTransactions[0].AmountCents)
 
 	assert.Empty(t, effects.LedgerEntries)
@@ -587,7 +587,7 @@ func TestGaapEngine_RecordTransaction_LateFee(t *testing.T) {
 	// Fund: late_fee directive.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "late_fee", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTxTypeLateFee, effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(2500), effects.FundTransactions[0].AmountCents)
 
 	// Ledger: late fee entry on unit.
@@ -650,7 +650,7 @@ func TestGaapEngine_RecordTransaction_InterestAccrual(t *testing.T) {
 	// Fund: interest directive.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "interest", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTxTypeInterest, effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(1200), effects.FundTransactions[0].AmountCents)
 
 	// Ledger: charge entry on unit.
@@ -782,7 +782,7 @@ func TestGaapEngine_RecordTransaction_Expense_Accrual_Approved(t *testing.T) {
 	// Fund: expense directive.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "expense", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTxTypeExpense, effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(50000), effects.FundTransactions[0].AmountCents)
 
 	// No ledger entries — expenses don't affect unit balances.
@@ -818,7 +818,7 @@ func TestGaapEngine_RecordTransaction_Expense_Accrual_Paid(t *testing.T) {
 	// Fund: expense directive.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "expense", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTxTypeExpense, effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(50000), effects.FundTransactions[0].AmountCents)
 
 	// No ledger entries.
@@ -854,7 +854,7 @@ func TestGaapEngine_RecordTransaction_Expense_Cash_Paid(t *testing.T) {
 	// Fund: expense directive.
 	require.Len(t, effects.FundTransactions, 1)
 	assert.Equal(t, fundID, effects.FundTransactions[0].FundID)
-	assert.Equal(t, "expense", effects.FundTransactions[0].Type)
+	assert.Equal(t, FundTxTypeExpense, effects.FundTransactions[0].Type)
 	assert.Equal(t, int64(50000), effects.FundTransactions[0].AmountCents)
 
 	// No ledger entries.

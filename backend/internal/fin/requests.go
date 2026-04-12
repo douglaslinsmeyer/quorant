@@ -51,12 +51,13 @@ func (r CreateAssessmentScheduleRequest) Validate() error {
 // CreateAssessmentRequest is the request body for creating a single assessment
 // for a unit.
 type CreateAssessmentRequest struct {
-	UnitID      uuid.UUID  `json:"unit_id"`      // required
-	Description string     `json:"description"`  // required
-	AmountCents int64      `json:"amount_cents"` // required
-	DueDate     time.Time  `json:"due_date"`     // required
-	GraceDays   *int       `json:"grace_days,omitempty"`
-	ScheduleID  *uuid.UUID `json:"schedule_id,omitempty"`
+	UnitID       uuid.UUID  `json:"unit_id"`                 // required
+	Description  string     `json:"description"`             // required
+	AmountCents  int64      `json:"amount_cents"`            // required
+	DueDate      time.Time  `json:"due_date"`                // required
+	GraceDays    *int       `json:"grace_days,omitempty"`
+	ScheduleID   *uuid.UUID `json:"schedule_id,omitempty"`
+	LateFeeCents *int64     `json:"late_fee_cents,omitempty"`
 }
 
 // Validate checks that all required fields are present.
@@ -82,6 +83,7 @@ type CreatePaymentRequest struct {
 	AmountCents     int64      `json:"amount_cents"`       // required, positive
 	PaymentMethodID *uuid.UUID `json:"payment_method_id,omitempty"`
 	Description     *string    `json:"description,omitempty"`
+	IdempotencyKey  *string    `json:"idempotency_key,omitempty"`
 }
 
 // Validate checks that unit_id is set and amount_cents is positive.

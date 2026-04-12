@@ -98,6 +98,7 @@ type Payment struct {
 	Status          PaymentStatus `json:"status"`
 	ProviderRef     *string       `json:"provider_ref,omitempty"`
 	Description     *string    `json:"description,omitempty"`
+	IdempotencyKey  *string    `json:"idempotency_key,omitempty"`
 	PaidAt          *time.Time `json:"paid_at,omitempty"`
 	VoidedBy        *uuid.UUID `json:"voided_by,omitempty"`
 	VoidedAt        *time.Time `json:"voided_at,omitempty"`
@@ -220,11 +221,11 @@ type FundTransaction struct {
 	FundID           uuid.UUID  `json:"fund_id"`
 	OrgID            uuid.UUID  `json:"org_id"`
 	CurrencyCode     string     `json:"currency_code"`
-	TransactionType  string     `json:"transaction_type"`
+	TransactionType  FundTransactionType     `json:"transaction_type"`
 	AmountCents      int64      `json:"amount_cents"`
 	BalanceAfterCents int64     `json:"balance_after_cents"`
 	Description      *string    `json:"description,omitempty"`
-	ReferenceType    *string    `json:"reference_type,omitempty"`
+	ReferenceType    *FundTransactionRefType `json:"reference_type,omitempty"`
 	ReferenceID      *uuid.UUID `json:"reference_id,omitempty"`
 	EffectiveDate    time.Time  `json:"effective_date"`
 	CreatedAt        time.Time  `json:"created_at"`
