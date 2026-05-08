@@ -1,3 +1,6 @@
 bin/
-quorant-api
-quorant-worker
+# Anchor to backend/ root so cmd/quorant-api/ and cmd/quorant-worker/
+# (which contain source + .air.toml) aren't matched.
+/quorant-api
+/quorant-worker
+
