@@ -18,16 +18,23 @@ CREATE TABLE jurisdiction_rules (
     UNIQUE (jurisdiction, rule_category, rule_key, effective_date)
 );
 
+-- Index for active (non-expired) rules. The `expiration_date > now()` filter
+-- can't be in the index predicate (now() is STABLE, not IMMUTABLE), so it is
+-- applied at query time; the partial index covers the common case of rules
+-- with no expiration set.
 CREATE INDEX idx_jurisdiction_rules_active
     ON jurisdiction_rules (jurisdiction, rule_category, rule_key)
-    WHERE expiration_date IS NULL OR expiration_date > now();
+    WHERE expiration_date IS NULL;
 
 CREATE INDEX idx_jurisdiction_rules_jurisdiction
     ON jurisdiction_rules (jurisdiction);
 
-CREATE INDEX idx_jurisdiction_rules_upcoming
-    ON jurisdiction_rules (effective_date)
-    WHERE effective_date > now();
+-- Index on effective_date for finding upcoming (or any-date) rules.
+-- A `WHERE effective_date > now()` predicate can't live in the index (now() is
+-- STABLE, not IMMUTABLE), so this is a regular index and the time comparison
+-- is applied at query time.
+CREATE INDEX idx_jurisdiction_rules_effective_date
+    ON jurisdiction_rules (effective_date);
 
 -- compliance_checks: tenant-scoped audit trail of compliance evaluations.
 CREATE TABLE compliance_checks (

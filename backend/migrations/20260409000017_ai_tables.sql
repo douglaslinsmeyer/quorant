@@ -95,9 +95,13 @@ CREATE INDEX idx_policy_extractions_history
     ON policy_extractions (org_id, policy_key, effective_at DESC);
 
 -- ---------------------------------------------------------------------------
--- policy_resolutions: runtime AI inference log
+-- ai_policy_resolutions: runtime AI inference log for the internal/ai
+-- package. Renamed from policy_resolutions because the certiorari engine in
+-- internal/platform/policy claims that name (see 20260409000029_policy_records).
+-- These are conceptually different: ai_policy_resolutions records every AI
+-- inference attempt; policy_resolutions records certiorari review workflow.
 -- ---------------------------------------------------------------------------
-CREATE TABLE policy_resolutions (
+CREATE TABLE ai_policy_resolutions (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id          UUID NOT NULL REFERENCES organizations(id),
     query           TEXT NOT NULL,
@@ -118,7 +122,7 @@ CREATE TABLE policy_resolutions (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_policy_resolutions_org ON policy_resolutions (org_id, created_at DESC);
-CREATE INDEX idx_policy_resolutions_pending
-    ON policy_resolutions (org_id, resolution_type)
+CREATE INDEX idx_ai_policy_resolutions_org ON ai_policy_resolutions (org_id, created_at DESC);
+CREATE INDEX idx_ai_policy_resolutions_pending
+    ON ai_policy_resolutions (org_id, resolution_type)
     WHERE resolution_type = 'human_escalated' AND decided_at IS NULL;

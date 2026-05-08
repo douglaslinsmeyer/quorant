@@ -18,6 +18,19 @@ services:
       retries: 5
       start_period: 10s
 
+  # ─── Atlas migration runner (profiled — only runs via `make migrate-up`) ──
+  atlas:
+    image: arigaio/atlas:latest
+    profiles: ["tools"]
+    network_mode: service:postgres
+    volumes:
+      - ./backend/migrations:/work/migrations
+      - ./backend/migrations/atlas.hcl:/work/atlas.hcl
+    working_dir: /work
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # ─── Redis 7 ──────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
@@ -115,18 +128,15 @@ services:
     depends_on:
       zitadel-db:
         condition: service_healthy
-    # NOTE: Zitadel uses a distroless image (no shell/wget/curl available).
-    # The HTTP readiness endpoint is http://localhost:8085/debug/ready (returns "ok").
-    # The built-in `zitadel ready` CLI subcommand requires the full server config to
-    # resolve the target host/port, which isn't available in a simple health check.
-    # Zitadel is confirmed healthy when its logs show "server is listening".
-    # A proper health check can be wired in Phase 2 using a curl-enabled init container.
-    healthcheck:
-      test: ["CMD", "/app/zitadel", "ready"]
-      interval: 15s
-      timeout: 10s
-      retries: 20
-      start_period: 60s
+    # NOTE: Zitadel uses a distroless image (no shell/wget/curl available), so we
+    # can't probe http://localhost:8085/debug/ready from inside the container.
+    # The built-in `zitadel ready` CLI subcommand requires the full server config
+    # to resolve the target host/port, which isn't available in a simple
+    # healthcheck. Until a proper probe is wired in (Phase 2: a small init/sidecar
+    # container with curl), we omit the healthcheck entirely. This matters for
+    # `make dev`: `docker compose up --wait` only blocks on services that have
+    # healthchecks, so omitting one keeps the bootstrap pipeline fast. Zitadel
+    # is confirmed running when its logs show "server is listening".
 
 volumes:
   postgres_data:

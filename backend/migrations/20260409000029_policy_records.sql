@@ -34,9 +34,13 @@ CREATE TABLE policy_records (
     )
 );
 
+-- Lookup index by category and active flag. The original predicate
+-- `expiration_date > CURRENT_DATE` can't live in an index (CURRENT_DATE is
+-- STABLE, not IMMUTABLE), so the time check is applied at query time and the
+-- partial index covers the common case of records with no expiration set.
 CREATE INDEX idx_policy_records_lookup
     ON policy_records (category, is_active)
-    WHERE expiration_date IS NULL OR expiration_date > CURRENT_DATE;
+    WHERE expiration_date IS NULL;
 
 CREATE INDEX idx_policy_records_unit
     ON policy_records (unit_id, category)
@@ -73,3 +77,11 @@ CREATE INDEX idx_policy_resolutions_sla
     ON policy_resolutions (review_sla_deadline)
     WHERE review_status IN ('pending_review', 'ai_unavailable')
       AND review_sla_deadline IS NOT NULL;
+
+-- RLS on policy_resolutions (created here, after the table). The bulk RLS
+-- sweep in migration 20 happens before this table exists, so RLS is enabled
+-- alongside creation.
+ALTER TABLE policy_resolutions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE policy_resolutions FORCE ROW LEVEL SECURITY;
+CREATE POLICY policy_resolutions_tenant_isolation ON policy_resolutions
+    USING (org_id = current_setting('app.current_org_id', true)::uuid);

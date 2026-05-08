@@ -79,7 +79,7 @@ func setupPolicyFixture(t *testing.T) policyTestFixture {
 
 	t.Cleanup(func() {
 		cleanCtx := context.Background()
-		pool.Exec(cleanCtx, "DELETE FROM policy_resolutions WHERE org_id = $1", orgID)
+		pool.Exec(cleanCtx, "DELETE FROM ai_policy_resolutions WHERE org_id = $1", orgID)
 		pool.Exec(cleanCtx, "DELETE FROM policy_extractions WHERE org_id = $1", orgID)
 		pool.Exec(cleanCtx, "DELETE FROM governing_documents WHERE org_id = $1", orgID)
 		pool.Exec(cleanCtx, "DELETE FROM documents WHERE org_id = $1", orgID)

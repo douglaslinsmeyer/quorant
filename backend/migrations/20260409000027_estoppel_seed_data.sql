@@ -6,8 +6,6 @@
 -- Uses idempotent INSERT ... WHERE NOT EXISTS patterns so the migration is
 -- safe to re-run.
 
-BEGIN;
-
 -- ─── Jurisdiction Rules: estoppel statutory parameters ────────────────────────
 -- Stored in jurisdiction_rules (platform-managed, no org_id, no RLS) rather
 -- than policy_extractions, which requires org_id NOT NULL and source_doc_id NOT NULL.
@@ -188,5 +186,3 @@ WHERE NOT EXISTS (
     WHERE org_id IS NULL
       AND key = 'estoppel_request'
 );
-
-COMMIT;
