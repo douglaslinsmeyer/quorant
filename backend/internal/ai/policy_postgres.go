@@ -332,7 +332,7 @@ func (r *PostgresPolicyRepository) UpdateExtraction(ctx context.Context, e *Poli
 // CreateResolution inserts a new policy resolution log entry and returns the persisted record.
 func (r *PostgresPolicyRepository) CreateResolution(ctx context.Context, res *PolicyResolution) (*PolicyResolution, error) {
 	const q = `
-		INSERT INTO policy_resolutions (
+		INSERT INTO ai_policy_resolutions (
 			org_id, query, policy_keys, resolution,
 			reasoning, source_passages, confidence,
 			resolution_type, model_version, latency_ms,
@@ -388,7 +388,7 @@ func (r *PostgresPolicyRepository) FindResolutionByID(ctx context.Context, id uu
 		       resolution_type, model_version, latency_ms,
 		       requesting_module, requesting_context,
 		       human_decision, decided_by, decided_at, fed_back, created_at
-		FROM policy_resolutions
+		FROM ai_policy_resolutions
 		WHERE id = $1`
 
 	row := r.pool.QueryRow(ctx, q, id)
@@ -410,7 +410,7 @@ func (r *PostgresPolicyRepository) ListResolutionsByOrg(ctx context.Context, org
 		       resolution_type, model_version, latency_ms,
 		       requesting_module, requesting_context,
 		       human_decision, decided_by, decided_at, fed_back, created_at
-		FROM policy_resolutions
+		FROM ai_policy_resolutions
 		WHERE org_id = $1
 		ORDER BY created_at DESC`
 
@@ -431,7 +431,7 @@ func (r *PostgresPolicyRepository) ListPendingEscalations(ctx context.Context, o
 		       resolution_type, model_version, latency_ms,
 		       requesting_module, requesting_context,
 		       human_decision, decided_by, decided_at, fed_back, created_at
-		FROM policy_resolutions
+		FROM ai_policy_resolutions
 		WHERE org_id = $1
 		  AND resolution_type = 'human_escalated'
 		  AND decided_at IS NULL
@@ -449,7 +449,7 @@ func (r *PostgresPolicyRepository) ListPendingEscalations(ctx context.Context, o
 // UpdateResolution persists changes to an existing policy resolution and returns the updated row.
 func (r *PostgresPolicyRepository) UpdateResolution(ctx context.Context, res *PolicyResolution) (*PolicyResolution, error) {
 	const q = `
-		UPDATE policy_resolutions SET
+		UPDATE ai_policy_resolutions SET
 			query              = $1,
 			policy_keys        = $2,
 			resolution         = $3,

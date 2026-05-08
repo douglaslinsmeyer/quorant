@@ -15,9 +15,12 @@ DROP INDEX IF EXISTS idx_audit_log_resource;
 DROP INDEX IF EXISTS idx_audit_log_action;
 
 -- Step 3: Create partitioned table
+-- Postgres requires UNIQUE constraints on partitioned tables to include the
+-- partitioning column. The composite (event_id, occurred_at) preserves global
+-- uniqueness in practice (gen_random_uuid is collision-resistant).
 CREATE TABLE audit_log (
     id              BIGINT GENERATED ALWAYS AS IDENTITY,
-    event_id        UUID UNIQUE DEFAULT gen_random_uuid(),
+    event_id        UUID NOT NULL DEFAULT gen_random_uuid(),
     org_id          UUID NOT NULL,
     actor_id        UUID NOT NULL,
     impersonator_id UUID,
@@ -29,7 +32,8 @@ CREATE TABLE audit_log (
     after_state     JSONB,
     metadata        JSONB DEFAULT '{}',
     occurred_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (id, occurred_at)
+    PRIMARY KEY (id, occurred_at),
+    UNIQUE (event_id, occurred_at)
 ) PARTITION BY RANGE (occurred_at);
 
 -- Step 4: Create monthly partitions for 2026

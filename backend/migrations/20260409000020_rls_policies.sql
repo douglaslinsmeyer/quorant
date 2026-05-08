@@ -277,9 +277,11 @@ ALTER TABLE policy_extractions FORCE ROW LEVEL SECURITY;
 CREATE POLICY policy_extractions_tenant_isolation ON policy_extractions
     USING (org_id = current_setting('app.current_org_id', true)::uuid);
 
-ALTER TABLE policy_resolutions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE policy_resolutions FORCE ROW LEVEL SECURITY;
-CREATE POLICY policy_resolutions_tenant_isolation ON policy_resolutions
+-- AI inference log (formerly named policy_resolutions; renamed to avoid
+-- collision with the certiorari engine's table created in migration 29).
+ALTER TABLE ai_policy_resolutions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_policy_resolutions FORCE ROW LEVEL SECURITY;
+CREATE POLICY ai_policy_resolutions_tenant_isolation ON ai_policy_resolutions
     USING (org_id = current_setting('app.current_org_id', true)::uuid);
 
 -- ---------------------------------------------------------------------------

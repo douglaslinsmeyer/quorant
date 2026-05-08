@@ -48,9 +48,9 @@ docker-up:
 docker-down:
 	docker compose down
 
-## migrate-up: apply database migrations (placeholder – implemented in Task 12)
+## migrate-up: apply pending database migrations via the compose atlas service
 migrate-up:
-	@echo "TODO: atlas migrate apply"
+	docker compose run --rm atlas migrate apply --env compose
 
 ## migrate-down: roll back database migrations (placeholder – implemented in Task 12)
 migrate-down:

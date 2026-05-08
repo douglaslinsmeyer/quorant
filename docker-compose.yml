@@ -18,6 +18,19 @@ services:
       retries: 5
       start_period: 10s
 
+  # ─── Atlas migration runner (profiled — only runs via `make migrate-up`) ──
+  atlas:
+    image: arigaio/atlas:latest
+    profiles: ["tools"]
+    network_mode: service:postgres
+    volumes:
+      - ./backend/migrations:/work/migrations
+      - ./backend/migrations/atlas.hcl:/work/atlas.hcl
+    working_dir: /work
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # ─── Redis 7 ──────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
